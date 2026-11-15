@@ -8,6 +8,7 @@ import {
   Building2,
   MapPin,
   FileSpreadsheet,
+  FileText,
   Layers,
   Calculator,
   AlertCircle,
@@ -1275,6 +1276,14 @@ export default function ProjectWorkspacePage() {
 
         <div className="flex flex-col gap-2 sm:flex-row">
           <Link
+            href={`/proyek/${project.id}/rekap`}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
+            title="Buka rekap RAB lengkap dan cetak laporan"
+          >
+            <FileText className="h-4 w-4" />
+            Rekap & Cetak PDF
+          </Link>
+          <Link
             href="/master/ahsp"
             className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
           >
@@ -1984,7 +1993,7 @@ export default function ProjectWorkspacePage() {
         style={{ fontFamily: PDF_FONTS[pdfFont].css, fontWeight: 400, color: '#1e293b', fontSize: '9pt', lineHeight: 1.35 }}
       >
         <header style={{ display: 'block', width: '100%', textAlign: 'left', borderBottom: `3px solid ${activePdfTheme.accent}`, padding: '0 0 9px', margin: '0 0 12px' }}>
-          <p style={{ margin: 0, textAlign: 'left', fontSize: '8pt', fontWeight: 700, letterSpacing: '1.2px', color: activePdfTheme.accent }}>JAVAWASTHU CONSTRUCTION</p>
+          <p style={{ margin: 0, textAlign: 'left', fontSize: '8pt', fontWeight: 700, letterSpacing: '1.2px', color: activePdfTheme.accent }}>DAHLIA CONSTRUCTION</p>
           <h1 style={{ margin: '4px 0 2px', textAlign: 'left', fontSize: '17pt', lineHeight: 1.15, fontWeight: 800, color: activePdfTheme.text }}>RENCANA ANGGARAN BIAYA</h1>
           <p style={{ margin: 0, textAlign: 'left', fontSize: '8pt', color: '#64748b' }}>Rincian Anggaran Biaya Proyek</p>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '6px', fontSize: '7.5pt', color: '#64748b' }}>
