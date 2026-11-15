@@ -1,4 +1,5 @@
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import ProjectTabs from '@/components/layout/ProjectTabs';
 
 export default function ProjectLayout({
   children,
@@ -6,11 +7,9 @@ export default function ProjectLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Anda bisa menambahkan sub-header khusus proyek atau breadcrumb di sini jika diperlukan */}
-      <div className="flex-1 flex flex-col">
-        {children}
-      </div>
+    <div className="flex min-h-screen min-w-0 flex-col bg-slate-50">
+      <ProjectTabs />
+      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
     </div>
   );
 }

@@ -32,7 +32,7 @@ export type AppSettings = {
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   id: 'global',
-  company_name: 'JavaWasthu Construction',
+  company_name: 'DAHLIA Construction',
   company_tagline: 'Perencanaan, Estimasi, dan Konstruksi',
   company_logo_url: null,
   company_address: '',
@@ -52,7 +52,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   document_title: 'RENCANA ANGGARAN BIAYA',
   document_subtitle: '',
   document_intro: '',
-  document_footer: 'Dokumen ini dibuat menggunakan sistem estimasi JavaWasthu Construction.',
+  document_footer: 'Dokumen ini dibuat menggunakan sistem estimasi DAHLIA Construction.',
   document_city: '',
   document_signatory_name: '',
   document_signatory_title: '',

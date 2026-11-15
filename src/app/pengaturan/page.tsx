@@ -40,7 +40,7 @@ type AppSettings = {
 
 const DEFAULT_APP_SETTINGS: AppSettings = {
   id: 'global',
-  company_name: 'JavaWasthu Construction',
+  company_name: 'DAHLIA Construction',
   company_tagline: '',
   company_address: '',
   company_phone: '',
@@ -233,7 +233,7 @@ export default function SettingsPage() {
   const exportSettings = () => {
     const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), app_settings: settings }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `backup-pengaturan-javawasthu-${new Date().toISOString().slice(0, 10)}.json`; anchor.click(); URL.revokeObjectURL(url);
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `backup-pengaturan-DAHLIA-${new Date().toISOString().slice(0, 10)}.json`; anchor.click(); URL.revokeObjectURL(url);
   };
 
   const importSettings = async (file?: File) => {
@@ -267,7 +267,7 @@ export default function SettingsPage() {
         <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <Link href="/" className="mb-3 inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-emerald-700"><ArrowLeft className="h-4 w-4"/>Kembali ke Dashboard</Link>
-            <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700"><SettingsIcon className="h-4 w-4"/>JavaWasthu Construction · System Settings</div>
+            <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700"><SettingsIcon className="h-4 w-4"/>DAHLIA Construction · System Settings</div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Pengaturan Aplikasi</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">Pusat identitas perusahaan, standar awal perhitungan RAB, dan format dokumen untuk seluruh proyek.</p>
           </div>
@@ -291,7 +291,7 @@ export default function SettingsPage() {
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 <SectionTitle icon={Building2} title="Identitas Perusahaan" description="Identitas ini menjadi sumber informasi perusahaan untuk kop dan dokumen proyek."/>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="sm:col-span-2"><label className={labelClass}>Nama perusahaan *</label><input className={inputClass} maxLength={255} value={settings.company_name} onChange={(e) => updateField('company_name', e.target.value)} placeholder="JavaWasthu Construction"/></div>
+                  <div className="sm:col-span-2"><label className={labelClass}>Nama perusahaan *</label><input className={inputClass} maxLength={255} value={settings.company_name} onChange={(e) => updateField('company_name', e.target.value)} placeholder="DAHLIA Construction"/></div>
                   <div className="sm:col-span-2"><label className={labelClass}>Tagline</label><input className={inputClass} maxLength={255} value={settings.company_tagline} onChange={(e) => updateField('company_tagline', e.target.value)} placeholder="Perencanaan, Estimasi, dan Konstruksi"/></div>
                   <div className="sm:col-span-2"><label className={labelClass}>Alamat kantor</label><textarea className={inputClass} rows={3} value={settings.company_address} onChange={(e) => updateField('company_address', e.target.value)} placeholder="Alamat lengkap perusahaan"/></div>
                   <div><label className={labelClass}>Nomor telepon / WhatsApp</label><input className={inputClass} value={settings.company_phone} onChange={(e) => updateField('company_phone', e.target.value)} placeholder="08xxxxxxxxxx"/></div>
