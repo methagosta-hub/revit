@@ -87,7 +87,7 @@ async function getRoleWithPermissions(admin: SupabaseClient, roleId: string) {
   const [{ data: role, error: roleError }, { data: grants, error: grantsError }, { data: assignments, error: assignmentsError }] = await Promise.all([
     admin.from('app_roles').select('id, code, name, scope, description, is_system, created_at').eq('id', roleId).maybeSingle(),
     admin.from('role_permissions').select('permission_id').eq('role_id', roleId),
-    admin.from('user_role_assignments').select('id').eq('role_id', roleId),
+    admin.from('user_role_assignments').select('id').eq('role_id', roleId).is('revoked_at', null),
   ]);
   if (roleError || grantsError || assignmentsError) {
     return { error: roleError?.message || grantsError?.message || assignmentsError?.message || 'Gagal membaca role.' };
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
       .order('module')
       .order('name'),
     admin.from('role_permissions').select('role_id, permission_id'),
-    admin.from('user_role_assignments').select('role_id, user_id'),
+    admin.from('user_role_assignments').select('role_id, user_id').is('revoked_at', null),
   ]);
 
   const failed = [rolesResult.error, permissionsResult.error, grantsResult.error, assignmentsResult.error].find(Boolean);
