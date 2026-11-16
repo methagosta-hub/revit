@@ -155,11 +155,12 @@ async function writeAudit(
   recordId: string,
   oldData: Record<string, unknown> | null,
   newData: Record<string, unknown> | null,
+  tableName = 'user_role_assignments',
 ) {
   const { error } = await admin.from('audit_logs').insert({
     actor_id: actorId,
     action,
-    table_name: 'user_role_assignments',
+    table_name: tableName,
     record_id: recordId,
     old_data: oldData,
     new_data: newData,
@@ -327,7 +328,7 @@ export async function POST(request: NextRequest) {
 
   await writeAudit(admin, actorId, 'user.created', newUserId, null, {
     full_name: fullName, email, employee_code: employeeCode, role_assignments: validated.rows,
-  });
+  }, 'user_profiles');
   return NextResponse.json({ success: true, user_id: newUserId }, { status: 201 });
 }
 
@@ -369,7 +370,7 @@ export async function PATCH(request: NextRequest) {
     if (error) return jsonError(`Profil gagal diperbarui: ${error.message}`, 400);
     await writeAudit(admin, actorId, 'user.profile.updated', userId, {
       id: userId, previous_is_active: targetProfile.is_active,
-    }, update);
+    }, update, 'user_profiles');
     return NextResponse.json({ success: true });
   }
 
