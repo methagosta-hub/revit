@@ -8,7 +8,8 @@ export type AppRoleCode =
   | 'warehouse'
   | 'finance'
   | 'hr'
-  | 'admin';
+  | 'admin'
+  | 'external_report_writer';
 
 export type RoleScope = 'company' | 'project' | 'both';
 
