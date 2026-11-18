@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type DragEvent } from 'react';
 import { GripVertical, Layers3, ListTree } from 'lucide-react';
 import RabTable, {
   type RabTableItem,
@@ -191,7 +191,7 @@ export default function RabCategoryBoard({
 
   const dragHandleProps = (state: DragState) => ({
     draggable: canReorder && !savingOrder,
-    onDragStart: (event: React.DragEvent<HTMLDivElement>) => {
+    onDragStart: (event: DragEvent<HTMLDivElement>) => {
       event.stopPropagation();
       if (!canReorder || savingOrder) {
         event.preventDefault();
@@ -202,13 +202,13 @@ export default function RabCategoryBoard({
       event.dataTransfer.setData('text/plain', state.key);
     },
     onDragEnd: () => setDragState(null),
-    onDragOver: (event: React.DragEvent<HTMLDivElement>) => {
+    onDragOver: (event: DragEvent<HTMLDivElement>) => {
       if (!canReorder || !dragState || dragState.level !== state.level || dragState.key === state.key || savingOrder) return;
       if ('parentKey' in state && 'parentKey' in dragState && state.parentKey !== dragState.parentKey) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
     },
-    onDrop: (event: React.DragEvent<HTMLDivElement>) => {
+    onDrop: (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
       event.stopPropagation();
       void handleGroupDrop(state.level, state.key, 'parentKey' in state ? state.parentKey : undefined);
