@@ -58,9 +58,9 @@ export default function ProjectTabs() {
   );
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur print:hidden">
-      <div className="px-4 py-3 sm:px-6">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+    <header className="sticky top-14 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur print:hidden xl:top-0">
+      <div className="min-w-0 px-3 py-2.5 sm:px-4 sm:py-3 xl:px-6">
+        <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2 sm:mb-3">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">
               DAHLIA Construction
@@ -77,7 +77,7 @@ export default function ProjectTabs() {
           </Link>
         </div>
 
-        <nav aria-label="Modul proyek" className="flex items-center gap-2 overflow-x-auto pb-1">
+        <nav aria-label="Modul proyek" className="dahlia-horizontal-tabs flex items-center gap-1.5 pb-1 sm:gap-2">
           <Link
             href={projectBase}
             aria-current={isPlanning ? 'page' : undefined}
@@ -123,7 +123,7 @@ export default function ProjectTabs() {
         </nav>
 
         {isPlanning ? (
-          <nav aria-label="Menu Perencanaan" className="mt-3 flex items-center gap-1 overflow-x-auto border-t border-slate-100 pt-2">
+          <nav aria-label="Menu Perencanaan" className="dahlia-horizontal-tabs mt-2 flex items-center gap-1 border-t border-slate-100 pt-2 sm:mt-3 sm:gap-1.5">
             {visiblePlanningLinks.map((item) => {
               const href = `${projectBase}${item.suffix}`;
               const isActive = item.suffix
