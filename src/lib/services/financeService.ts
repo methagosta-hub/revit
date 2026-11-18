@@ -23,6 +23,7 @@ export async function fetchFinanceProjects(): Promise<FinanceProject[]> {
   const { data, error } = await supabase
     .from('projects')
     .select('id, title, client, total_value')
+    .eq('status', 'DIKERJAKAN')
     .order('title', { ascending: true });
   if (error) fail(error, 'Gagal memuat proyek');
   return (data ?? []).map((row: any) => ({ ...row, total_value: Number(row.total_value ?? 0) }));
