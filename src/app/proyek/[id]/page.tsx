@@ -493,6 +493,9 @@ export default function ProjectWorkspacePage() {
   const [newLocationName, setNewLocationName] = useState('');
   const [creatingLocation, setCreatingLocation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [draggedDivisionId, setDraggedDivisionId] = useState<string | null>(null);
+  const [dropDivisionId, setDropDivisionId] = useState<string | null>(null);
+  const [reorderingDivisions, setReorderingDivisions] = useState(false);
 
   const [divisionDialog, setDivisionDialog] = useState<DivisionDialogState | null>(null);
   const [divisionNameDraft, setDivisionNameDraft] = useState('');
@@ -1092,6 +1095,51 @@ export default function ProjectWorkspacePage() {
     }
   };
 
+  const handleReorderDivisions = async (targetId: string) => {
+    if (!canManageRab || !draggedDivisionId || draggedDivisionId === targetId || reorderingDivisions) return;
+    const current = [...(project?.divisions ?? [])].sort(
+      (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
+    );
+    const fromIndex = current.findIndex((entry) => entry.id === draggedDivisionId);
+    const toIndex = current.findIndex((entry) => entry.id === targetId);
+    if (fromIndex < 0 || toIndex < 0) {
+      setDraggedDivisionId(null);
+      setDropDivisionId(null);
+      return;
+    }
+
+    const [moved] = current.splice(fromIndex, 1);
+    current.splice(toIndex, 0, moved);
+    if (current.every((entry, index) => entry.id === project?.divisions?.[index]?.id)) {
+      setDraggedDivisionId(null);
+      setDropDivisionId(null);
+      return;
+    }
+
+    setReorderingDivisions(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      const results = await Promise.all(
+        current.map((entry, index) =>
+          supabase.from('rab_divisions').update({ sort_order: index + 1 }).eq('id', entry.id),
+        ),
+      );
+      const failed = results.find((result) => result.error);
+      if (failed?.error) throw failed.error;
+      await loadData(true);
+      setSuccessMessage('Urutan menu/lokasi pekerjaan berhasil disimpan.');
+    } catch (error) {
+      console.error('Gagal menyimpan urutan lokasi pekerjaan:', error);
+      setErrorMessage(`Gagal mengurutkan menu/lokasi pekerjaan: ${getErrorMessage(error)}`);
+      await loadData(true);
+    } finally {
+      setDraggedDivisionId(null);
+      setDropDivisionId(null);
+      setReorderingDivisions(false);
+    }
+  };
+
   const openDivisionDialog = async (mode: 'edit' | 'copy' | 'export', division: RABDivision) => {
     if (mode !== 'export' && !canEditRab) { setErrorMessage('Data lokasi RAB terkunci pada status proyek saat ini.'); return; }
     setErrorMessage('');
@@ -1618,13 +1666,42 @@ export default function ProjectWorkspacePage() {
             return (
               <article
                 key={division.id || divisionIndex}
-                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                onDragOver={(event) => {
+                  if (!canManageRab || !draggedDivisionId || draggedDivisionId === division.id || reorderingDivisions) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'move';
+                  setDropDivisionId(division.id);
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  void handleReorderDivisions(division.id);
+                }}
+                className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition ${dropDivisionId === division.id ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-slate-200'} ${draggedDivisionId === division.id ? 'opacity-50' : ''}`}
               >
                 <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold text-white">
-                      {divisionIndex + 1}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {canManageRab && (
+                        <span
+                          draggable={!reorderingDivisions}
+                          onDragStart={(event) => {
+                            if (!canManageRab || reorderingDivisions) { event.preventDefault(); return; }
+                            setDraggedDivisionId(division.id);
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', division.id);
+                          }}
+                          onDragEnd={() => { setDraggedDivisionId(null); setDropDivisionId(null); }}
+                          title="Tarik untuk mengubah urutan menu/lokasi pekerjaan"
+                          aria-label={`Tarik untuk mengurutkan lokasi ${division.name}`}
+                          className="cursor-grab rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 active:cursor-grabbing"
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </span>
+                      )}
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold text-white">
+                        {divisionIndex + 1}
+                      </span>
+                    </div>
                     <div className="min-w-0">
                       <h3 className="truncate text-sm font-bold uppercase tracking-wide text-slate-900">
                         {division.name}
