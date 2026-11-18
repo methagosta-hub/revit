@@ -200,6 +200,8 @@ export default function BkuPage() {
   const [openingCash, setOpeningCash] = useState("0");
   const [openingBank, setOpeningBank] = useState("0");
   const [showExport, setShowExport] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState(() => dateKey(new Date()));
+  const [exportEndDate, setExportEndDate] = useState(() => dateKey(new Date()));
   const [exportTheme, setExportTheme] = useState<string>("emerald");
   const [exportFont, setExportFont] = useState<string>("Inter");
   const [drafts, setDrafts] = useState<Draft[]>([blankDraft()]);
@@ -686,6 +688,10 @@ export default function BkuPage() {
       setPageError(`Pilih tepat ${signatureCount} orang untuk menandatangani PDF.`);
       return;
     }
+    if (!exportStartDate || !exportEndDate || exportStartDate > exportEndDate) {
+      setPageError("Tanggal awal dan tanggal akhir PDF tidak valid. Pastikan tanggal akhir tidak lebih awal dari tanggal awal.");
+      return;
+    }
     const popup = window.open("", "_blank");
     if (!popup) {
       setPageError("Jendela PDF diblokir browser. Izinkan pop-up untuk situs BKU lalu coba kembali.");
@@ -694,7 +700,50 @@ export default function BkuPage() {
     const theme = exportThemes.find((item) => item.id === exportTheme) || exportThemes[0];
     const font = exportFonts.find((item) => item === exportFont) || "Inter";
     const dateFormat = (value: string) => new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(value + "T00:00:00"));
-    const transactionRows = ordered.map((tx) => {
+    const reportTransactions = ordered.filter((tx) =>
+      tx.transaction_date >= exportStartDate && tx.transaction_date <= exportEndDate
+    );
+    let openingCashValue = Number(book.opening_cash || 0);
+    let openingBankValue = Number(book.opening_bank || 0);
+    let closingCashValue = Number(book.opening_cash || 0);
+    let closingBankValue = Number(book.opening_bank || 0);
+    let periodIncoming = 0;
+    let periodOutgoing = 0;
+    for (const tx of ordered) {
+      if (tx.transaction_date < exportStartDate) {
+        const amount = Number(tx.amount || 0);
+        if (tx.transaction_type === "IN") {
+          if (tx.account === "BANK") openingBankValue += amount;
+          else openingCashValue += amount;
+        } else if (tx.transaction_type === "OUT") {
+          if (tx.account === "BANK") openingBankValue -= amount;
+          else openingCashValue -= amount;
+        } else {
+          if (tx.from_account === "BANK") openingBankValue -= amount;
+          else openingCashValue -= amount;
+          if (tx.to_account === "BANK") openingBankValue += amount;
+          else openingCashValue += amount;
+        }
+      }
+      if (tx.transaction_date <= exportEndDate) {
+        const amount = Number(tx.amount || 0);
+        if (tx.transaction_type === "IN") {
+          periodIncoming += tx.transaction_date >= exportStartDate ? amount : 0;
+          if (tx.account === "BANK") closingBankValue += amount;
+          else closingCashValue += amount;
+        } else if (tx.transaction_type === "OUT") {
+          periodOutgoing += tx.transaction_date >= exportStartDate ? amount : 0;
+          if (tx.account === "BANK") closingBankValue -= amount;
+          else closingCashValue -= amount;
+        } else {
+          if (tx.from_account === "BANK") closingBankValue -= amount;
+          else closingCashValue -= amount;
+          if (tx.to_account === "BANK") closingBankValue += amount;
+          else closingCashValue += amount;
+        }
+      }
+    }
+    const transactionRows = reportTransactions.map((tx) => {
       const balance = balances.rows[tx.id];
       const detailRows = (tx.details || []).map((line) =>
         `<div class="line"><span>${escapeHtml(line.name)}</span><span>${money(Number(line.unit_price))} × ${Number(line.volume).toLocaleString("id-ID")} ${escapeHtml(line.unit || "")}</span><strong>${money(Number(line.line_total ?? Number(line.unit_price) * Number(line.volume)))}</strong></div>`
@@ -706,9 +755,11 @@ export default function BkuPage() {
       const method = tx.transaction_type === "TRANSFER" ? `${tx.from_account === "BANK" ? "Bank" : "Tunai"} → ${tx.to_account === "BANK" ? "Bank" : "Tunai"}` : tx.account === "BANK" ? "Bank" : "Tunai";
       return `<tr><td class="nowrap">${dateFormat(tx.transaction_date)}</td><td><strong>${escapeHtml(tx.receipt_number || "—")}</strong><div class="muted">${type} · ${method}${tx.store_name ? " · Toko: " + escapeHtml(tx.store_name) : ""}</div></td><td>${description}</td><td class="num in">${tx.transaction_type === "IN" ? money(Number(tx.amount)) : "—"}</td><td class="num out">${tx.transaction_type === "OUT" ? money(Number(tx.amount)) : "—"}</td><td class="num balance">${money(balance?.total || 0)}</td></tr>`;
     }).join("");
-    const rangeEnd = ordered.length ? ordered[ordered.length - 1].transaction_date : dateKey(new Date());
-    const closingCash = money(balances.cash);
-    const closingBank = money(balances.bank);
+    const rangeEnd = exportEndDate;
+    const openingTotal = money(openingCashValue + openingBankValue);
+    const closingCash = money(closingCashValue);
+    const closingBank = money(closingBankValue);
+    const closingTotal = money(closingCashValue + closingBankValue);
     const signatureNames: Record<string, string> = {
       school_head: "Kepala Sekolah", p2sp: "P2SP", supervisor: "Pengawas", planner: "Perencana",
     };
@@ -740,7 +791,7 @@ export default function BkuPage() {
       </style></head><body>
       <div class="printbar"><button onclick="window.print()">Cetak / Simpan sebagai PDF</button></div>
       <main class="sheet">
-        <header class="top"><div><div class="brand">Dahlia Management System · Buku Kas Eksternal</div><h1 class="title">Laporan Buku Kas Umum</h1><div class="subtitle">Periode ${dateFormat(book.start_date)} – ${dateFormat(rangeEnd)}</div></div><div class="pill">DOKUMEN PEMBUKUAN</div></header>
+        <header class="top"><div><div class="brand">Dahlia Management System · Buku Kas Eksternal</div><h1 class="title">Laporan Buku Kas Umum</h1><div class="subtitle">Periode ${dateFormat(exportStartDate)} – ${dateFormat(rangeEnd)}</div></div><div class="pill">DOKUMEN PEMBUKUAN</div></header>
         <section class="identity">
           <div><span>Nama Sekolah</span><strong>${escapeHtml(book.name)}</strong></div>
           <div><span>NPSN</span><strong>${escapeHtml(book.npsn || "—")}</strong></div>
@@ -753,15 +804,15 @@ export default function BkuPage() {
           <div><span>Tanggal cetak</span><strong>${dateFormat(dateKey(new Date()))}</strong></div>
         </section>
         <section class="summary">
-          <div class="stat"><small>Saldo awal</small><strong>${money(Number(book.opening_cash) + Number(book.opening_bank))}</strong></div>
-          <div class="stat"><small>Total pemasukan</small><strong>${money(balances.incoming)}</strong></div>
-          <div class="stat"><small>Total pengeluaran</small><strong>${money(balances.outgoing)}</strong></div>
-          <div class="stat"><small>Saldo akhir</small><strong>${money(balances.total)}</strong></div>
+          <div class="stat"><small>Saldo awal periode</small><strong>${openingTotal}</strong></div>
+          <div class="stat"><small>Pemasukan periode</small><strong>${money(periodIncoming)}</strong></div>
+          <div class="stat"><small>Pengeluaran periode</small><strong>${money(periodOutgoing)}</strong></div>
+          <div class="stat"><small>Saldo akhir periode</small><strong>${closingTotal}</strong></div>
         </section>
         <div class="section">Rincian transaksi dan nota</div>
         <div class="table-wrap"><table><thead><tr><th style="width:12%">Tanggal</th><th style="width:13%">No. Nota / Jenis</th><th style="width:38%">Uraian / Rincian Material</th><th style="width:12%;text-align:right">Masuk</th><th style="width:12%;text-align:right">Keluar</th><th style="width:13%;text-align:right">Saldo</th></tr></thead><tbody>${transactionRows || '<tr><td colspan="6" style="text-align:center;padding:22px;color:#64748b">Belum ada transaksi pada buku kas ini.</td></tr>'}</tbody></table></div>
         <div class="section">Posisi saldo akhir</div>
-        <section class="closing"><div><small>Saldo tunai</small><strong>${closingCash}</strong></div><div><small>Saldo bank / non-tunai</small><strong>${closingBank}</strong></div><div><small>Total saldo</small><strong>${money(balances.total)}</strong></div></section>
+        <section class="closing"><div><small>Saldo tunai akhir periode</small><strong>${closingCash}</strong></div><div><small>Saldo bank / non-tunai akhir periode</small><strong>${closingBank}</strong></div><div><small>Total saldo akhir periode</small><strong>${closingTotal}</strong></div></section>
         <section class="signatures">${signatureHtml}</section>
         <footer class="foot"><span>BKU Eksternal · Database terpisah</span><span>Dicetak ${dateFormat(dateKey(new Date()))}</span></footer>
       </main></body></html>`;
@@ -870,7 +921,7 @@ export default function BkuPage() {
           <div className="flex flex-wrap gap-2">
             {books.length > 0 && <select value={book?.id || ""} onChange={(e) => setBook(books.find((item) => item.id === e.target.value) || null)} className="h-11 max-w-[240px] rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"><option value="">Pilih buku kas</option>{books.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}
             <button onClick={() => setShowNewBook(true)} className="flex h-11 items-center gap-2 rounded-xl border border-emerald-700 px-4 text-sm font-bold text-emerald-800 hover:bg-emerald-50"><Plus size={17} />Buku kas baru</button>
-            {book && <button onClick={() => setShowExport(true)} className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><Download size={17} />Export PDF</button>}
+            {book && <button onClick={() => { setExportStartDate(book.start_date); setExportEndDate(ordered.reduce((latest, tx) => tx.transaction_date > latest ? tx.transaction_date : latest, dateKey(new Date()))); setShowExport(true); }} className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><Download size={17} />Export PDF</button>}
             {book && <button onClick={() => { setEditingTransactionId(null); setDrafts([blankDraft()]); setShowEntry(true); }} className="flex h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white shadow-sm hover:bg-emerald-800"><Plus size={17} />Catat transaksi</button>}
           </div>
         </div>
@@ -996,6 +1047,19 @@ export default function BkuPage() {
 
       {showExport && book && <Modal title="Export laporan BKU ke PDF" subtitle="Pilih gaya dokumen sebelum mencetak atau menyimpan sebagai PDF." onClose={() => setShowExport(false)}>
         <div className="space-y-4">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
+            <p className="text-sm font-bold text-emerald-900">Periode laporan BKU</p>
+            <p className="mt-1 text-xs leading-5 text-emerald-800">Atur tanggal awal dan tanggal akhir. PDF hanya memuat nota dalam rentang ini, sementara saldo awal dihitung dari transaksi sebelum tanggal awal.</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Field label="Dari tanggal"><input type="date" required value={exportStartDate} max={exportEndDate} onChange={(e) => setExportStartDate(e.target.value)} className={fieldClass}/></Field>
+              <Field label="Sampai tanggal"><input type="date" required value={exportEndDate} min={exportStartDate} onChange={(e) => setExportEndDate(e.target.value)} className={fieldClass}/></Field>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+              <button type="button" onClick={() => {setExportStartDate(book.start_date);setExportEndDate(ordered.reduce((latest, tx) => tx.transaction_date > latest ? tx.transaction_date : latest, dateKey(new Date())));}} className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 font-semibold text-emerald-800">Seluruh periode</button>
+              <button type="button" onClick={() => {const now = new Date();setExportStartDate(dateKey(new Date(now.getFullYear(), now.getMonth(), 1)));setExportEndDate(dateKey(now));}} className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 font-semibold text-emerald-800">Bulan ini</button>
+            </div>
+            <p className="mt-2 text-[11px] text-slate-600">Transaksi yang masuk laporan: {ordered.filter((tx) => tx.transaction_date >= exportStartDate && tx.transaction_date <= exportEndDate).length} nota / transaksi.</p>
+          </div>
           <Field label="Tema dokumen (20 pilihan)"><select value={exportTheme} onChange={(e) => setExportTheme(e.target.value)} className={fieldClass}>{exportThemes.map((theme) => <option key={theme.id} value={theme.id}>{theme.label}</option>)}</select></Field>
           <Field label="Font dokumen (20 pilihan)"><select value={exportFont} onChange={(e) => setExportFont(e.target.value)} className={fieldClass}>{exportFonts.map((font) => <option key={font} value={font}>{font}</option>)}</select></Field>
           <Field label="Jumlah penandatangan"><select value={signatureCount} onChange={(e) => { setSignatureCount(e.target.value); setSignatoryRoles((current) => current.slice(0, Number(e.target.value))); }} className={fieldClass}><option value="1">1 orang</option><option value="2">2 orang</option><option value="3">3 orang</option><option value="4">4 orang</option></select></Field>
