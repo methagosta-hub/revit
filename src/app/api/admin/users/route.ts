@@ -251,13 +251,13 @@ export async function GET(request: NextRequest) {
 
   const [profilesResult, assignmentsResult, rolesResult, projectsResult, authUsersResult] = await Promise.all([
     admin.from('user_profiles')
-      .select('id, employee_code, full_name, phone, avatar_url, is_active, created_at, updated_at')
+      .select('id, employee_code, full_name, phone, avatar_url, is_active, is_demo_user, created_at, updated_at')
       .order('full_name'),
     admin.from('user_role_assignments')
       .select('id, user_id, role_id, project_id, assigned_by, assigned_at, valid_from, valid_until, revoked_at, revoked_by, revocation_reason')
       .order('assigned_at', { ascending: false }),
     admin.from('app_roles').select('id, code, name, scope, description').order('name'),
-    admin.from('projects').select('id, title, status').order('title'),
+    admin.from('projects').select('id, title, status, project_category').order('title'),
     admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
   ]);
   const failed = [profilesResult.error, assignmentsResult.error, rolesResult.error, projectsResult.error, authUsersResult.error].find(Boolean);
@@ -313,6 +313,7 @@ export async function POST(request: NextRequest) {
   const newUserId = created.user.id;
   const { error: profileError } = await admin.from('user_profiles').upsert({
     id: newUserId, full_name: fullName, phone, employee_code: employeeCode, is_active: true,
+    is_demo_user: body.is_demo_user === true,
   }, { onConflict: 'id' });
   if (profileError) {
     await admin.auth.admin.deleteUser(newUserId);
@@ -327,7 +328,7 @@ export async function POST(request: NextRequest) {
   }
 
   await writeAudit(admin, actorId, 'user.created', newUserId, null, {
-    full_name: fullName, email, employee_code: employeeCode, role_assignments: validated.rows,
+    full_name: fullName, email, employee_code: employeeCode, is_demo_user: body.is_demo_user === true, role_assignments: validated.rows,
   }, 'user_profiles');
   return NextResponse.json({ success: true, user_id: newUserId }, { status: 201 });
 }
@@ -344,7 +345,7 @@ export async function PATCH(request: NextRequest) {
   if (!userId) return jsonError('ID pengguna wajib diisi.');
 
   const { data: targetProfile, error: targetError } = await admin.from('user_profiles')
-    .select('id, is_active').eq('id', userId).maybeSingle();
+    .select('id, is_active, is_demo_user').eq('id', userId).maybeSingle();
   if (targetError || !targetProfile) return jsonError('Pengguna tidak ditemukan.', 404);
 
   if (action === 'update_profile') {
