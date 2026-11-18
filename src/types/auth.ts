@@ -19,6 +19,7 @@ export interface UserProfile {
   phone?: string | null;
   avatar_url?: string | null;
   is_active: boolean;
+  is_demo_user?: boolean;
   created_at?: string;
   updated_at?: string;
 }
