@@ -23,8 +23,9 @@ import AhspPickerModal, {
 import RabTable, {
   type RabTableItem,
   type RabItemUpdate,
+  type RabComponentsUpdate,
 } from '@/components/rab/RabTable';
-import { fetchProjectDetail } from '@/lib/services/projectService';
+import { fetchProjectDetail, recalculateProjectTotal } from '@/lib/services/projectService';
 import { generateRABExcel } from '@/lib/excel-generator';
 import { formatRupiah } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
@@ -265,7 +266,6 @@ export default function ProjectWorkspacePage() {
           // Kolom unit tidak disertakan: satuan RAB adalah snapshot terkunci
           // dari Master AHSP ketika item pertama kali dimasukkan.
           volume: changes.volume,
-          unit_price: changes.unit_price,
           total_price: changes.total_price,
         })
         .eq('id', itemId);
@@ -277,6 +277,30 @@ export default function ProjectWorkspacePage() {
     } catch (error) {
       console.error('Gagal memperbarui item RAB:', error);
       setErrorMessage(`Gagal memperbarui item RAB: ${getErrorMessage(error)}`);
+      throw error;
+    }
+  };
+
+  const handleUpdateComponents = async (itemId: string, changes: RabComponentsUpdate) => {
+    try {
+      // Menyimpan hanya snapshot milik item proyek ini; master tidak disentuh.
+      const { error } = await supabase
+        .from('rab_items')
+        .update({
+          components_snapshot: changes.components_snapshot,
+          subitems_snapshot: changes.subitems_snapshot,
+          unit_price: changes.unit_price,
+          total_price: changes.total_price,
+        })
+        .eq('id', itemId);
+
+      if (error) throw error;
+      if (projectId) await recalculateProjectTotal(projectId);
+      await loadData(true);
+      setSuccessMessage('Rincian nama, koefisien, harga komponen, dan komposisi AHSP berhasil disimpan pada snapshot proyek. Master tidak berubah.');
+    } catch (error) {
+      console.error('Gagal memperbarui snapshot komponen RAB:', error);
+      setErrorMessage('Gagal memperbarui komponen AHSP: ' + getErrorMessage(error));
       throw error;
     }
   };
@@ -536,6 +560,7 @@ export default function ProjectWorkspacePage() {
                 <RabTable
                   items={items}
                   onUpdate={handleUpdateItem}
+                  onUpdateComponents={handleUpdateComponents}
                   onDelete={handleDeleteItem}
                 />
               </article>
