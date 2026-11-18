@@ -184,8 +184,8 @@ grant execute on function public.dahlia_project_category_value_access(text) to a
 revoke all on function public.dahlia_project_category_access(uuid) from public, anon;
 grant execute on function public.dahlia_project_category_access(uuid) to authenticated;
 
--- PORTOFOLIO accounts are deliberately read-only. Company administrators
--- retain the ability to prepare and maintain sample projects.
+-- Active signed-in accounts may work only within the category they are assigned:
+-- REGULER accounts work in REGULER; demo accounts work in PORTOFOLIO.
 create or replace function public.dahlia_project_write_access()
 returns boolean
 language sql
@@ -197,7 +197,6 @@ as $dahlia_project_write$
     select 1 from public.user_profiles up
     where up.id = auth.uid()
       and up.is_active = true
-      and (not up.is_demo_user or coalesce(public.is_company_admin(), false))
   );
 $dahlia_project_write$;
 
@@ -509,27 +508,6 @@ begin
     end if;
   end if;
 
-  if v_is_demo then
-    if exists (
-      select 1 from public.app_roles ar
-      where ar.id = new.role_id and ar.scope = 'company'
-    ) then
-      raise exception 'Akun PORTOFOLIO tidak boleh menerima role global perusahaan.' using errcode = '42501';
-    end if;
-    if not exists (
-      select 1
-      from public.role_permissions rp
-      join public.app_permissions ap on ap.id = rp.permission_id
-      where rp.role_id = new.role_id and ap.code like '%.read'
-    ) or exists (
-      select 1
-      from public.role_permissions rp
-      join public.app_permissions ap on ap.id = rp.permission_id
-      where rp.role_id = new.role_id and ap.code not like '%.read'
-    ) then
-      raise exception 'Role akun PORTOFOLIO hanya boleh berisi permission baca-saja dengan akhiran .read.' using errcode = '42501';
-    end if;
-  end if;
   return new;
 end;
 $$;
@@ -600,7 +578,7 @@ begin
     raise exception 'Proyek tidak ditemukan.' using errcode = 'P0002';
   end if;
   if not public.dahlia_project_write_access() then
-    raise exception 'Akun PORTOFOLIO hanya memiliki akses baca. Hubungi administrator perusahaan untuk mengubah data proyek.' using errcode = '42501';
+    raise exception 'Akun ini tidak dapat menulis data pada kategori proyek tersebut.' using errcode = '42501';
   end if;
   if not public.dahlia_has_project_execution_permission(p_project_id, 'project.manage') then
     raise exception 'Tidak memiliki izin mengubah status proyek.' using errcode = '42501';
@@ -672,7 +650,7 @@ begin
     raise exception 'Lokasi RAB tidak ditemukan.' using errcode = 'P0002';
   end if;
   if not public.dahlia_project_write_access() then
-    raise exception 'Akun PORTOFOLIO hanya memiliki akses baca. Administrator perusahaan dapat mengatur RAB sampel.' using errcode = '42501';
+    raise exception 'Akun ini tidak dapat mengubah RAB pada kategori proyek tersebut.' using errcode = '42501';
   end if;
   if not public.dahlia_has_project_execution_permission(v_project_id, 'rab.manage')
      and not public.dahlia_has_project_execution_permission(v_project_id, 'project.manage') then
@@ -816,6 +794,9 @@ begin
   end if;
 
   if v_project_id is null then
+    if not public.dahlia_project_category_value_access('REGULER') then
+      raise exception 'Transaksi tanpa project_id hanya dapat dikelola oleh akun REGULER atau administrator perusahaan.' using errcode = '42501';
+    end if;
     if tg_op = 'DELETE' then return old; end if;
     return new;
   end if;
@@ -932,7 +913,7 @@ begin
     raise exception 'Akun ini tidak dapat mengubah RAB pada kategori proyek tersebut.' using errcode = '42501';
   end if;
   if not public.dahlia_project_write_access() then
-    raise exception 'Akun PORTOFOLIO hanya memiliki akses baca terhadap dokumen sampel.' using errcode = '42501';
+    raise exception 'Akun ini tidak dapat mengubah RAB pada kategori proyek tersebut.' using errcode = '42501';
   end if;
   if not public.dahlia_has_project_execution_permission(v_project_id, 'rab.manage')
      and not public.dahlia_has_project_execution_permission(v_project_id, 'project.manage') then
