@@ -6,6 +6,7 @@ begin
   if to_regclass('public.projects') is null
      or to_regclass('public.user_profiles') is null
      or to_regclass('public.user_role_assignments') is null
+     or to_regclass('public.app_roles') is null
      or to_regclass('public.role_permissions') is null
      or to_regclass('public.app_permissions') is null
      or to_regclass('public.rab_divisions') is null
@@ -806,10 +807,14 @@ create trigger rab_divisions_editable_guard
 before insert or update or delete on public.rab_divisions
 for each row execute function public.dahlia_guard_rab_editable();
 
-drop trigger if exists volume_details_editable_guard on public.volume_details;
-create trigger volume_details_editable_guard
-before insert or update or delete on public.volume_details
-for each row execute function public.dahlia_guard_rab_editable();
+do $install_volume_details_guard$
+begin
+  if to_regclass('public.volume_details') is not null then
+    execute 'drop trigger if exists volume_details_editable_guard on public.volume_details';
+    execute 'create trigger volume_details_editable_guard before insert or update or delete on public.volume_details for each row execute function public.dahlia_guard_rab_editable()';
+  end if;
+end;
+$install_volume_details_guard$;
 
 alter table public.project_status_history enable row level security;
 drop policy if exists project_status_history_read on public.project_status_history;
