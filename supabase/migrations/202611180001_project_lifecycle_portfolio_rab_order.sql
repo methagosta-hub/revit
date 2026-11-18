@@ -41,6 +41,11 @@ alter table public.projects
   add constraint projects_project_category_check
   check (project_category in ('REGULER', 'PORTOFOLIO'));
 
+-- Remove the old three-value CHECK first; otherwise rewriting 'Draft'
+-- to 'DRAFT' would be rejected by the previous constraint.
+alter table public.projects
+  drop constraint if exists projects_status_check;
+
 -- Normalisasi tiga status lama tanpa mengubah proyek yang sudah memiliki
 -- status baru. Nilai yang tidak dikenal dihentikan agar tidak diam-diam hilang.
 do $normalize_status$
@@ -72,9 +77,6 @@ end;
 alter table public.projects
   alter column status set default 'DRAFT',
   alter column status set not null;
-
-alter table public.projects
-  drop constraint if exists projects_status_check;
 
 alter table public.projects
   add constraint projects_status_check
@@ -154,6 +156,10 @@ declare
   v_report_id uuid;
   v_issue_id uuid;
   v_receipt_id uuid;
+  v_request_id uuid;
+  v_payment_transaction_id uuid;
+  v_obligation_id uuid;
+  v_external_report_id uuid;
   v_division_id uuid;
   v_rab_item_id uuid;
 begin
@@ -175,6 +181,10 @@ begin
   v_report_id := nullif(p_row->>'report_id', '')::uuid;
   v_issue_id := nullif(p_row->>'issue_id', '')::uuid;
   v_receipt_id := nullif(p_row->>'receipt_id', '')::uuid;
+  v_request_id := nullif(p_row->>'request_id', '')::uuid;
+  v_payment_transaction_id := nullif(p_row->>'payment_transaction_id', '')::uuid;
+  v_obligation_id := nullif(p_row->>'obligation_id', '')::uuid;
+  v_external_report_id := nullif(p_row->>'report_id', '')::uuid;
   v_division_id := nullif(p_row->>'division_id', '')::uuid;
   v_rab_item_id := nullif(p_row->>'rab_item_id', '')::uuid;
 
@@ -217,6 +227,22 @@ begin
       from public.rab_items ri
       join public.rab_divisions d on d.id = ri.division_id
      where ri.id = v_rab_item_id;
+  end if;
+  if v_project_id is null and v_request_id is not null then
+    select p.project_id into v_project_id
+      from public.subcontract_payment_requests spr
+      join public.execution_segments es on es.id = spr.segment_id
+      join public.project_work_packages p on p.id = es.package_id
+     where spr.id = v_request_id;
+  end if;
+  if v_project_id is null and v_obligation_id is not null then
+    select project_id into v_project_id from public.payment_obligations where id = v_obligation_id;
+  end if;
+  if v_project_id is null and v_payment_transaction_id is not null then
+    select project_id into v_project_id from public.payment_transactions where id = v_payment_transaction_id;
+  end if;
+  if v_project_id is null and v_external_report_id is not null then
+    select project_id into v_project_id from public.external_report_books where id = v_external_report_id;
   end if;
 
   if v_project_id is null then
@@ -268,7 +294,19 @@ declare
     'rab_items',
     'volume_details',
     'user_role_assignments',
-    'finance_recap_documents'
+    'finance_recap_documents',
+    'subcontract_retention_balances',
+    'subcontract_payment_request_progress',
+    'payment_transactions',
+    'payment_transaction_allocations',
+    'payment_audit_logs',
+    'execution_audit_logs',
+    'project_daily_report_photos',
+    'external_report_books',
+    'external_report_ledger_entries',
+    'external_report_wage_snapshots',
+    'external_report_adjustments',
+    'external_report_audit_logs'
   ];
 begin
   foreach v_table in array v_tables loop
@@ -551,6 +589,9 @@ declare
   v_report_id uuid;
   v_issue_id uuid;
   v_receipt_id uuid;
+  v_request_id uuid;
+  v_obligation_id uuid;
+  v_payment_transaction_id uuid;
   v_project public.projects;
 begin
   v_project_id := coalesce(nullif(v_row->>'project_id', '')::uuid, nullif(v_row->>'record_origin_project_id', '')::uuid);
@@ -562,6 +603,9 @@ begin
   v_report_id := nullif(v_row->>'report_id', '')::uuid;
   v_issue_id := nullif(v_row->>'issue_id', '')::uuid;
   v_receipt_id := nullif(v_row->>'receipt_id', '')::uuid;
+  v_request_id := nullif(v_row->>'request_id', '')::uuid;
+  v_obligation_id := nullif(v_row->>'obligation_id', '')::uuid;
+  v_payment_transaction_id := nullif(v_row->>'payment_transaction_id', '')::uuid;
 
   if v_project_id is null and v_package_id is not null and to_regclass('public.project_work_packages') is not null then
     select project_id into v_project_id from public.project_work_packages where id = v_package_id;
@@ -603,6 +647,22 @@ begin
   if v_project_id is null and v_receipt_id is not null
      and to_regclass('public.project_material_receipts') is not null then
     select project_id into v_project_id from public.project_material_receipts where id = v_receipt_id;
+  end if;
+  if v_project_id is null and v_request_id is not null
+     and to_regclass('public.subcontract_payment_requests') is not null then
+    select p.project_id into v_project_id
+      from public.subcontract_payment_requests spr
+      join public.execution_segments es on es.id = spr.segment_id
+      join public.project_work_packages p on p.id = es.package_id
+     where spr.id = v_request_id;
+  end if;
+  if v_project_id is null and v_obligation_id is not null
+     and to_regclass('public.payment_obligations') is not null then
+    select project_id into v_project_id from public.payment_obligations where id = v_obligation_id;
+  end if;
+  if v_project_id is null and v_payment_transaction_id is not null
+     and to_regclass('public.payment_transactions') is not null then
+    select project_id into v_project_id from public.payment_transactions where id = v_payment_transaction_id;
   end if;
 
   if v_project_id is null then
@@ -657,7 +717,15 @@ declare
     'project_daily_report_materials',
     'project_daily_report_equipment',
     'project_material_issue_items',
-    'project_material_receipt_items'
+    'project_material_receipt_items',
+    'subcontract_retention_balances',
+    'subcontract_payment_request_progress',
+    'payment_transactions',
+    'payment_transaction_allocations',
+    'payment_audit_logs',
+    'execution_audit_logs',
+    'project_daily_report_photos',
+    'finance_recap_documents'
   ];
 begin
   foreach v_table in array v_tables loop
@@ -665,7 +733,7 @@ begin
        and exists (
          select 1 from information_schema.columns
          where table_schema='public' and table_name=v_table
-           and column_name in ('project_id','package_id','segment_id','segment_item_id','contract_id','purchase_order_id','report_id','issue_id','receipt_id')
+           and column_name in ('project_id','package_id','segment_id','segment_item_id','contract_id','purchase_order_id','report_id','issue_id','receipt_id','request_id','obligation_id','payment_transaction_id')
        ) then
       execute format('drop trigger if exists %I on public.%I', v_table || '_active_project_guard', v_table);
       execute format(
@@ -691,13 +759,19 @@ declare
   v_old jsonb := case when tg_op = 'UPDATE' then to_jsonb(old) else '{}'::jsonb end;
   v_project_id uuid;
   v_division_id uuid;
+  v_rab_item_id uuid;
   v_project public.projects;
 begin
   if tg_table_name = 'rab_divisions' then
     v_project_id := nullif(v_row->>'project_id', '')::uuid;
-  else
+  elsif tg_table_name = 'rab_items' then
     v_division_id := nullif(v_row->>'division_id', '')::uuid;
     select project_id into v_project_id from public.rab_divisions where id = v_division_id;
+  else
+    v_rab_item_id := nullif(v_row->>'rab_item_id', '')::uuid;
+    select d.project_id into v_project_id
+      from public.rab_items ri join public.rab_divisions d on d.id = ri.division_id
+     where ri.id = v_rab_item_id;
   end if;
 
   if v_project_id is null then
@@ -730,6 +804,11 @@ for each row execute function public.dahlia_guard_rab_editable();
 drop trigger if exists rab_divisions_editable_guard on public.rab_divisions;
 create trigger rab_divisions_editable_guard
 before insert or update or delete on public.rab_divisions
+for each row execute function public.dahlia_guard_rab_editable();
+
+drop trigger if exists volume_details_editable_guard on public.volume_details;
+create trigger volume_details_editable_guard
+before insert or update or delete on public.volume_details
 for each row execute function public.dahlia_guard_rab_editable();
 
 alter table public.project_status_history enable row level security;
