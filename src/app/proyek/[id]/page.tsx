@@ -39,7 +39,7 @@ import { fetchProjectDetail, recalculateProjectTotal } from '@/lib/services/proj
 import { generateRABExcel } from '@/lib/excel-generator';
 import { formatRupiah } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import { useAppAccess } from '@/hooks/useAppAccess';
+import { getMyAccess, hasPermission } from '@/lib/services/authService';
 import type { Project, ProjectCategory } from '@/types/rab';
 
 type RABDivision = {
@@ -497,8 +497,7 @@ export default function ProjectWorkspacePage() {
   const projectId = params?.id;
 
   const [project, setProject] = useState<WorkspaceProject | null>(null);
-  const { loading: accessLoading, hasPermission } = useAppAccess();
-  const canManageRabPermission = Boolean(!accessLoading && projectId && hasPermission('rab.manage', projectId));
+  const [canManageRabPermission, setCanManageRabPermission] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -540,8 +539,9 @@ export default function ProjectWorkspacePage() {
     setErrorMessage('');
 
     try {
-      const data = await fetchProjectDetail(projectId);
+      const [data, access] = await Promise.all([fetchProjectDetail(projectId), getMyAccess()]);
       setProject(data ? (data as unknown as WorkspaceProject) : null);
+      setCanManageRabPermission(hasPermission(access, 'rab.manage', projectId));
     } catch (error) {
       console.error('Gagal memuat detail proyek:', error);
       setProject(null);
