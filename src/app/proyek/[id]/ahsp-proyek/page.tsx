@@ -30,6 +30,7 @@ import { generateRABExcel } from '@/lib/excel-generator';
 import { formatRupiah } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { Project } from '@/types/rab';
+import { getMyAccess, hasPermission } from '@/lib/services/authService';
 
 type RABDivision = {
   id: string;
@@ -60,6 +61,7 @@ export default function ProjectWorkspacePage() {
   const projectId = params?.id;
 
   const [project, setProject] = useState<WorkspaceProject | null>(null);
+  const [canManageRabPermission, setCanManageRabPermission] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -85,8 +87,9 @@ export default function ProjectWorkspacePage() {
     setErrorMessage('');
 
     try {
-      const data = await fetchProjectDetail(projectId);
+      const [data, access] = await Promise.all([fetchProjectDetail(projectId), getMyAccess()]);
       setProject(data ? (data as unknown as WorkspaceProject) : null);
+      setCanManageRabPermission(hasPermission(access, 'rab.manage', projectId));
     } catch (error) {
       console.error('Gagal memuat detail proyek:', error);
       setProject(null);
@@ -102,6 +105,7 @@ export default function ProjectWorkspacePage() {
   }, [loadData]);
 
   const divisions = project?.divisions ?? [];
+  const canEditRab = canManageRabPermission && ['DRAFT', 'REVIEW'].includes(String(project?.status ?? 'DRAFT'));
 
   const divisionTotals = useMemo(
     () =>
@@ -257,6 +261,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleUpdateItem = async (itemId: string, changes: RabItemUpdate) => {
+    if (!canEditRab) throw new Error('Perubahan item RAB hanya tersedia pada status DRAFT atau REVIEW dengan izin rab.manage.');
     try {
       const { error } = await supabase
         .from('rab_items')
@@ -271,9 +276,10 @@ export default function ProjectWorkspacePage() {
         .eq('id', itemId);
 
       if (error) throw error;
+      if (projectId) await recalculateProjectTotal(projectId);
 
       await loadData(true);
-      setSuccessMessage('Item RAB berhasil diperbarui. Snapshot AHSP lainnya tetap tidak berubah.');
+      setSuccessMessage('Item RAB berhasil diperbarui. Harga satuan tetap mengikuti analisa komponen.');
     } catch (error) {
       console.error('Gagal memperbarui item RAB:', error);
       setErrorMessage(`Gagal memperbarui item RAB: ${getErrorMessage(error)}`);
@@ -282,6 +288,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleUpdateComponents = async (itemId: string, changes: RabComponentsUpdate) => {
+    if (!canEditRab) throw new Error('Perubahan komponen RAB hanya tersedia pada status DRAFT atau REVIEW dengan izin rab.manage.');
     try {
       // Menyimpan hanya snapshot milik item proyek ini; master tidak disentuh.
       const { error } = await supabase
@@ -306,6 +313,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleDeleteItem = async (item: RabTableItem) => {
+    if (!canEditRab) throw new Error('Penghapusan item RAB hanya tersedia pada status DRAFT atau REVIEW dengan izin rab.manage.');
     try {
       const { error } = await supabase
         .from('rab_items')
@@ -562,6 +570,7 @@ export default function ProjectWorkspacePage() {
                   onUpdate={handleUpdateItem}
                   onUpdateComponents={handleUpdateComponents}
                   onDelete={handleDeleteItem}
+                  readOnly={!canEditRab}
                 />
               </article>
             );
