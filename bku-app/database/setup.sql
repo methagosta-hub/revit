@@ -166,16 +166,22 @@ drop policy if exists "BKU owners create transactions" on public.bku_transaction
 create policy "BKU owners create transactions" on public.bku_transactions
   for insert to authenticated with check (
     created_by = auth.uid()
-    and exists (select 1 from public.bku_books b where b.id = book_id and b.created_by = auth.uid())
+    and exists (select 1 from public.bku_books b where b.id = bku_transactions.book_id and b.created_by = auth.uid())
+    and (store_id is null or exists (
+      select 1 from public.bku_stores st where st.id = bku_transactions.store_id and st.book_id = bku_transactions.book_id
+    ))
   );
 
 drop policy if exists "BKU owners update transactions" on public.bku_transactions;
 create policy "BKU owners update transactions" on public.bku_transactions
   for update to authenticated using (
-    exists (select 1 from public.bku_books b where b.id = book_id and b.created_by = auth.uid())
+    exists (select 1 from public.bku_books b where b.id = bku_transactions.book_id and b.created_by = auth.uid())
   ) with check (
     created_by = auth.uid()
-    and exists (select 1 from public.bku_books b where b.id = book_id and b.created_by = auth.uid())
+    and exists (select 1 from public.bku_books b where b.id = bku_transactions.book_id and b.created_by = auth.uid())
+    and (store_id is null or exists (
+      select 1 from public.bku_stores st where st.id = bku_transactions.store_id and st.book_id = bku_transactions.book_id
+    ))
   );
 
 drop policy if exists "BKU owners delete transactions" on public.bku_transactions;
@@ -208,6 +214,19 @@ create policy "BKU user delete evidence" on storage.objects
     bucket_id = 'bku-evidence'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- Izin tabel untuk akun aplikasi BKU. RLS tetap membatasi akses per sekolah.
+grant select, insert, update, delete on public.bku_stores to authenticated;
+grant select, insert, update, delete on public.bku_materials to authenticated;
+
+-- Sumber acuan harga:
+-- * Peraturan Bupati Magelang No. 6 Tahun 2026 (standar harga, CFS baja ringan, aluminium, semen):
+--   https://peraturan.bpk.go.id/Download/418689/1787732563-2026pb3308006.pdf
+-- * Median harga dasar nasional dari 11 kota, edisi 16 November 2026:
+--   https://bangun.com/harga-bahan
+-- * Pembanding kisaran pasar bahan bangunan 2026:
+--   https://www.propertyday.id/harga-bahan-bangunan-2026/
+-- Katalog adalah estimasi harga referensi, bukan penawaran toko; cek ulang spesifikasi dan harga lokal.
 -- Master katalog sekitar 200 material umum untuk konstruksi / rehabilitasi sekolah (210 item).
 -- Harga acuan estimasi nasional per November 2026, bukan penawaran vendor.
 -- Sesuaikan merek, ketebalan, mutu, volume, ongkir, pajak, dan lokasi sekolah.
@@ -441,7 +460,12 @@ begin
  v_delta:=p_new_start_date-v_old_start;
  select count(*) into v_moved from public.bku_transactions
  where book_id=p_book_id and transaction_date>=v_old_start;
- update public.bku_transactions set entry_no=entry_no+1000000 where book_id=p_book_id;
+ with numbered as (
+  select id,(1000000000+row_number() over(order by transaction_date,entry_no,created_at,id))::integer as temp_no
+  from public.bku_transactions where book_id=p_book_id
+ )
+ update public.bku_transactions t set entry_no=numbered.temp_no
+ from numbered where t.id=numbered.id;
  update public.bku_transactions set transaction_date=transaction_date+v_delta
  where book_id=p_book_id and transaction_date>=v_old_start;
  with ranked as (
