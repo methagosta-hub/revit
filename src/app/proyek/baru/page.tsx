@@ -21,8 +21,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { fetchAppSettings } from '@/lib/services/appSettingsService';
-
-type ProjectStatus = 'Draft' | 'Review' | 'Final';
+import type { ProjectCategory } from '@/types/rab';
 
 type ProjectForm = {
   title: string;
@@ -33,7 +32,7 @@ type ProjectForm = {
   p2sp_chair_name: string;
   planning_consultant: string;
   supervisory_consultant: string;
-  status: ProjectStatus;
+  project_category: ProjectCategory;
   tax_rate: string;
   profit_margin: string;
 };
@@ -47,7 +46,7 @@ const initialForm: ProjectForm = {
   p2sp_chair_name: '',
   planning_consultant: '',
   supervisory_consultant: '',
-  status: 'Draft',
+  project_category: 'REGULER',
   tax_rate: '11',
   profit_margin: '10',
 };
@@ -108,7 +107,6 @@ export default function ProjectCreatePage() {
           ...current,
           tax_rate: String(appSettings.default_tax_rate ?? 11),
           profit_margin: String(appSettings.default_profit_margin ?? 10),
-          status: appSettings.default_project_status ?? 'Draft',
         }));
       })
       .catch((error) => {
@@ -157,7 +155,8 @@ export default function ProjectCreatePage() {
         p2sp_chair_name: form.p2sp_chair_name.trim() || null,
         planning_consultant: form.planning_consultant.trim() || null,
         supervisory_consultant: form.supervisory_consultant.trim() || null,
-        status: form.status,
+        status: 'DRAFT',
+        project_category: form.project_category,
         total_value: 0,
         tax_rate: taxRate,
         profit_margin: profitMargin,
@@ -379,24 +378,24 @@ export default function ProjectCreatePage() {
               <SectionHeader
                 icon={ClipboardList}
                 step="04"
-                title="Status & Parameter Anggaran"
-                description="Pengaturan awal proyek. Nilai total proyek akan mengikuti akumulasi item pekerjaan pada RAB."
+                title="Kategori Proyek & Parameter Anggaran"
+                description="Pilih REGULER untuk proyek resmi atau PORTOFOLIO untuk simulasi. Proyek baru selalu dimulai dari status DRAFT."
               />
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
-                  <label className={labelClassName} htmlFor="status">Status Proyek</label>
+                  <label className={labelClassName} htmlFor="project_category">Kategori Proyek</label>
                   <select
-                    id="status"
-                    name="status"
+                    id="project_category"
+                    name="project_category"
                     className={inputClassName}
-                    value={form.status}
-                    onChange={(event) => updateField('status', event.target.value as ProjectStatus)}
+                    value={form.project_category}
+                    onChange={(event) => updateField('project_category', event.target.value as ProjectCategory)}
                   >
-                    <option value="Draft">Draft</option>
-                    <option value="Review">Review</option>
-                    <option value="Final">Final</option>
+                    <option value="REGULER">REGULER — proyek resmi perusahaan</option>
+                    <option value="PORTOFOLIO">PORTOFOLIO — simulasi / uji coba</option>
                   </select>
+                  <p className="mt-1.5 text-xs text-slate-500">Proyek baru otomatis dibuat dengan status DRAFT.</p>
                 </div>
 
                 <div>
@@ -483,7 +482,7 @@ export default function ProjectCreatePage() {
               <div className="mt-4 space-y-3">
                 <div className="flex items-center justify-between gap-3 text-xs">
                   <span className="text-slate-500">Status awal</span>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 font-bold text-slate-700">{form.status}</span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 font-bold text-slate-700">{form.project_category}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-xs">
                   <span className="text-slate-500">Pajak</span>
