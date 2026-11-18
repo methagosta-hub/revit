@@ -6,6 +6,10 @@ create extension if not exists pgcrypto;
 create table if not exists public.bku_books (
   id uuid primary key default gen_random_uuid(),
   name text not null check (length(trim(name)) > 0),
+  school_head text not null default '',
+  planner text not null default '',
+  supervisor text not null default '',
+  p2sp text not null default '',
   start_date date not null default current_date,
   opening_cash numeric(15,2) not null default 0 check (opening_cash >= 0),
   opening_bank numeric(15,2) not null default 0 check (opening_bank >= 0),
@@ -27,6 +31,7 @@ create table if not exists public.bku_transactions (
   to_account text check (to_account in ('CASH','BANK')),
   receipt_number text,
   evidence_path text,
+  details jsonb not null default '[]'::jsonb check (jsonb_typeof(details) = 'array'),
   created_by uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
   constraint bku_transaction_day_entry_unique unique (book_id, transaction_date, entry_no),
@@ -36,6 +41,13 @@ create table if not exists public.bku_transactions (
     (transaction_type = 'TRANSFER' and account is null and from_account is not null and to_account is not null and from_account <> to_account)
   )
 );
+
+-- Migrasi aman untuk database BKU yang sudah pernah menjalankan versi awal setup.sql.
+alter table public.bku_books add column if not exists school_head text not null default '';
+alter table public.bku_books add column if not exists planner text not null default '';
+alter table public.bku_books add column if not exists supervisor text not null default '';
+alter table public.bku_books add column if not exists p2sp text not null default '';
+alter table public.bku_transactions add column if not exists details jsonb not null default '[]'::jsonb;
 
 create index if not exists bku_transactions_book_date_idx
   on public.bku_transactions(book_id, transaction_date, created_at, id);
