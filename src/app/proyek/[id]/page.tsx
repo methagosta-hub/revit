@@ -30,11 +30,12 @@ import {
 import AhspPickerModal, {
   type SelectedAhspBatchPayload,
 } from '@/components/rab/AhspPickerModal';
-import RabTable, {
+import {
   type RabTableItem,
   type RabItemUpdate,
   type RabComponentsUpdate,
 } from '@/components/rab/RabTable';
+import RabCategoryBoard from '@/components/rab/RabCategoryBoard';
 import { fetchProjectDetail, recalculateProjectTotal } from '@/lib/services/projectService';
 import { generateRABExcel } from '@/lib/excel-generator';
 import { formatRupiah } from '@/lib/format';
@@ -349,22 +350,22 @@ function getAhspCodeClassification(codeValue: string): AhspCodeClassification {
 }
 
 function buildAhspItemGroups(items: RabTableItem[]): AhspItemGroup[] {
-  // Code determines the label only. Both category sequence and item sequence
-  // follow the saved manual sort_order. Repeated categories remain separate
-  // when another category occurs between their rows.
+  // Setiap item ditempatkan pada kombinasi bidang/divisi/subkategori AHSP.
+  // Urutan kategori mengikuti kemunculan pertama pada sort_order, sedangkan
+  // urutan item di dalam kategori tetap mengikuti sort_order tersimpan.
   const orderedItems = [...items].sort(
     (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
   );
-  const groups: AhspItemGroup[] = [];
+  const groupsByKey = new Map<string, AhspItemGroup>();
 
   for (const item of orderedItems) {
     const classification = getAhspCodeClassification(String(item.code || ''));
-    const previousGroup = groups[groups.length - 1];
-    if (previousGroup?.classification.key === classification.key) {
-      previousGroup.items.push(item);
+    const existing = groupsByKey.get(classification.key);
+    if (existing) {
+      existing.items.push(item);
     } else {
-      groups.push({
-        key: `${classification.key}-${groups.length}`,
+      groupsByKey.set(classification.key, {
+        key: classification.key,
         prefix: classification.prefix,
         classification,
         items: [item],
@@ -372,7 +373,7 @@ function buildAhspItemGroups(items: RabTableItem[]): AhspItemGroup[] {
     }
   }
 
-  return groups;
+  return Array.from(groupsByKey.values());
 }
 
 function getErrorMessage(error: unknown): string {
@@ -1600,7 +1601,7 @@ export default function ProjectWorkspacePage() {
               Tambah Lokasi Pekerjaan
             </button>}
             <span className="text-xs text-slate-400">
-              Buat satu item pekerjaan, lalu gabungkan beberapa AHSP di dalamnya
+              Susun RAB per bidang, kategori, subkategori, dan item. AHSP massal dapat menjadi item terpisah atau subpekerjaan.
             </span>
           </div>
         </div>
@@ -1673,18 +1674,16 @@ export default function ProjectWorkspacePage() {
                 </div>
 
                 {orderedItems.length > 0 ? (
-                  <div className="p-3 sm:p-5">
-                    <RabTable
-                      items={orderedItems}
-                      onUpdate={handleUpdateItem}
-                      onUpdateComponents={handleUpdateComponents}
-                      onDelete={handleDeleteItem}
-                      onVolumeUpdated={() => loadData(true)}
-                      onReorder={(orderedIds) => handleReorderItems(division.id, orderedIds)}
-                      canReorder={canManageRab}
-                      readOnly={!canEditRab}
-                    />
-                  </div>
+                  <RabCategoryBoard
+                    groups={buildAhspItemGroups(orderedItems)}
+                    onUpdate={handleUpdateItem}
+                    onUpdateComponents={handleUpdateComponents}
+                    onDelete={handleDeleteItem}
+                    onVolumeUpdated={() => loadData(true)}
+                    onReorder={(orderedIds) => handleReorderItems(division.id, orderedIds)}
+                    canReorder={canManageRab}
+                    readOnly={!canEditRab}
+                  />
                 ) : (
                   <div className="px-5 py-8 text-center text-sm text-slate-400">
                     Belum ada item AHSP pada lokasi ini.
