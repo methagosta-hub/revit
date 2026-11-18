@@ -573,8 +573,8 @@ export default function BkuPage() {
     setPageError("");
     try {
       const records = [];
-      const resolvedStores = new Map(stores.map((item) => [item.name.toLowerCase(), item]));
-      const resolvedMaterials = new Map(materials.map((item) => [item.name.toLowerCase() + "|" + item.unit, item]));
+      const resolvedStores = new Map<string, SchoolStore>(stores.map((item) => [item.name.toLowerCase(), item] as [string, SchoolStore]));
+      const resolvedMaterials = new Map<string, Material>(materials.map((item) => [item.name.toLowerCase() + "|" + item.unit, item] as [string, Material]));
       const original = editingTransactionId ? transactions.find((tx) => tx.id === editingTransactionId) : null;
       const firstEntryNo = original?.entry_no ?? (ordered.filter((tx) => tx.transaction_date === selectedDate).length + 1);
       for (const [index, draft] of valid.entries()) {
