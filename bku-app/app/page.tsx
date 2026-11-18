@@ -371,49 +371,186 @@ export default function BkuPage() {
     if (!supabase || !session?.user || !bookName.trim()) return;
     setSaving(true);
     setPageError("");
-    const { data, error } = await supabase.from("bku_books").insert({
-      name: bookName.trim(),
-      school_head: schoolHead.trim(),
-      planner: planner.trim(),
-      supervisor: supervisor.trim(),
-      p2sp: p2sp.trim(),
-      address: "",
-      phone: "",
-      npsn: "",
-      start_date: startDate,
-      opening_cash: amountValue(openingCash),
-      opening_bank: amountValue(openingBank),
-      created_by: session.user.id,
-    }).select("id,name,school_head,planner,supervisor,p2sp,address,phone,npsn,start_date,opening_cash,opening_bank").single();
-    setSaving(false);
+    try {
+      const { data, error } = await supabase.from("bku_books").insert({
+        name: bookName.trim(),
+        school_head: schoolHead.trim(),
+        planner: planner.trim(),
+        supervisor: supervisor.trim(),
+        p2sp: p2sp.trim(),
+        address: "",
+        phone: "",
+        npsn: "",
+        start_date: startDate,
+        opening_cash: amountValue(openingCash),
+        opening_bank: amountValue(openingBank),
+        created_by: session.user.id,
+      }).select("id,name,school_head,planner,supervisor,p2sp,address,phone,npsn,start_date,opening_cash,opening_bank").single();
+      if (error) throw error;
+      const created = data as Book;
+      setBooks((current) => [created, ...current]);
+      setBook(created);
+      setTransactions([]);
+      await loadSchoolResources(created.id);
+      setView("calendar");
+      setShowNewBook(false);
+      setBookName("");
+      setSchoolHead("");
+      setPlanner("");
+      setSupervisor("");
+      setP2sp("");
+      setOpeningCash("0");
+      setOpeningBank("0");
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "Buku kas gagal dibuat.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function transactionToDraft(tx: Transaction): Draft {
+    return {
+      transaction_type: tx.transaction_type,
+      category: tx.category,
+      description: tx.description,
+      amount: String(tx.amount),
+      account: tx.account || "CASH",
+      from_account: tx.from_account || "CASH",
+      to_account: tx.to_account || "BANK",
+      receipt_number: tx.receipt_number || "",
+      file: null,
+      store_id: tx.store_id || "",
+      store_name: tx.store_name || "",
+      details: (tx.details || []).length
+        ? (tx.details || []).map((line) => ({
+            material_id: line.material_id || "",
+            name: line.name,
+            unit_price: String(line.unit_price),
+            volume: String(line.volume),
+            unit: line.unit || "pcs",
+          }))
+        : [{ name: "", unit_price: "", volume: "", unit: "pcs", material_id: "" }],
+    };
+  }
+
+  function openEditTransaction(tx: Transaction) {
+    setSelectedDate(tx.transaction_date);
+    setEditingTransactionId(tx.id);
+    setDrafts([transactionToDraft(tx)]);
+    setShowEntry(true);
+  }
+
+  function openCopyTransaction(tx: Transaction) {
+    setCopySource(tx);
+    setCopyTargetDate(tx.transaction_date);
+  }
+
+  async function confirmCopyTransaction() {
+    if (!copySource) return;
+    setSelectedDate(copyTargetDate);
+    setEditingTransactionId(null);
+    setDrafts([transactionToDraft(copySource)]);
+    setShowEntry(true);
+    setCopySource(null);
+  }
+
+  async function deleteTransaction(tx: Transaction) {
+    if (!supabase || !book) return;
+    if (!window.confirm(`Hapus nota ${tx.receipt_number || tx.description}? Tindakan ini tidak dapat dibatalkan.`)) return;
+    const { error } = await supabase.from("bku_transactions").delete().eq("id", tx.id).eq("book_id", book.id);
     if (error) {
       setPageError(error.message);
       return;
     }
-    const created = data as Book;
-    setBooks((current) => [created, ...current]);
-    setBook(created);
-    setTransactions([]);
-    await loadSchoolResources(created.id);
-    setView("calendar");
-    setShowNewBook(false);
-    setBookName("");
-    setSchoolHead("");
-    setPlanner("");
-    setSupervisor("");
-    setP2sp("");
-    setOpeningCash("0");
-    setOpeningBank("0");
+    await loadTransactions(book.id);
+  }
+
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase || !book) return;
+    setSaving(true);
+    setPageError("");
+    try {
+      const update = {
+        name: book.name.trim(),
+        school_head: book.school_head.trim(),
+        planner: book.planner.trim(),
+        supervisor: book.supervisor.trim(),
+        p2sp: book.p2sp.trim(),
+        address: profileAddress.trim(),
+        phone: profilePhone.trim(),
+        npsn: profileNpsn.trim(),
+      };
+      const { data, error } = await supabase.from("bku_books").update(update).eq("id", book.id)
+        .select("id,name,school_head,planner,supervisor,p2sp,address,phone,npsn,start_date,opening_cash,opening_bank").single();
+      if (error) throw error;
+      const updated = data as Book;
+      setBook(updated);
+      setBooks((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setPageError("");
+      setView("calendar");
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "Profil lembaga gagal disimpan.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function shiftProjectStart(targetDate: string) {
+    if (!supabase || !book || targetDate === book.start_date || shiftingSchedule) return;
+    const affected = transactions.filter((tx) => tx.transaction_date >= book.start_date).length;
+    const oldDate = new Date(book.start_date + "T00:00:00Z");
+    const newDate = new Date(targetDate + "T00:00:00Z");
+    const delta = Math.round((newDate.getTime() - oldDate.getTime()) / 86400000);
+    const deltaLabel = `${Math.abs(delta)} hari ${delta >= 0 ? "lebih lambat" : "lebih awal"}`;
+    if (!window.confirm(`Geser tanggal mulai proyek ${deltaLabel}? ${affected} nota pada / setelah ${book.start_date} akan ikut bergeser dengan jumlah hari yang sama. Saldo dan urutan nota akan dihitung ulang.`)) return;
+    setShiftingSchedule(true);
+    setPageError("");
+    try {
+      const { data, error } = await supabase.rpc("bku_shift_project_schedule", {
+        p_book_id: book.id,
+        p_new_start_date: targetDate,
+      });
+      if (error) throw error;
+      const updated = { ...book, start_date: targetDate };
+      setBook(updated);
+      setBooks((current) => current.map((item) => item.id === updated.id ? updated : item));
+      await loadTransactions(book.id);
+      setMonth(new Date(targetDate + "T00:00:00"));
+      setSelectedDate(targetDate);
+      setPageError(`Tanggal mulai dan ${Number(data ?? affected)} nota berhasil digeser.`);
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "Jadwal proyek gagal digeser. Pastikan SQL migrasi terbaru sudah dijalankan.");
+    } finally {
+      setShiftingSchedule(false);
+    }
+  }
+
+  async function updateDraftMaterial(index: number, lineIndex: number, materialId: string) {
+    const material = materials.find((item) => item.id === materialId);
+    setDrafts((current) => current.map((draft, i) => {
+      if (i !== index) return draft;
+      return {
+        ...draft,
+        details: draft.details.map((line, j) => j !== lineIndex ? line : material
+          ? { ...line, material_id: material.id, name: material.name, unit_price: String(material.unit_price), unit: material.unit }
+          : { ...line, material_id: "" }),
+      };
+    }));
   }
 
   async function saveEntries(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !book || !session?.user) return;
+    if (editingTransactionId && drafts.length !== 1) {
+      setPageError("Mode edit hanya untuk satu nota. Simpan satu nota pada satu waktu.");
+      return;
+    }
     const valid = drafts.filter((draft) => draft.transaction_type === "OUT"
       ? draft.details.some((line) => line.name.trim() && parseDecimal(line.unit_price) > 0 && parseDecimal(line.volume) > 0)
       : draft.description.trim() && amountValue(draft.amount) > 0);
     if (!valid.length) {
-      setPageError("Untuk pengeluaran, isi minimal satu rincian material dengan harga satuan dan volume. Untuk pemasukan / transfer, isi uraian dan nominal.");
+      setPageError("Isi minimal satu rincian material untuk nota pengeluaran, atau uraian dan nominal untuk pemasukan / transfer.");
       return;
     }
     const hasIncompleteDetail = valid.some((draft) => draft.transaction_type === "OUT" && draft.details.some((line) =>
@@ -432,9 +569,61 @@ export default function BkuPage() {
     setPageError("");
     try {
       const records = [];
-      const firstEntryNo = ordered.filter((tx) => tx.transaction_date === selectedDate).length + 1;
+      const original = editingTransactionId ? transactions.find((tx) => tx.id === editingTransactionId) : null;
+      const firstEntryNo = original?.entry_no ?? (ordered.filter((tx) => tx.transaction_date === selectedDate).length + 1);
       for (const [index, draft] of valid.entries()) {
-        let evidencePath: string | null = null;
+        let storeId = draft.store_id || null;
+        let storeName = draft.store_name.trim();
+        if (storeId) {
+          storeName = stores.find((item) => item.id === storeId)?.name || storeName;
+        } else if (storeName) {
+          const existingStore = stores.find((item) => item.name.toLowerCase() === storeName.toLowerCase());
+          if (existingStore) {
+            storeId = existingStore.id;
+            storeName = existingStore.name;
+          } else {
+            const { data: newStore, error: storeError } = await supabase.from("bku_stores").insert({
+              book_id: book.id, name: storeName, created_by: session.user.id,
+            }).select("id,book_id,name,address,phone").single();
+            if (storeError) throw storeError;
+            const createdStore = newStore as SchoolStore;
+            setStores((current) => [...current, createdStore].sort((a, b) => a.name.localeCompare(b.name)));
+            storeId = createdStore.id;
+            storeName = createdStore.name;
+          }
+        }
+
+        const detailRows: StoredDetail[] = [];
+        if (draft.transaction_type === "OUT") {
+          for (const line of draft.details.filter((item) => item.name.trim() && parseDecimal(item.unit_price) > 0 && parseDecimal(item.volume) > 0)) {
+            let materialId = line.material_id || null;
+            const matching = materials.find((item) => item.name.toLowerCase() === line.name.trim().toLowerCase() && item.unit === line.unit);
+            if (!materialId && matching) materialId = matching.id;
+            if (!materialId && !matching) {
+              const { data: customMaterial, error: materialError } = await supabase.from("bku_materials").insert({
+                book_id: book.id, category: "Material tambahan", name: line.name.trim(),
+                unit: line.unit.trim() || "pcs", unit_price: parseDecimal(line.unit_price),
+                price_basis: "Harga aktual dari nota", is_seed: false, created_by: session.user.id,
+              }).select("id,book_id,category,name,unit,unit_price,price_basis,is_seed,is_active").single();
+              if (materialError && !materialError.message.toLowerCase().includes("duplicate")) throw materialError;
+              if (customMaterial) {
+                const savedMaterial = customMaterial as Material;
+                materialId = savedMaterial.id;
+                setMaterials((current) => [...current, savedMaterial]);
+              }
+            }
+            detailRows.push({
+              material_id: materialId,
+              name: line.name.trim(),
+              unit_price: parseDecimal(line.unit_price),
+              volume: parseDecimal(line.volume),
+              unit: line.unit.trim() || "pcs",
+              line_total: detailLineTotal(line),
+            });
+          }
+        }
+
+        let evidencePath = original?.evidence_path || null;
         if (draft.file) {
           const safeName = draft.file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
           const path = session.user.id + "/" + book.id + "/" + Date.now() + "-" + safeName;
@@ -451,31 +640,29 @@ export default function BkuPage() {
           transaction_type: draft.transaction_type,
           category: draft.category,
           description: draft.transaction_type === "OUT"
-            ? (draft.description.trim() || draft.details.filter((line) => line.name.trim()).map((line) => line.name.trim()).join(", ").slice(0, 250))
+            ? (draft.description.trim() || detailRows.map((line) => line.name).join(", ").slice(0, 250))
             : draft.description.trim(),
-          amount: draft.transaction_type === "OUT"
-            ? draft.details.reduce((sum, line) => sum + detailLineTotal(line), 0)
-            : amountValue(draft.amount),
-          details: draft.transaction_type === "OUT"
-            ? draft.details.filter((line) => line.name.trim() && parseDecimal(line.unit_price) > 0 && parseDecimal(line.volume) > 0).map((line) => ({
-                name: line.name.trim(),
-                unit_price: parseDecimal(line.unit_price),
-                volume: parseDecimal(line.volume),
-                unit: line.unit.trim(),
-                line_total: detailLineTotal(line),
-              }))
-            : [],
+          amount: draft.transaction_type === "OUT" ? detailRows.reduce((sum, line) => sum + line.line_total, 0) : amountValue(draft.amount),
+          details: detailRows,
           account: draft.transaction_type === "TRANSFER" ? null : draft.account,
           from_account: draft.transaction_type === "TRANSFER" ? draft.from_account : null,
           to_account: draft.transaction_type === "TRANSFER" ? draft.to_account : null,
           receipt_number: draft.receipt_number.trim() || null,
           evidence_path: evidencePath,
-          created_by: session.user.id,
+          store_id: storeId,
+          store_name: storeName,
+          created_by: original?.created_at ? undefined : session.user.id,
         });
       }
-      const { error } = await supabase.from("bku_transactions").insert(records);
-      if (error) throw error;
+      if (editingTransactionId) {
+        const { error } = await supabase.from("bku_transactions").update(records[0]).eq("id", editingTransactionId).eq("book_id", book.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("bku_transactions").insert(records);
+        if (error) throw error;
+      }
       setDrafts([blankDraft()]);
+      setEditingTransactionId(null);
       setShowEntry(false);
       await loadTransactions(book.id);
     } catch (error) {
