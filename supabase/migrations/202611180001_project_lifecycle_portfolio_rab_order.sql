@@ -503,7 +503,7 @@ begin
 
   if new.project_id is not null then
     select project_category into v_category from public.projects where id = new.project_id;
-    if v_category is distinct from case when v_is_demo then 'PORTOFOLIO' else 'REGULER' end then
+    if v_category is distinct from (case when v_is_demo then 'PORTOFOLIO'::text else 'REGULER'::text end) then
       raise exception 'Penugasan akun hanya boleh menggunakan kategori proyek yang sesuai dengan jenis akunnya.' using errcode = '42501';
     end if;
   end if;
