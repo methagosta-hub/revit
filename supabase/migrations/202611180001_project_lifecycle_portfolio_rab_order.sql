@@ -15,6 +15,9 @@ begin
   if to_regprocedure('public.dahlia_role_assignment_is_effective(date,date,timestamptz)') is null then
     raise exception 'Helper dahlia_role_assignment_is_effective belum tersedia. Jalankan migration akses pengguna terlebih dahulu.';
   end if;
+  if to_regprocedure('public.is_company_admin()') is null then
+    raise exception 'Fungsi is_company_admin belum tersedia. Pastikan modul pengelolaan pengguna sudah terpasang.';
+  end if;
 end;
 $preflight$;
 
@@ -104,7 +107,10 @@ as $$
     from public.user_profiles up
     where up.id = auth.uid()
       and up.is_active = true
-      and p_project_category = case when up.is_demo_user then 'PORTOFOLIO' else 'REGULER' end
+      and (
+        p_project_category = case when up.is_demo_user then 'PORTOFOLIO' else 'REGULER' end
+        or coalesce(public.is_company_admin(), false)
+      )
   );
 $$;
 
