@@ -297,7 +297,8 @@ export default function BkuPage() {
     setPageError("");
     try {
       const records = [];
-      for (const draft of valid) {
+      const firstEntryNo = ordered.filter((tx) => tx.transaction_date === selectedDate).length + 1;
+      for (const [index, draft] of valid.entries()) {
         let evidencePath: string | null = null;
         if (draft.file) {
           const safeName = draft.file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
