@@ -740,6 +740,7 @@ declare
     'material_issues',
     'goods_receipts',
     'payment_obligations',
+    'payroll_cost_allocations',
     'project_work_packages',
     'project_work_package_items',
     'execution_segments',
@@ -873,3 +874,5 @@ create policy project_status_history_read
     public.dahlia_has_project_execution_permission(project_id, 'project.read')
     or public.dahlia_has_project_execution_permission(project_id, 'project.manage')
   );
+
+grant select on public.project_status_history to authenticated;
