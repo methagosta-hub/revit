@@ -1627,7 +1627,7 @@ export default function ProjectWorkspacePage() {
                         {division.name}
                       </h3>
                       <p className="mt-0.5 text-xs text-slate-500">
-                        {workItemCount} item pekerjaan · {items.length} AHSP
+                        {workItemCount} item pekerjaan · {orderedItems.length} AHSP
                       </p>
                     </div>
                   </div>
