@@ -93,9 +93,9 @@ function AssignmentFields({ value, onChange, roles, projects, isDemoUser = false
     </label>
     <label className={LABEL}>Cakupan penugasan
       <select value={value.project_id} onChange={(e) => onChange({ project_id: e.target.value })}
-        disabled={!role || role.scope === 'company'} required={!!role && role.scope === 'project'} className={INPUT}>
+        disabled={!role || role.scope === 'company'} required={isDemoUser || (!!role && role.scope === 'project')} className={INPUT}>
         {role?.scope === 'company' ? <option value="">Seluruh perusahaan</option> : null}
-        {role?.scope === 'both' ? <option value="">Seluruh perusahaan (global)</option> : null}
+        {role?.scope === 'both' && !isDemoUser ? <option value="">Seluruh perusahaan (global)</option> : null}
         {role?.scope === 'project' ? <option value="">Pilih proyek</option> : null}
         {projects.filter((project) => (project.project_category ?? 'REGULER') === (isDemoUser ? 'PORTOFOLIO' : 'REGULER')).map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}
       </select>
