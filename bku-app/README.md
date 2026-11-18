@@ -34,3 +34,8 @@ Jalankan database/setup.sql di SQL Editor pada proyek Supabase BKU baru. File te
 
 ## Pembaruan skema database
 Jika database BKU sudah menjalankan versi setup.sql sebelumnya, jalankan kembali file database/setup.sql terbaru. Migrasi menggunakan ADD COLUMN IF NOT EXISTS sehingga menambahkan kolom identitas sekolah dan rincian nota tanpa menghapus transaksi yang sudah ada.
+
+## Pembaruan database terbaru
+Jalankan ulang `database/setup.sql` pada proyek Supabase BKU. Selain migrasi profil, file ini membuat tabel toko per sekolah, katalog material master dan custom per sekolah, menambahkan relasi toko pada transaksi, menambahkan RPC untuk menggeser jadwal, serta mengisi 210 harga referensi material. Perubahan bersifat idempotent untuk migrasi kolom, kebijakan, dan seed katalog.
+
+Harga katalog adalah estimasi acuan nasional per November 2026, bukan quotation toko. Harga perlu dicek ulang sesuai kota, spesifikasi, merek, volume, ongkos kirim, serta perlakuan pajak sebelum dipakai untuk RAB atau pembelian.
