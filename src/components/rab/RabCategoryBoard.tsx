@@ -138,6 +138,9 @@ export default function RabCategoryBoard({
     setSavingOrder(true);
     try {
       await onReorder(orderedIds);
+    } catch (error) {
+      // Parent menampilkan pesan kegagalan dan memuat ulang susunan yang tersimpan.
+      console.error('Gagal menyimpan urutan kategori RAB:', error);
     } finally {
       setSavingOrder(false);
       setDragState(null);
