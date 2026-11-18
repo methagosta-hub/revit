@@ -123,7 +123,7 @@ export async function fetchDailyAssignmentPageData(): Promise<DailyAssignmentPag
     supabase.from('employees')
       .select('id, employee_number, full_name, department, position_title, employment_type, status')
       .order('full_name'),
-    supabase.from('projects').select('id, title, client').order('title'),
+    supabase.from('projects').select('id, title, client').eq('status', 'DIKERJAKAN').order('title'),
     supabase.from('rab_divisions').select('id, project_id, name, code, sort_order')
       .order('sort_order', { ascending: true }),
   ]);
