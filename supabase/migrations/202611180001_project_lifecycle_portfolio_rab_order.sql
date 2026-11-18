@@ -208,6 +208,7 @@ as $$
 declare
   v_project public.projects;
   v_new_status text := upper(trim(coalesce(p_new_status, '')));
+  v_old_status text;
   v_allowed boolean := false;
 begin
   select * into v_project
@@ -241,6 +242,7 @@ begin
   if v_project.status = v_new_status then
     return v_project;
   end if;
+  v_old_status := v_project.status;
 
   update public.projects
      set status = v_new_status,
@@ -249,24 +251,7 @@ begin
    returning * into v_project;
 
   insert into public.project_status_history(project_id, old_status, new_status, reason, changed_by)
-  values (p_project_id, (select status from public.projects where id = p_project_id) /* overwritten below */, v_new_status, nullif(trim(coalesce(p_reason, '')), ''), auth.uid());
-
-  -- Correct old_status using the prior locked row value.
-  update public.project_status_history
-     set old_status = case v_new_status when v_new_status then
-       (case v_new_status
-          when 'REVIEW' then 'DRAFT'
-          when 'FINAL RAB' then 'REVIEW'
-          when 'DIKERJAKAN' then 'FINAL RAB'
-          when 'SELESAI' then 'DIKERJAKAN'
-          else null
-        end)
-       else null end
-   where id = (
-     select id from public.project_status_history
-      where project_id = p_project_id and changed_by is not distinct from auth.uid()
-      order by changed_at desc limit 1
-   );
+  values (p_project_id, v_old_status, v_new_status, nullif(trim(coalesce(p_reason, '')), ''), auth.uid());
 
   return v_project;
 end;
@@ -307,7 +292,7 @@ begin
   if p_item_ids is null or cardinality(p_item_ids) = 0 then
     raise exception 'Daftar item urutan RAB tidak boleh kosong.' using errcode = '22023';
   end if;
-  if cardinality(p_item_ids) <> (select count(distinct item_id) from unnest(p_item_ids) as item_id) then
+  if cardinality(p_item_ids) <> (select count(distinct x) from unnest(p_item_ids) as t(x)) then
     raise exception 'Daftar item urutan RAB mengandung ID ganda.' using errcode = '22023';
   end if;
 
