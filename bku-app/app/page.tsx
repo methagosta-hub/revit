@@ -139,7 +139,8 @@ const exportFonts = [
   "Space Grotesk", "Urbanist", "Mulish", "Figtree", "IBM Plex Sans",
 ] as const;
 const parseDecimal = (value: string) => Number(value.trim().replace(",", ".")) || 0;
-const detailLineTotal = (line: DetailLine) => Math.round(parseDecimal(line.unit_price) * parseDecimal(line.volume));
+const parseUnitPrice = (value: string) => Number(value.trim().replace(/\\./g, "").replace(",", ".")) || 0;
+const detailLineTotal = (line: DetailLine) => Math.round(parseUnitPrice(line.unit_price) * parseDecimal(line.volume));
 const draftDetailsTotal = (draft: Draft) => draft.details.reduce((sum, line) => sum + detailLineTotal(line), 0);
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => {
   const replacements: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -546,7 +547,7 @@ export default function BkuPage() {
       return;
     }
     const valid = drafts.filter((draft) => draft.transaction_type === "OUT"
-      ? draft.details.some((line) => line.name.trim() && parseDecimal(line.unit_price) > 0 && parseDecimal(line.volume) > 0)
+      ? draft.details.some((line) => line.name.trim() && parseUnitPrice(line.unit_price) > 0 && parseDecimal(line.volume) > 0)
       : draft.description.trim() && amountValue(draft.amount) > 0);
     if (!valid.length) {
       setPageError("Isi minimal satu rincian material untuk nota pengeluaran, atau uraian dan nominal untuk pemasukan / transfer.");
@@ -554,7 +555,7 @@ export default function BkuPage() {
     }
     const hasIncompleteDetail = valid.some((draft) => draft.transaction_type === "OUT" && draft.details.some((line) =>
       (line.name.trim() || line.unit_price.trim() || line.volume.trim()) &&
-      (!line.name.trim() || parseDecimal(line.unit_price) <= 0 || parseDecimal(line.volume) <= 0)
+      (!line.name.trim() || parseUnitPrice(line.unit_price) <= 0 || parseDecimal(line.volume) <= 0)
     ));
     if (hasIncompleteDetail) {
       setPageError("Lengkapi nama material, harga satuan, dan volume pada setiap baris nota yang digunakan.");
@@ -572,6 +573,8 @@ export default function BkuPage() {
     setPageError("");
     try {
       const records = [];
+      const resolvedStores = new Map(stores.map((item) => [item.name.toLowerCase(), item]));
+      const resolvedMaterials = new Map(materials.map((item) => [item.name.toLowerCase() + "|" + item.unit, item]));
       const original = editingTransactionId ? transactions.find((tx) => tx.id === editingTransactionId) : null;
       const firstEntryNo = original?.entry_no ?? (ordered.filter((tx) => tx.transaction_date === selectedDate).length + 1);
       for (const [index, draft] of valid.entries()) {
@@ -580,7 +583,7 @@ export default function BkuPage() {
         if (storeId) {
           storeName = stores.find((item) => item.id === storeId)?.name || storeName;
         } else if (storeName) {
-          const existingStore = stores.find((item) => item.name.toLowerCase() === storeName.toLowerCase());
+          const existingStore = resolvedStores.get(storeName.toLowerCase());
           if (existingStore) {
             storeId = existingStore.id;
             storeName = existingStore.name;
@@ -590,7 +593,8 @@ export default function BkuPage() {
             }).select("id,book_id,name,address,phone").single();
             if (storeError) throw storeError;
             const createdStore = newStore as SchoolStore;
-            setStores((current) => [...current, createdStore].sort((a, b) => a.name.localeCompare(b.name)));
+            resolvedStores.set(createdStore.name.toLowerCase(), createdStore);
+            setStores((current) => current.some((item) => item.id === createdStore.id) ? current : [...current, createdStore].sort((a, b) => a.name.localeCompare(b.name)));
             storeId = createdStore.id;
             storeName = createdStore.name;
           }
@@ -600,25 +604,26 @@ export default function BkuPage() {
         if (draft.transaction_type === "OUT") {
           for (const line of draft.details.filter((item) => item.name.trim() && parseDecimal(item.unit_price) > 0 && parseDecimal(item.volume) > 0)) {
             let materialId = line.material_id || null;
-            const matching = materials.find((item) => item.name.toLowerCase() === line.name.trim().toLowerCase() && item.unit === line.unit);
+            const matching = resolvedMaterials.get(line.name.trim().toLowerCase() + "|" + line.unit);
             if (!materialId && matching) materialId = matching.id;
             if (!materialId && !matching) {
               const { data: customMaterial, error: materialError } = await supabase.from("bku_materials").insert({
                 book_id: book.id, category: "Material tambahan", name: line.name.trim(),
-                unit: line.unit.trim() || "pcs", unit_price: parseDecimal(line.unit_price),
+                unit: line.unit.trim() || "pcs", unit_price: parseUnitPrice(line.unit_price),
                 price_basis: "Harga aktual dari nota", is_seed: false, created_by: session.user.id,
               }).select("id,book_id,category,name,unit,unit_price,price_basis,is_seed,is_active").single();
               if (materialError && !materialError.message.toLowerCase().includes("duplicate")) throw materialError;
               if (customMaterial) {
                 const savedMaterial = customMaterial as Material;
                 materialId = savedMaterial.id;
-                setMaterials((current) => [...current, savedMaterial]);
+                resolvedMaterials.set(savedMaterial.name.toLowerCase() + "|" + savedMaterial.unit, savedMaterial);
+                setMaterials((current) => current.some((item) => item.id === savedMaterial.id) ? current : [...current, savedMaterial]);
               }
             }
             detailRows.push({
               material_id: materialId,
               name: line.name.trim(),
-              unit_price: parseDecimal(line.unit_price),
+              unit_price: parseUnitPrice(line.unit_price),
               volume: parseDecimal(line.volume),
               unit: line.unit.trim() || "pcs",
               line_total: detailLineTotal(line),
