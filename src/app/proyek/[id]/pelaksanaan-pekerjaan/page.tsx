@@ -248,7 +248,7 @@ function ProjectExecutionContent() {
       setData(workspace);
       setSelectedPackageId((current) => current && workspace.packages.some((p) => p.id === current)
         ? current : workspace.packages[0]?.id ?? '');
-      const manage = hasPermission(access, 'project.manage', projectId);
+      const manage = workspace.project.status === 'DIKERJAKAN' && hasPermission(access, 'project.manage', projectId);
       const canPayDetails = hasPermission(access, 'payroll.read')
         || hasPermission(access, 'execution.payment.read')
         || hasPermission(access, 'execution.payment.manage');
