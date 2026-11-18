@@ -17,6 +17,7 @@ create table if not exists public.bku_transactions (
   id uuid primary key default gen_random_uuid(),
   book_id uuid not null references public.bku_books(id) on delete cascade,
   transaction_date date not null,
+  entry_no integer not null check (entry_no >= 1),
   transaction_type text not null check (transaction_type in ('IN','OUT','TRANSFER')),
   category text not null,
   description text not null check (length(trim(description)) > 0),
@@ -28,6 +29,7 @@ create table if not exists public.bku_transactions (
   evidence_path text,
   created_by uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
+  constraint bku_transaction_day_entry_unique unique (book_id, transaction_date, entry_no),
   constraint bku_transaction_account_shape check (
     (transaction_type in ('IN','OUT') and account is not null and from_account is null and to_account is null)
     or
