@@ -1,1 +1,69 @@
 @import "tailwindcss";
+
+/* Workspace scales with available viewport width without browser zoom. */
+:root {
+  font-size: clamp(14px, calc(13.5px + 0.13vw), 16px);
+  color-scheme: light;
+}
+
+@media (max-width: 1279px) {
+  :root {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1600px) {
+  :root {
+    font-size: 16px;
+  }
+}
+
+html {
+  min-width: 320px;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  overflow-x: hidden;
+}
+
+#dahlia-main {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#dahlia-main > main {
+  width: 100%;
+  max-width: min(100%, 112rem);
+  margin-inline: auto;
+}
+
+/* Horizontal project tabs stay accessible on touch screens and hide their
+   scrollbar without disabling swipe / trackpad scrolling. */
+.dahlia-horizontal-tabs {
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.dahlia-horizontal-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
