@@ -430,8 +430,11 @@ function CompanyDashboardContent() {
 
 
 export default function CompanyDashboardPage() {
+  // Dashboard hanya memerlukan sesi aktif. Daftar proyek dan seluruh angka
+  // tetap mengikuti RLS, sehingga akun PORTOFOLIO hanya melihat proyek sampel
+  // yang memang ditugaskan kepadanya.
   return (
-    <RequireAuth permission="company.dashboard.read">
+    <RequireAuth>
       <CompanyDashboardContent />
     </RequireAuth>
   );
