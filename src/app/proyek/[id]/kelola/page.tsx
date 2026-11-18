@@ -20,6 +20,7 @@ import {
   AlertCircle,
   ExternalLink,
   ListOrdered,
+  History,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatRupiah } from '@/lib/format';
@@ -44,6 +45,8 @@ type ProjectForm = {
   tax_rate: string;
   profit_margin: string;
 };
+
+type ProjectStatusHistoryRow = { id: string; old_status: string | null; new_status: ProjectStatus; reason: string | null; changed_by: string | null; changed_at: string };
 
 type DivisionFormRow = {
   id?: string;
@@ -136,22 +139,30 @@ export default function DetailEditProyekPage() {
   const [nextStatus, setNextStatus] = useState<ProjectStatus>('DRAFT');
   const [statusReason, setStatusReason] = useState('');
   const [changingStatus, setChangingStatus] = useState(false);
+  const [statusHistory, setStatusHistory] = useState<ProjectStatusHistoryRow[]>([]);
 
   const loadData = useCallback(async () => {
     if (!projectId) return;
     setLoading(true);
     setLoadError('');
     try {
-      const [projectResult, divisionResult] = await Promise.all([
+      const [projectResult, divisionResult, historyResult] = await Promise.all([
         supabase.from('projects').select('*').eq('id', projectId).single(),
         supabase
           .from('rab_divisions')
           .select('id, project_id, code, name, sort_order, items:rab_items(id, total_price)')
           .eq('project_id', projectId)
           .order('sort_order', { ascending: true }),
+        supabase.from('project_status_history')
+          .select('id, old_status, new_status, reason, changed_by, changed_at')
+          .eq('project_id', projectId)
+          .order('changed_at', { ascending: false })
+          .limit(20),
       ]);
       if (projectResult.error) throw projectResult.error;
       if (divisionResult.error) throw divisionResult.error;
+      if (historyResult.error && !['42501', '42P01', 'PGRST205'].includes(historyResult.error.code ?? '')) throw historyResult.error;
+      setStatusHistory((historyResult.data ?? []) as ProjectStatusHistoryRow[]);
 
       const project = projectResult.data as ProjectRow;
       setForm({
@@ -409,6 +420,31 @@ export default function DetailEditProyekPage() {
               {changingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               {changingStatus ? 'Mengubah status...' : 'Simpan Perubahan Status'}
             </button>
+          </div>
+          <div className="mt-5 border-t border-emerald-100 pt-4">
+            <div className="mb-3 flex items-center gap-2">
+              <History className="h-4 w-4 text-emerald-700" />
+              <h3 className="text-sm font-bold text-slate-900">Riwayat Perubahan Status</h3>
+            </div>
+            {statusHistory.length ? (
+              <ol className="space-y-3">
+                {statusHistory.map((entry) => (
+                  <li key={entry.id} className="flex gap-3 text-xs">
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <strong className="text-slate-800">{entry.old_status || 'PROYEK BARU'} → {entry.new_status}</strong>
+                        <span className="text-slate-400">{formatDate(entry.changed_at)}</span>
+                      </div>
+                      {entry.reason ? <p className="mt-1 text-slate-600">{entry.reason}</p> : null}
+                      {entry.changed_by ? <p className="mt-1 text-[10px] text-slate-400">Aktor: {entry.changed_by}</p> : null}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="text-xs text-slate-500">Belum ada riwayat perpindahan status, atau riwayat tidak dapat dibaca oleh akun ini.</p>
+            )}
           </div>
         </section>
 
