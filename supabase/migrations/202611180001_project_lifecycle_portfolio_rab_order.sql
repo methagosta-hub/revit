@@ -289,6 +289,9 @@ begin
      and not public.dahlia_has_project_execution_permission(v_project_id, 'project.manage') then
     raise exception 'Tidak memiliki izin mengubah urutan kategori RAB.' using errcode = '42501';
   end if;
+  if not exists (select 1 from public.projects where id = v_project_id and status in ('DRAFT', 'REVIEW', 'FINAL RAB')) then
+    raise exception 'Urutan kategori RAB hanya dapat diubah sebelum proyek masuk tahap DIKERJAKAN.' using errcode = '23514';
+  end if;
   if p_item_ids is null or cardinality(p_item_ids) = 0 then
     raise exception 'Daftar item urutan RAB tidak boleh kosong.' using errcode = '22023';
   end if;
@@ -331,30 +334,71 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $$
+as $
 declare
+  v_row jsonb := case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;
   v_project_id uuid;
+  v_package_id uuid;
+  v_segment_id uuid;
+  v_segment_item_id uuid;
+  v_contract_id uuid;
+  v_purchase_order_id uuid;
   v_project public.projects;
 begin
-  v_project_id := nullif(to_jsonb(new)->>'project_id', '')::uuid;
+  v_project_id := nullif(v_row->>'project_id', '')::uuid;
+  v_package_id := nullif(v_row->>'package_id', '')::uuid;
+  v_segment_id := nullif(v_row->>'segment_id', '')::uuid;
+  v_segment_item_id := nullif(v_row->>'segment_item_id', '')::uuid;
+  v_contract_id := nullif(v_row->>'contract_id', '')::uuid;
+  v_purchase_order_id := nullif(v_row->>'purchase_order_id', '')::uuid;
+
+  if v_project_id is null and v_package_id is not null and to_regclass('public.project_work_packages') is not null then
+    select project_id into v_project_id from public.project_work_packages where id = v_package_id;
+  end if;
+  if v_project_id is null and v_segment_id is not null
+     and to_regclass('public.execution_segments') is not null
+     and to_regclass('public.project_work_packages') is not null then
+    select p.project_id into v_project_id
+      from public.execution_segments es
+      join public.project_work_packages p on p.id = es.package_id
+     where es.id = v_segment_id;
+  end if;
+  if v_project_id is null and v_segment_item_id is not null
+     and to_regclass('public.execution_segment_items') is not null
+     and to_regclass('public.execution_segments') is not null
+     and to_regclass('public.project_work_packages') is not null then
+    select p.project_id into v_project_id
+      from public.execution_segment_items esi
+      join public.execution_segments es on es.id = esi.segment_id
+      join public.project_work_packages p on p.id = es.package_id
+     where esi.id = v_segment_item_id;
+  end if;
+  if v_project_id is null and v_contract_id is not null
+     and to_regclass('public.execution_contract_register') is not null then
+    select project_id into v_project_id from public.execution_contract_register where id = v_contract_id;
+  end if;
+  if v_project_id is null and v_purchase_order_id is not null
+     and to_regclass('public.project_purchase_orders') is not null then
+    select project_id into v_project_id from public.project_purchase_orders where id = v_purchase_order_id;
+  end if;
+
   if v_project_id is null then
-    return new;
+    return case when tg_op = 'DELETE' then old else new end;
   end if;
 
   select * into v_project from public.projects where id = v_project_id;
   if v_project.id is null then
     raise exception 'Proyek transaksi tidak ditemukan.' using errcode = '23503';
   end if;
-
   if not public.dahlia_project_category_access(v_project_id) then
     raise exception 'Akun ini tidak dapat menulis transaksi pada kategori proyek tersebut.' using errcode = '42501';
   end if;
   if v_project.status <> 'DIKERJAKAN' then
-    raise exception 'Transaksi baru hanya diperbolehkan untuk proyek berstatus DIKERJAKAN. Status sekarang: %.', v_project.status using errcode = '23514';
+    raise exception 'Perubahan transaksi proyek hanya diperbolehkan saat status DIKERJAKAN. Status sekarang: %.', v_project.status using errcode = '23514';
   end if;
-  return new;
+  return case when tg_op = 'DELETE' then old else new end;
 end;
-$$;
+$;
 
 do $install_transaction_guards$
 declare
@@ -370,18 +414,29 @@ declare
     'project_material_usages',
     'material_issues',
     'goods_receipts',
-    'payment_obligations'
+    'payment_obligations',
+    'project_work_packages',
+    'project_work_package_items',
+    'execution_segments',
+    'execution_segment_items',
+    'execution_progress_entries',
+    'execution_change_orders',
+    'execution_contract_register',
+    'execution_contract_documents',
+    'subcontract_payment_terms',
+    'subcontract_payment_requests'
   ];
 begin
   foreach v_table in array v_tables loop
     if to_regclass(format('public.%I', v_table)) is not null
        and exists (
          select 1 from information_schema.columns
-         where table_schema='public' and table_name=v_table and column_name='project_id'
+         where table_schema='public' and table_name=v_table
+           and column_name in ('project_id','package_id','segment_id','segment_item_id','contract_id','purchase_order_id')
        ) then
       execute format('drop trigger if exists %I on public.%I', v_table || '_active_project_guard', v_table);
       execute format(
-        'create trigger %I before insert on public.%I for each row execute function public.dahlia_guard_active_project_transaction()',
+        'create trigger %I before insert or update or delete on public.%I for each row execute function public.dahlia_guard_active_project_transaction()',
         v_table || '_active_project_guard',
         v_table
       );
@@ -389,6 +444,59 @@ begin
   end loop;
 end;
 $install_transaction_guards$;
+
+-- RAB can be edited during DRAFT/REVIEW. After FINAL RAB, only category ordering
+-- remains editable so the approved baseline values are not accidentally changed.
+create or replace function public.dahlia_guard_rab_editable()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+declare
+  v_row jsonb := case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;
+  v_old jsonb := case when tg_op = 'UPDATE' then to_jsonb(old) else '{}'::jsonb end;
+  v_project_id uuid;
+  v_division_id uuid;
+  v_project public.projects;
+begin
+  if tg_table_name = 'rab_divisions' then
+    v_project_id := nullif(v_row->>'project_id', '')::uuid;
+  else
+    v_division_id := nullif(v_row->>'division_id', '')::uuid;
+    select project_id into v_project_id from public.rab_divisions where id = v_division_id;
+  end if;
+
+  if v_project_id is null then
+    raise exception 'Proyek untuk data RAB tidak ditemukan.' using errcode = '23503';
+  end if;
+  if not public.dahlia_project_category_access(v_project_id) then
+    raise exception 'Akun ini tidak dapat mengubah RAB pada kategori proyek tersebut.' using errcode = '42501';
+  end if;
+  select * into v_project from public.projects where id = v_project_id;
+
+  if v_project.status in ('DRAFT', 'REVIEW') then
+    return case when tg_op = 'DELETE' then old else new end;
+  end if;
+
+  if v_project.status = 'FINAL RAB' and tg_op = 'UPDATE'
+     and (v_row - 'sort_order') = (v_old - 'sort_order') then
+    return new;
+  end if;
+
+  raise exception 'RAB terkunci pada status %. Kembalikan status ke REVIEW untuk mengubah isi RAB.', v_project.status using errcode = '23514';
+end;
+$;
+
+drop trigger if exists rab_items_editable_guard on public.rab_items;
+create trigger rab_items_editable_guard
+before insert or update or delete on public.rab_items
+for each row execute function public.dahlia_guard_rab_editable();
+
+drop trigger if exists rab_divisions_editable_guard on public.rab_divisions;
+create trigger rab_divisions_editable_guard
+before insert or update or delete on public.rab_divisions
+for each row execute function public.dahlia_guard_rab_editable();
 
 alter table public.project_status_history enable row level security;
 drop policy if exists project_status_history_read on public.project_status_history;
