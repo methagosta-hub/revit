@@ -43,6 +43,7 @@ type CurveProject = {
   client?: string | null;
   location?: string | null;
   status?: string | null;
+  project_category?: 'REGULER' | 'PORTOFOLIO';
   total_value?: number | string | null;
   school_npsn?: string | null;
   principal_name?: string | null;
@@ -619,6 +620,9 @@ export default function CurvaSRencanaPage() {
       </div>
 
       <section id="curva-s-print" aria-label="Rencana waktu pelaksanaan" className="hidden">
+        {project.project_category === 'PORTOFOLIO' && (
+          <div className="curve-portfolio-watermark" aria-hidden="true">LAPORAN DUMMY/SAMPEL</div>
+        )}
         <header className="curve-report-heading">
           <div className="curve-report-title">
             <strong>DAHLIA CONSTRUCTION</strong>
@@ -835,6 +839,7 @@ export default function CurvaSRencanaPage() {
         .curve-signature-block span { margin-top: .7mm; font-size: 5.8pt; }
         @page { size: A4 landscape; margin: 10mm; }
         #curva-s-print { display: none; }
+        .curve-portfolio-watermark { display:none; }
 
         @media print {
           html, body {
@@ -854,6 +859,7 @@ export default function CurvaSRencanaPage() {
           #curva-s-screen { display: none !important; }
           #curva-s-print,
           #curva-s-print * { visibility: visible !important; }
+          .curve-portfolio-watermark { display:block!important; position:fixed!important; z-index:9999!important; top:43%!important; left:0!important; width:100%!important; transform:rotate(-32deg)!important; color:#9f1239!important; opacity:.14!important; font-size:30pt!important; font-weight:900!important; letter-spacing:4px!important; text-align:center!important; white-space:nowrap!important; pointer-events:none!important; }
           #curva-s-print {
             display: block !important;
             position: relative !important;
