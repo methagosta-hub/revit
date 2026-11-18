@@ -75,7 +75,7 @@ export async function fetchPayrollWorkspace(): Promise<PayrollWorkspace> {
     supabase.from('subcontract_retention_balances')
       .select('id, request_id, segment_id, retention_amount, released_amount, release_due_date, status, segment:execution_segments(segment_number, subcontractor:subcontractors(legal_name), package:project_work_packages(package_name, project:projects(title)))')
       .order('created_at', { ascending: false }),
-    supabase.from('projects').select('id, title').order('title'),
+    supabase.from('projects').select('id, title').eq('status', 'DIKERJAKAN').order('title'),
     supabase.from('project_work_packages').select('id, project_id, package_name').order('package_name'),
     supabase.from('payroll_cost_allocations')
       .select('id, payroll_line_id, project_id, package_id, amount, notes, status, created_at, project:projects(title), package:project_work_packages(package_name)')
