@@ -23,6 +23,7 @@ import {
 import { fetchProjects } from '@/lib/services/projectService';
 import { formatRupiah } from '@/lib/format';
 import RequireAuth from '@/components/auth/RequireAuth';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 type DashboardProject = {
   id: string;
@@ -124,6 +125,8 @@ const quickLinks = [
 ];
 
 function CompanyDashboardContent() {
+  const { access } = useAuth();
+  const isPortfolioAccount = access?.profile?.is_demo_user === true;
   const [projects, setProjects] = useState<DashboardProject[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -185,7 +188,7 @@ function CompanyDashboardContent() {
               DAHLIA Construction
             </div>
             <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-              Dashboard Perusahaan
+              {isPortfolioAccount ? 'Dashboard Portofolio' : 'Dashboard Perusahaan'}
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-slate-500">
               Ringkasan proyek dan akses cepat ke aktivitas operasional perusahaan.
@@ -201,6 +204,7 @@ function CompanyDashboardContent() {
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               Segarkan
             </button>
+            {!isPortfolioAccount ? (
             <Link
               href="/proyek/baru"
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
@@ -208,6 +212,7 @@ function CompanyDashboardContent() {
               <Plus className="h-4 w-4" />
               Buat Proyek
             </Link>
+            ) : null}
           </div>
         </header>
 
@@ -340,7 +345,7 @@ function CompanyDashboardContent() {
                 <p className="mt-1 text-xs text-slate-500">
                   {search ? 'Coba kata kunci lain.' : 'Buat proyek pertama untuk mulai menggunakan ruang kerja perusahaan.'}
                 </p>
-                {!search ? (
+                {!search && !isPortfolioAccount ? (
                   <Link href="/proyek/baru" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800">
                     <Plus className="h-3.5 w-3.5" /> Buat Proyek
                   </Link>
@@ -350,6 +355,7 @@ function CompanyDashboardContent() {
           </div>
 
           <aside className="space-y-5">
+            {!isPortfolioAccount ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4">
                 <h2 className="font-bold text-slate-900">Akses Operasional</h2>
@@ -377,6 +383,7 @@ function CompanyDashboardContent() {
                 })}
               </div>
             </div>
+            ) : null}
 
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex items-center gap-2">
@@ -420,7 +427,7 @@ function CompanyDashboardContent() {
         </section>
 
         <footer className="flex flex-col gap-2 border-t border-slate-200 pt-4 text-[11px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-          <span>DAHLIA Construction · Company Management Hub</span>
+          <span>{isPortfolioAccount ? 'DAHLIA Construction · PORTOFOLIO' : 'DAHLIA Construction · Company Management Hub'}</span>
           <span>Ringkasan berdasarkan data proyek dan nilai RAB yang tersimpan.</span>
         </footer>
       </div>
