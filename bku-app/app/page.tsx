@@ -674,6 +674,10 @@ export default function BkuPage() {
 
   function exportBkuPdf() {
     if (!book) return;
+    if (signatoryRoles.length !== Number(signatureCount)) {
+      setPageError(`Pilih tepat ${signatureCount} orang untuk menandatangani PDF.`);
+      return;
+    }
     const popup = window.open("", "_blank");
     if (!popup) {
       setPageError("Jendela PDF diblokir browser. Izinkan pop-up untuk situs BKU lalu coba kembali.");
@@ -697,6 +701,15 @@ export default function BkuPage() {
     const rangeEnd = ordered.length ? ordered[ordered.length - 1].transaction_date : dateKey(new Date());
     const closingCash = money(balances.cash);
     const closingBank = money(balances.bank);
+    const signatureNames: Record<string, string> = {
+      school_head: "Kepala Sekolah", p2sp: "P2SP", supervisor: "Pengawas", planner: "Perencana",
+    };
+    const signaturePeople: Record<string, string> = {
+      school_head: book.school_head, p2sp: book.p2sp, supervisor: book.supervisor, planner: book.planner,
+    };
+    const signatureHtml = signatoryRoles.map((role) =>
+      `<div><strong>${signatureNames[role]}</strong><div class="line-sign">${escapeHtml(signaturePeople[role] || "Nama & tanda tangan")}</div></div>`
+    ).join("");
     const html = `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Laporan BKU - ${escapeHtml(book.name)}</title>
       <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
       <link href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(font).replace(/%20/g, "+")}:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -711,7 +724,7 @@ export default function BkuPage() {
         .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:15px 0}.stat{background:${theme.soft};border:1px solid ${theme.border};border-radius:9px;padding:10px}.stat small{display:block;color:#64748b;font-size:8px}.stat strong{display:block;color:${theme.primary};font-size:12px;margin-top:3px}
         .section{margin:17px 0 8px;font-size:12px;font-weight:800;color:${theme.primary}}.table-wrap{width:100%}table{width:100%;border-collapse:collapse;font-size:8.5px}thead{display:table-header-group}th{background:${theme.primary};color:#fff;text-align:left;padding:8px 6px;font-size:8px;text-transform:uppercase;letter-spacing:.3px}td{border-bottom:1px solid ${theme.border};padding:7px 6px;vertical-align:top}tbody tr:nth-child(even){background:${theme.soft}}.nowrap{white-space:nowrap}.num{text-align:right;white-space:nowrap;font-weight:700}.in{color:#047857}.out{color:#be123c}.balance{color:${theme.primary}}.muted{color:#64748b;font-size:7.5px;margin-top:2px}.desc{font-weight:600}.line{display:grid;grid-template-columns:minmax(90px,1fr) auto auto;gap:6px;padding:2px 0;border-bottom:1px dotted ${theme.border}}.line:last-child{border:0}.line span:nth-child(2){color:#64748b;font-size:7.5px}.line strong{white-space:nowrap;font-size:8px}
         .closing{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px}.closing div{border:1px solid ${theme.border};border-radius:8px;padding:9px}.closing small{display:block;color:#64748b}.closing strong{display:block;margin-top:3px;color:${theme.primary};font-size:11px}
-        .signatures{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:34px;text-align:center;font-size:8.5px}.signatures div{min-height:64px}.signatures .line-sign{margin-top:42px;border-top:1px solid #94a3b8;padding-top:5px}
+        .signatures{display:grid;grid-template-columns:repeat(${signatoryRoles.length},minmax(0,1fr));gap:16px;margin-top:34px;text-align:center;font-size:8.5px}.signatures div{min-height:64px}.signatures .line-sign{margin-top:42px;border-top:1px solid #94a3b8;padding-top:5px}
         .foot{margin-top:20px;border-top:1px solid ${theme.border};padding-top:8px;color:#64748b;font-size:8px;display:flex;justify-content:space-between}
         .printbar{display:flex;justify-content:flex-end;max-width:210mm;margin:12px auto}.printbar button{border:0;border-radius:8px;padding:10px 16px;background:${theme.primary};color:white;font-weight:700;cursor:pointer}
         @media print{body{background:#fff}.sheet{max-width:none;margin:0;padding:0;box-shadow:none}.printbar{display:none}tr,.stat,.closing div,.identity{break-inside:avoid}.section{break-after:avoid}}
@@ -738,7 +751,7 @@ export default function BkuPage() {
         <div class="table-wrap"><table><thead><tr><th style="width:12%">Tanggal</th><th style="width:13%">No. Nota / Jenis</th><th style="width:38%">Uraian / Rincian Material</th><th style="width:12%;text-align:right">Masuk</th><th style="width:12%;text-align:right">Keluar</th><th style="width:13%;text-align:right">Saldo</th></tr></thead><tbody>${transactionRows || '<tr><td colspan="6" style="text-align:center;padding:22px;color:#64748b">Belum ada transaksi pada buku kas ini.</td></tr>'}</tbody></table></div>
         <div class="section">Posisi saldo akhir</div>
         <section class="closing"><div><small>Saldo tunai</small><strong>${closingCash}</strong></div><div><small>Saldo bank / non-tunai</small><strong>${closingBank}</strong></div><div><small>Total saldo</small><strong>${money(balances.total)}</strong></div></section>
-        <section class="signatures"><div><strong>Mengetahui,<br>Kepala Sekolah</strong><div class="line-sign">${escapeHtml(book.school_head || "Nama & tanda tangan")}</div></div><div><strong>Perencana</strong><div class="line-sign">${escapeHtml(book.planner || "Nama & tanda tangan")}</div></div><div><strong>Pengawas</strong><div class="line-sign">${escapeHtml(book.supervisor || "Nama & tanda tangan")}</div></div><div><strong>P2SP</strong><div class="line-sign">${escapeHtml(book.p2sp || "Nama & tanda tangan")}</div></div></section>
+        <section class="signatures">${signatureHtml}</section>
         <footer class="foot"><span>BKU Eksternal · Database terpisah</span><span>Dicetak ${dateFormat(dateKey(new Date()))}</span></footer>
       </main></body></html>`;
     popup.document.open();
@@ -954,6 +967,20 @@ export default function BkuPage() {
         <div className="space-y-4">
           <Field label="Tema dokumen (20 pilihan)"><select value={exportTheme} onChange={(e) => setExportTheme(e.target.value)} className={fieldClass}>{exportThemes.map((theme) => <option key={theme.id} value={theme.id}>{theme.label}</option>)}</select></Field>
           <Field label="Font dokumen (20 pilihan)"><select value={exportFont} onChange={(e) => setExportFont(e.target.value)} className={fieldClass}>{exportFonts.map((font) => <option key={font} value={font}>{font}</option>)}</select></Field>
+          <Field label="Jumlah penandatangan"><select value={signatureCount} onChange={(e) => { setSignatureCount(e.target.value); setSignatoryRoles((current) => current.slice(0, Number(e.target.value))); }} className={fieldClass}><option value="1">1 orang</option><option value="2">2 orang</option><option value="3">3 orang</option><option value="4">4 orang</option></select></Field>
+          <div className="rounded-xl border border-slate-200 p-3">
+            <p className="text-xs font-bold text-slate-700">Pilih pihak yang menandatangani (tepat {signatureCount} orang)</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {([{id:"school_head",label:"Kepala Sekolah"},{id:"p2sp",label:"P2SP"},{id:"supervisor",label:"Pengawas"},{id:"planner",label:"Perencana"}]).map((role) => {
+                const checked = signatoryRoles.includes(role.id);
+                return <label key={role.id} className="flex items-center gap-2 rounded-lg border border-slate-100 px-3 py-2 text-sm font-medium text-slate-700">
+                  <input type="checkbox" checked={checked} disabled={!checked && signatoryRoles.length >= Number(signatureCount)} onChange={(e) => setSignatoryRoles((current) => e.target.checked ? [...current, role.id] : current.filter((item) => item !== role.id))} />
+                  {role.label}
+                </label>;
+              })}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">Terpilih {signatoryRoles.length} dari {signatureCount} penandatangan.</p>
+          </div>
           <div className="rounded-xl border border-slate-200 p-3"><p className="text-xs font-bold text-slate-700">Pratinjau gaya</p><div className="mt-2 flex items-center gap-3 rounded-lg p-3" style={{ background: exportThemes.find((item) => item.id === exportTheme)?.soft }}><span className="h-9 w-2 rounded-full" style={{ background: exportThemes.find((item) => item.id === exportTheme)?.primary }} /><div><p className="text-sm font-bold" style={{ color: exportThemes.find((item) => item.id === exportTheme)?.primary }}>Laporan Buku Kas Umum</p><p className="text-xs text-slate-500" style={{ fontFamily: exportFont }}>Font: {exportFont} · Tema: {exportThemes.find((item) => item.id === exportTheme)?.label}</p></div></div></div>
           <p className="text-xs leading-5 text-slate-500">PDF memuat identitas sekolah, ringkasan saldo, seluruh transaksi, rincian material per nota, dan kolom tanda tangan. Pada dialog cetak, pilih tujuan “Save as PDF / Simpan sebagai PDF”.</p>
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setShowExport(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600">Batal</button><button type="button" onClick={exportBkuPdf} className="flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white"><Download size={16} />Buat PDF</button></div>
