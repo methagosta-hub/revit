@@ -19,6 +19,7 @@ import {
   Database,
   Copy,
   GripVertical,
+  Lock,
   ChevronUp,
   ChevronDown,
   Pencil,
@@ -38,6 +39,7 @@ import { fetchProjectDetail, recalculateProjectTotal } from '@/lib/services/proj
 import { generateRABExcel } from '@/lib/excel-generator';
 import { formatRupiah } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
+import { getMyAccess, hasPermission } from '@/lib/services/authService';
 import type { Project, ProjectCategory } from '@/types/rab';
 
 type RABDivision = {
@@ -495,6 +497,7 @@ export default function ProjectWorkspacePage() {
   const projectId = params?.id;
 
   const [project, setProject] = useState<WorkspaceProject | null>(null);
+  const [canManageRabPermission, setCanManageRabPermission] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -536,8 +539,9 @@ export default function ProjectWorkspacePage() {
     setErrorMessage('');
 
     try {
-      const data = await fetchProjectDetail(projectId);
+      const [data, access] = await Promise.all([fetchProjectDetail(projectId), getMyAccess()]);
       setProject(data ? (data as unknown as WorkspaceProject) : null);
+      setCanManageRabPermission(hasPermission(access, 'rab.manage', projectId));
     } catch (error) {
       console.error('Gagal memuat detail proyek:', error);
       setProject(null);
@@ -551,6 +555,10 @@ export default function ProjectWorkspacePage() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  const canEditRab = canManageRabPermission && ['DRAFT', 'REVIEW'].includes(String(project?.status ?? 'DRAFT'));
+  const canManageRab = canManageRabPermission && ['DRAFT', 'REVIEW', 'FINAL RAB'].includes(String(project?.status ?? 'DRAFT'));
+
 
   // Memuat keluarga font modern pada halaman agar pratinjau sesuai dengan hasil PDF.
   // PDF tetap memakai fallback sans-serif bila jaringan tidak tersedia.
@@ -961,6 +969,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleUpdateItem = async (itemId: string, changes: RabItemUpdate) => {
+    if (!canEditRab) throw new Error('Perubahan item RAB hanya tersedia pada status DRAFT atau REVIEW.');
     try {
       const { error } = await supabase
         .from('rab_items')
@@ -988,6 +997,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleUpdateComponents = async (itemId: string, changes: RabComponentsUpdate) => {
+    if (!canEditRab) throw new Error('Perubahan komponen RAB hanya tersedia pada status DRAFT atau REVIEW.');
     try {
       // Perubahan analisa hanya menyentuh snapshot pada rab_items proyek ini.
       // Tidak ada UPDATE/INSERT ke master_ahsp atau master_ahsp_components.
@@ -1013,6 +1023,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleDeleteItem = async (item: RabTableItem) => {
+    if (!canEditRab) throw new Error('Penghapusan item RAB hanya tersedia pada status DRAFT atau REVIEW.');
     try {
       const { error } = await supabase
         .from('rab_items')
@@ -1093,6 +1104,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const openDivisionDialog = async (mode: 'edit' | 'copy' | 'export', division: RABDivision) => {
+    if (!canEditRab) { setErrorMessage('Data lokasi RAB terkunci pada status proyek saat ini.'); return; }
     setErrorMessage('');
     setSuccessMessage('');
     setDivisionNameDraft(
@@ -1405,6 +1417,16 @@ export default function ProjectWorkspacePage() {
         </div>
       </header>
 
+      {project && !canEditRab && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            RAB berstatus <strong>{project.status}</strong> dan dikunci dari perubahan isi. 
+            {project.status === 'FINAL RAB' && canManageRab ? ' Urutan kategori masih dapat disesuaikan sebelum proyek dimulai.' : ' Untuk perubahan nilai, kembalikan status proyek ke REVIEW melalui halaman Pengelolaan Proyek.'}
+          </p>
+        </div>
+      )}
+
       {(errorMessage || successMessage) && (
         <div
           role="status"
@@ -1552,7 +1574,7 @@ export default function ProjectWorkspacePage() {
             >
               <Plus className="h-4 w-4" />
               Tambah Lokasi Pekerjaan
-            </button>
+            </button>}
             <span className="text-xs text-slate-400">
               Buat satu item pekerjaan, lalu gabungkan beberapa AHSP di dalamnya
             </span>
@@ -1614,30 +1636,30 @@ export default function ProjectWorkspacePage() {
                     <span className="mr-1 text-sm font-bold tabular-nums text-slate-900">
                       {formatRupiah(divisionTotal)}
                     </span>
-                    <button
+                    {canEditRab && <button
                       type="button"
                       onClick={() => openAhspPicker(division.id, division.name)}
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Tambah Item Pekerjaan
-                    </button>
-                    <button
+                    </button>}
+                    {canEditRab && <button
                       type="button"
                       onClick={() => void openDivisionDialog('edit', division)}
                       className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                       title="Ubah nama lokasi pekerjaan"
                     >
                       <Pencil className="h-3.5 w-3.5" /> Edit
-                    </button>
-                    <button
+                    </button>}
+                    {canEditRab && <button
                       type="button"
                       onClick={() => void openDivisionDialog('copy', division)}
                       className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                       title="Salin lokasi beserta item RAB"
                     >
                       <Copy className="h-3.5 w-3.5" /> Salin
-                    </button>
+                    </button>}
                     <button
                       type="button"
                       onClick={() => void openDivisionDialog('export', division)}
@@ -1678,6 +1700,7 @@ export default function ProjectWorkspacePage() {
                             onUpdateComponents={handleUpdateComponents}
                             onDelete={handleDeleteItem}
                             onVolumeUpdated={() => loadData(true)}
+                            readOnly={!canEditRab}
                           />
                         </section>
                       );
