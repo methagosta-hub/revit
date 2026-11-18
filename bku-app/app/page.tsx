@@ -560,6 +560,10 @@ export default function BkuPage() {
       setPageError("Lengkapi nama material, harga satuan, dan volume pada setiap baris nota yang digunakan.");
       return;
     }
+    if (valid.some((draft) => draft.transaction_type === "OUT" && !draft.store_name.trim())) {
+      setPageError("Pilih toko yang sudah terdaftar atau tulis nama toko / pemasok untuk nota pengeluaran.");
+      return;
+    }
     if (valid.some((draft) => draft.transaction_type === "TRANSFER" && draft.from_account === draft.to_account)) {
       setPageError("Rekening asal dan tujuan transfer harus berbeda.");
       return;
@@ -695,7 +699,7 @@ export default function BkuPage() {
         : `<div class="desc">${escapeHtml(tx.description)}</div>`;
       const type = tx.transaction_type === "IN" ? "Pemasukan" : tx.transaction_type === "OUT" ? "Pengeluaran" : "Transfer";
       const method = tx.transaction_type === "TRANSFER" ? `${tx.from_account === "BANK" ? "Bank" : "Tunai"} → ${tx.to_account === "BANK" ? "Bank" : "Tunai"}` : tx.account === "BANK" ? "Bank" : "Tunai";
-      return `<tr><td class="nowrap">${dateFormat(tx.transaction_date)}</td><td><strong>${escapeHtml(tx.receipt_number || "—")}</strong><div class="muted">${type} · ${method}</div></td><td>${description}</td><td class="num in">${tx.transaction_type === "IN" ? money(Number(tx.amount)) : "—"}</td><td class="num out">${tx.transaction_type === "OUT" ? money(Number(tx.amount)) : "—"}</td><td class="num balance">${money(balance?.total || 0)}</td></tr>`;
+      return `<tr><td class="nowrap">${dateFormat(tx.transaction_date)}</td><td><strong>${escapeHtml(tx.receipt_number || "—")}</strong><div class="muted">${type} · ${method}${tx.store_name ? " · Toko: " + escapeHtml(tx.store_name) : ""}</div></td><td>${description}</td><td class="num in">${tx.transaction_type === "IN" ? money(Number(tx.amount)) : "—"}</td><td class="num out">${tx.transaction_type === "OUT" ? money(Number(tx.amount)) : "—"}</td><td class="num balance">${money(balance?.total || 0)}</td></tr>`;
     }).join("");
     const rangeEnd = ordered.length ? ordered[ordered.length - 1].transaction_date : dateKey(new Date());
     const closingCash = money(balances.cash);
@@ -734,6 +738,9 @@ export default function BkuPage() {
         <header class="top"><div><div class="brand">Dahlia Management System · Buku Kas Eksternal</div><h1 class="title">Laporan Buku Kas Umum</h1><div class="subtitle">Periode ${dateFormat(book.start_date)} – ${dateFormat(rangeEnd)}</div></div><div class="pill">DOKUMEN PEMBUKUAN</div></header>
         <section class="identity">
           <div><span>Nama Sekolah</span><strong>${escapeHtml(book.name)}</strong></div>
+          <div><span>NPSN</span><strong>${escapeHtml(book.npsn || "—")}</strong></div>
+          <div><span>Alamat</span><strong>${escapeHtml(book.address || "—")}</strong></div>
+          <div><span>Telepon</span><strong>${escapeHtml(book.phone || "—")}</strong></div>
           <div><span>Kepala Sekolah</span><strong>${escapeHtml(book.school_head || "—")}</strong></div>
           <div><span>Perencana</span><strong>${escapeHtml(book.planner || "—")}</strong></div>
           <div><span>Pengawas</span><strong>${escapeHtml(book.supervisor || "—")}</strong></div>
@@ -937,7 +944,7 @@ export default function BkuPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4"><div><h3 className="font-black">Buku transaksi</h3><p className="text-xs text-slate-500">Urut berdasarkan tanggal dan waktu pencatatan</p></div><span className="text-xs font-semibold text-slate-500">{ordered.length} transaksi</span></div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[820px] text-left text-sm">
-                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Uraian</th><th className="px-4 py-3">Metode</th><th className="px-4 py-3 text-right">Kas masuk</th><th className="px-4 py-3 text-right">Kas keluar</th><th className="px-4 py-3 text-right">Saldo akhir</th></tr></thead>
+                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Uraian</th><th className="px-4 py-3">Metode</th><th className="px-4 py-3 text-right">Kas masuk</th><th className="px-4 py-3 text-right">Kas keluar</th><th className="px-4 py-3 text-right">Saldo akhir</th><th className="px-4 py-3">Tindakan</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">
                       {ordered.map((tx) => {
                         const balance = balances.rows[tx.id];
@@ -948,6 +955,7 @@ export default function BkuPage() {
                           <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-emerald-700">{tx.transaction_type === "IN" ? money(Number(tx.amount)) : "—"}</td>
                           <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-rose-700">{tx.transaction_type === "OUT" ? money(Number(tx.amount)) : "—"}</td>
                           <td className="whitespace-nowrap px-4 py-3 text-right font-bold">{money(balance?.total || 0)}</td>
+                          <td className="whitespace-nowrap px-4 py-3"><div className="flex gap-1"><button onClick={() => openEditTransaction(tx)} className="rounded border border-slate-200 px-2 py-1 text-xs">Ubah</button><button onClick={() => openCopyTransaction(tx)} className="rounded border border-slate-200 px-2 py-1 text-xs">Salin</button><button onClick={() => void deleteTransaction(tx)} className="rounded border border-rose-100 px-2 py-1 text-xs text-rose-700">Hapus</button></div></td>
                         </tr>;
                       })}
                     </tbody>
@@ -1053,7 +1061,7 @@ export default function BkuPage() {
               <div className="space-y-3">
                 {draft.details.map((line, lineIndex) => <div key={lineIndex} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
                   <div className="mb-2 flex items-center justify-between"><span className="text-[11px] font-bold text-slate-500">Material {lineIndex + 1}</span>{draft.details.length > 1 && <button type="button" onClick={() => updateDraft(index, { details: draft.details.filter((_, i) => i !== lineIndex) })} className="text-[11px] font-semibold text-rose-600">Hapus</button>}</div>
-                  <div className="grid gap-2 sm:grid-cols-[minmax(170px,1.7fr)_1fr_.7fr_.7fr_1fr]">
+                  <div className="grid gap-2 sm:grid-cols-[minmax(220px,1.8fr)_minmax(170px,1.4fr)_1fr_.7fr_.7fr_1fr]">
                     <Field label="Pilih material dari katalog"><select value={line.material_id || ""} onChange={(e) => void updateDraftMaterial(index, lineIndex, e.target.value)} className={fieldClass}><option value="">Material baru / ketik manual</option>{Array.from(new Set(materials.map((item) => item.category))).map((category) => <optgroup key={category} label={category}>{materials.filter((item) => item.category === category).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.unit} · {money(Number(item.unit_price))}</option>)}</optgroup>)}</select></Field>
                     <Field label="Nama material"><input value={line.name} onChange={(e) => updateDraft(index, { details: draft.details.map((item, i) => i === lineIndex ? { ...item, name: e.target.value, material_id: "" } : item) })} placeholder="Cari / ketik nama material baru" className={fieldClass} /></Field>
                     <Field label="Harga satuan (Rp)"><input inputMode="numeric" value={line.unit_price} onChange={(e) => updateDraft(index, { details: draft.details.map((item, i) => i === lineIndex ? { ...item, unit_price: e.target.value } : item) })} placeholder="0" className={fieldClass} /></Field>
