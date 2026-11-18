@@ -81,6 +81,7 @@ async function getAdminContext(request: NextRequest): Promise<AdminContext | Nex
 async function validateAssignments(
   admin: SupabaseClient,
   input: unknown,
+  isDemoUser = false,
 ): Promise<{ rows: NormalizedAssignment[]; error?: string }> {
   if (!Array.isArray(input) || input.length === 0) {
     return { rows: [], error: 'Pilih minimal satu penugasan role untuk pengguna.' };
@@ -103,9 +104,17 @@ async function validateAssignments(
     .map((id) => id.trim()))];
   if (projectIds.length) {
     const { data: projects, error: projectError } = await admin
-      .from('projects').select('id').in('id', projectIds);
+      .from('projects').select('id, project_category').in('id', projectIds);
     if (projectError) return { rows: [], error: `Gagal memeriksa proyek: ${projectError.message}` };
     if ((projects ?? []).length !== projectIds.length) return { rows: [], error: 'Salah satu proyek tidak ditemukan.' };
+    const expectedCategory = isDemoUser ? 'PORTOFOLIO' : 'REGULER';
+    const wrongCategory = (projects ?? []).find((project: { id: string; project_category: string | null }) => project.project_category !== expectedCategory);
+    if (wrongCategory) return { rows: [], error: isDemoUser
+      ? 'Akun PORTOFOLIO hanya boleh ditugaskan ke proyek kategori PORTOFOLIO.'
+      : 'Akun reguler tidak boleh ditugaskan ke proyek PORTOFOLIO.' };
+  }
+  if (isDemoUser && requested.some((item) => !item.project_id)) {
+    return { rows: [], error: 'Akun PORTOFOLIO wajib menggunakan role proyek, bukan role global perusahaan.' };
   }
 
   const today = jakartaToday();
@@ -121,6 +130,9 @@ async function validateAssignments(
     const validFrom = item.valid_from == null || item.valid_from === '' ? today : item.valid_from;
     const validUntil = item.valid_until == null || item.valid_until === '' ? null : item.valid_until;
 
+    if (isDemoUser && role.scope === 'company') {
+      return { rows: [], error: `Role ${role.name} berlaku global dan tidak diperbolehkan untuk akun PORTOFOLIO.` };
+    }
     if (role.scope === 'company' && projectId) {
       return { rows: [], error: `Peran ${role.name} hanya berlaku di tingkat perusahaan.` };
     }
@@ -251,13 +263,13 @@ export async function GET(request: NextRequest) {
 
   const [profilesResult, assignmentsResult, rolesResult, projectsResult, authUsersResult] = await Promise.all([
     admin.from('user_profiles')
-      .select('id, employee_code, full_name, phone, avatar_url, is_active, created_at, updated_at')
+      .select('id, employee_code, full_name, phone, avatar_url, is_active, is_demo_user, created_at, updated_at')
       .order('full_name'),
     admin.from('user_role_assignments')
       .select('id, user_id, role_id, project_id, assigned_by, assigned_at, valid_from, valid_until, revoked_at, revoked_by, revocation_reason')
       .order('assigned_at', { ascending: false }),
     admin.from('app_roles').select('id, code, name, scope, description').order('name'),
-    admin.from('projects').select('id, title, status').order('title'),
+    admin.from('projects').select('id, title, status, project_category').order('title'),
     admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
   ]);
   const failed = [profilesResult.error, assignmentsResult.error, rolesResult.error, projectsResult.error, authUsersResult.error].find(Boolean);
@@ -302,7 +314,8 @@ export async function POST(request: NextRequest) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jsonError('Format email tidak valid.');
   if (password.length < 8) return jsonError('Kata sandi sementara minimal 8 karakter.');
 
-  const validated = await validateAssignments(admin, body.role_assignments);
+  const isDemoUser = body.is_demo_user === true;
+  const validated = await validateAssignments(admin, body.role_assignments, isDemoUser);
   if (validated.error) return jsonError(validated.error);
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
@@ -313,6 +326,7 @@ export async function POST(request: NextRequest) {
   const newUserId = created.user.id;
   const { error: profileError } = await admin.from('user_profiles').upsert({
     id: newUserId, full_name: fullName, phone, employee_code: employeeCode, is_active: true,
+    is_demo_user: isDemoUser,
   }, { onConflict: 'id' });
   if (profileError) {
     await admin.auth.admin.deleteUser(newUserId);
@@ -327,7 +341,7 @@ export async function POST(request: NextRequest) {
   }
 
   await writeAudit(admin, actorId, 'user.created', newUserId, null, {
-    full_name: fullName, email, employee_code: employeeCode, role_assignments: validated.rows,
+    full_name: fullName, email, employee_code: employeeCode, is_demo_user: body.is_demo_user === true, role_assignments: validated.rows,
   }, 'user_profiles');
   return NextResponse.json({ success: true, user_id: newUserId }, { status: 201 });
 }
@@ -344,7 +358,7 @@ export async function PATCH(request: NextRequest) {
   if (!userId) return jsonError('ID pengguna wajib diisi.');
 
   const { data: targetProfile, error: targetError } = await admin.from('user_profiles')
-    .select('id, is_active').eq('id', userId).maybeSingle();
+    .select('id, is_active, is_demo_user').eq('id', userId).maybeSingle();
   if (targetError || !targetProfile) return jsonError('Pengguna tidak ditemukan.', 404);
 
   if (action === 'update_profile') {
@@ -356,6 +370,17 @@ export async function PATCH(request: NextRequest) {
     }
     if (typeof body.phone === 'string') update.phone = body.phone.trim() || null;
     if (typeof body.employee_code === 'string') update.employee_code = body.employee_code.trim() || null;
+    if (typeof body.is_demo_user === 'boolean' && body.is_demo_user !== targetProfile.is_demo_user) {
+      const { count, error: assignmentsError } = await admin.from('user_role_assignments')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .is('revoked_at', null);
+      if (assignmentsError) return jsonError(`Gagal memeriksa penugasan akun: ${assignmentsError.message}`, 500);
+      if ((count ?? 0) > 0) {
+        return jsonError('Cabut seluruh penugasan role yang masih aktif terlebih dahulu. Setelah mode akun diubah, tambahkan kembali role dengan cakupan kategori proyek yang sesuai.');
+      }
+      update.is_demo_user = body.is_demo_user;
+    }
     if (typeof body.is_active === 'boolean') {
       if (userId === actorId && body.is_active === false) return jsonError('Anda tidak dapat menonaktifkan akun sendiri.');
       if (body.is_active === false && targetProfile.is_active) {
@@ -380,7 +405,7 @@ export async function PATCH(request: NextRequest) {
       project_id: (body.project_id as string | null) ?? null,
       valid_from: body.valid_from as string | null | undefined,
       valid_until: body.valid_until as string | null | undefined,
-    }]);
+    }], targetProfile.is_demo_user === true);
     if (validated.error) return jsonError(validated.error);
     const { data: inserted, error } = await admin.from('user_role_assignments').insert({
       user_id: userId, ...validated.rows[0], assigned_by: actorId,

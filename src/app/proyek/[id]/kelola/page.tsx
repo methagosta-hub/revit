@@ -20,11 +20,12 @@ import {
   AlertCircle,
   ExternalLink,
   ListOrdered,
+  History,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatRupiah } from '@/lib/format';
 
-type ProjectStatus = 'Draft' | 'Review' | 'Final';
+type ProjectStatus = 'DRAFT' | 'REVIEW' | 'FINAL RAB' | 'DIKERJAKAN' | 'SELESAI';
 
 type ProjectForm = {
   title: string;
@@ -32,6 +33,7 @@ type ProjectForm = {
   location: string;
   kabupaten_kota: string;
   status: ProjectStatus;
+  project_category: 'REGULER' | 'PORTOFOLIO';
   school_npsn: string;
   principal_name: string;
   principal_nip: string;
@@ -43,6 +45,8 @@ type ProjectForm = {
   tax_rate: string;
   profit_margin: string;
 };
+
+type ProjectStatusHistoryRow = { id: string; old_status: string | null; new_status: ProjectStatus; reason: string | null; changed_by: string | null; changed_at: string };
 
 type DivisionFormRow = {
   id?: string;
@@ -118,7 +122,7 @@ export default function DetailEditProyekPage() {
   const projectId = params?.id;
 
   const [form, setForm] = useState<ProjectForm>({
-    title: '', client: '', location: '', kabupaten_kota: '', status: 'Draft', school_npsn: '',
+    title: '', client: '', location: '', kabupaten_kota: '', status: 'DRAFT', project_category: 'REGULER', school_npsn: '',
     principal_name: '', principal_nip: '', p2sp_chair_name: '', planning_consultant: '',
     planning_consultant_skk: '', supervisory_consultant: '', supervisory_consultant_skk: '',
     tax_rate: '11', profit_margin: '10',
@@ -132,22 +136,33 @@ export default function DetailEditProyekPage() {
   const [loadError, setLoadError] = useState('');
   const [saveError, setSaveError] = useState('');
   const [success, setSuccess] = useState('');
+  const [nextStatus, setNextStatus] = useState<ProjectStatus>('DRAFT');
+  const [statusReason, setStatusReason] = useState('');
+  const [changingStatus, setChangingStatus] = useState(false);
+  const [statusHistory, setStatusHistory] = useState<ProjectStatusHistoryRow[]>([]);
 
   const loadData = useCallback(async () => {
     if (!projectId) return;
     setLoading(true);
     setLoadError('');
     try {
-      const [projectResult, divisionResult] = await Promise.all([
+      const [projectResult, divisionResult, historyResult] = await Promise.all([
         supabase.from('projects').select('*').eq('id', projectId).single(),
         supabase
           .from('rab_divisions')
           .select('id, project_id, code, name, sort_order, items:rab_items(id, total_price)')
           .eq('project_id', projectId)
           .order('sort_order', { ascending: true }),
+        supabase.from('project_status_history')
+          .select('id, old_status, new_status, reason, changed_by, changed_at')
+          .eq('project_id', projectId)
+          .order('changed_at', { ascending: false })
+          .limit(20),
       ]);
       if (projectResult.error) throw projectResult.error;
       if (divisionResult.error) throw divisionResult.error;
+      if (historyResult.error && !['42501', '42P01', 'PGRST205'].includes(historyResult.error.code ?? '')) throw historyResult.error;
+      setStatusHistory((historyResult.data ?? []) as ProjectStatusHistoryRow[]);
 
       const project = projectResult.data as ProjectRow;
       setForm({
@@ -155,7 +170,8 @@ export default function DetailEditProyekPage() {
         client: project.client ?? '',
         location: project.location ?? '',
         kabupaten_kota: project.kabupaten_kota ?? '',
-        status: (project.status ?? 'Draft') as ProjectStatus,
+        status: (project.status ?? 'DRAFT') as ProjectStatus,
+        project_category: project.project_category === 'PORTOFOLIO' ? 'PORTOFOLIO' : 'REGULER',
         school_npsn: project.school_npsn ?? '',
         principal_name: project.principal_name ?? '',
         principal_nip: project.principal_nip ?? '',
@@ -167,6 +183,7 @@ export default function DetailEditProyekPage() {
         tax_rate: String(project.tax_rate ?? 11),
         profit_margin: String(project.profit_margin ?? 10),
       });
+      setNextStatus((project.status ?? 'DRAFT') as ProjectStatus);
       setProjectTotal(Number(project.total_value ?? 0));
       setCreatedAt(project.created_at ?? '');
       setUpdatedAt(project.updated_at ?? '');
@@ -189,6 +206,17 @@ export default function DetailEditProyekPage() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  const allowedNextStatuses = useMemo<ProjectStatus[]>(() => {
+    switch (form.status) {
+      case 'DRAFT': return ['DRAFT', 'REVIEW'];
+      case 'REVIEW': return ['REVIEW', 'DRAFT', 'FINAL RAB'];
+      case 'FINAL RAB': return ['FINAL RAB', 'REVIEW', 'DIKERJAKAN'];
+      case 'DIKERJAKAN': return ['DIKERJAKAN', 'SELESAI'];
+      case 'SELESAI': return ['SELESAI'];
+      default: return ['DRAFT'];
+    }
+  }, [form.status]);
 
   const divisionTotal = useMemo(
     () => divisions.reduce((sum, division) => sum + division.total_value, 0),
@@ -216,6 +244,30 @@ export default function DetailEditProyekPage() {
       item_count: 0,
       total_value: 0,
     }]);
+  }
+
+  async function handleStatusTransition() {
+    if (!projectId || changingStatus || nextStatus === form.status) return;
+    setChangingStatus(true);
+    setSaveError('');
+    setSuccess('');
+    try {
+      const { error } = await supabase.rpc('transition_project_status', {
+        p_project_id: projectId,
+        p_new_status: nextStatus,
+        p_reason: statusReason.trim() || null,
+      });
+      if (error) throw error;
+      await loadData();
+      setStatusReason('');
+      setSuccess(`Status proyek berhasil diubah menjadi ${nextStatus}.`);
+      router.refresh();
+    } catch (error) {
+      console.error('Gagal mengubah status proyek:', error);
+      setSaveError(`Status proyek belum berubah: ${getErrorMessage(error)}`);
+    } finally {
+      setChangingStatus(false);
+    }
   }
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
@@ -341,7 +393,7 @@ export default function DetailEditProyekPage() {
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Total Nilai RAB</p><p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatRupiah(projectTotal || divisionTotal)}</p></article>
         <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Jumlah Lokasi Pekerjaan</p><p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{divisions.length} lokasi</p></article>
-        <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Status Dokumen</p><p className="mt-1 text-xl font-bold text-slate-900">{form.status}</p></article>
+        <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Status Proyek</p><p className="mt-1 text-xl font-bold text-slate-900">{form.status}</p><p className="mt-1 text-xs text-slate-500">Perubahan status dicatat di riwayat proyek.</p></article>
       </section>
 
       {(saveError || success) && (
@@ -352,6 +404,57 @@ export default function DetailEditProyekPage() {
       )}
 
       <form onSubmit={handleSave} className="space-y-6">
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm sm:p-6">
+          <div className="mb-4">
+            <h2 className="font-bold text-slate-900">Alur Status Proyek</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Status hanya dapat diubah melalui perpindahan yang sah dan tercatat di riwayat proyek.</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-[1fr_1fr]">
+            <label className="block">
+              <span className={labelClass}>Status berikutnya</span>
+              <select className={inputClass} value={nextStatus} onChange={(event) => setNextStatus(event.target.value as ProjectStatus)}>
+                {allowedNextStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className={labelClass}>Alasan / catatan perubahan (opsional)</span>
+              <input className={inputClass} value={statusReason} onChange={(event) => setStatusReason(event.target.value)} placeholder="Contoh: RAB telah disetujui pemilik proyek" maxLength={500} />
+            </label>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-slate-500">Saat status menjadi DIKERJAKAN, proyek mulai tersedia untuk transaksi dan aktivitas pelaksanaan sesuai hak akses.</p>
+            <button type="button" onClick={() => void handleStatusTransition()} disabled={changingStatus || nextStatus === form.status} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
+              {changingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              {changingStatus ? 'Mengubah status...' : 'Simpan Perubahan Status'}
+            </button>
+          </div>
+          <div className="mt-5 border-t border-emerald-100 pt-4">
+            <div className="mb-3 flex items-center gap-2">
+              <History className="h-4 w-4 text-emerald-700" />
+              <h3 className="text-sm font-bold text-slate-900">Riwayat Perubahan Status</h3>
+            </div>
+            {statusHistory.length ? (
+              <ol className="space-y-3">
+                {statusHistory.map((entry) => (
+                  <li key={entry.id} className="flex gap-3 text-xs">
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-600" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <strong className="text-slate-800">{entry.old_status || 'PROYEK BARU'} → {entry.new_status}</strong>
+                        <span className="text-slate-400">{formatDate(entry.changed_at)}</span>
+                      </div>
+                      {entry.reason ? <p className="mt-1 text-slate-600">{entry.reason}</p> : null}
+                      {entry.changed_by ? <p className="mt-1 text-[10px] text-slate-400">Aktor: {entry.changed_by}</p> : null}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="text-xs text-slate-500">Belum ada riwayat perpindahan status, atau riwayat tidak dapat dibaca oleh akun ini.</p>
+            )}
+          </div>
+        </section>
+
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="mb-5 flex items-start gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><FileText className="h-5 w-5" /></div>
@@ -362,7 +465,11 @@ export default function DetailEditProyekPage() {
             <Field label="Nama Sekolah / Instansi (Client)" value={form.client} onChange={(value) => updateProject('client', value)} placeholder="Nama sekolah atau instansi" required />
             <Field label="Lokasi Proyek" value={form.location} onChange={(value) => updateProject('location', value)} placeholder="Alamat / kecamatan / wilayah proyek" required />
             <Field label="Kabupaten / Kota (untuk tanda tangan PDF)" value={form.kabupaten_kota} onChange={(value) => updateProject('kabupaten_kota', value)} placeholder="Contoh: Kabupaten Ciamis" maxLength={150} />
-            <label className="block"><span className={labelClass}>Status Proyek</span><select className={inputClass} value={form.status} onChange={(event) => updateProject('status', event.target.value as ProjectStatus)}><option value="Draft">Draft</option><option value="Review">Review</option><option value="Final">Final</option></select></label>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold text-slate-500">Kategori Proyek</p>
+              <p className="mt-1 text-sm font-bold text-slate-900">{form.project_category}</p>
+              <p className="mt-2 text-xs text-slate-500">Kategori ditetapkan ketika proyek dibuat untuk menjaga pemisahan data REGULER dan PORTOFOLIO.</p>
+            </div>
           </div>
         </section>
 

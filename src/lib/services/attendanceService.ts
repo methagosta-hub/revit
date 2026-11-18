@@ -46,7 +46,7 @@ export async function fetchAttendancePageData(date: string): Promise<AttendanceP
       .eq('status', 'active')
       .lte('start_date', date)
       .or(`end_date.is.null,end_date.gte.${date}`),
-    supabase.from('projects').select('id, title, client').order('title'),
+    supabase.from('projects').select('id, title, client').eq('status', 'DIKERJAKAN').order('title'),
     supabase.from('rab_divisions').select('id, project_id, code, name, sort_order').order('sort_order', { ascending: true }),
     supabase.from('employee_work_schedules')
       .select('id, employee_id, schedule_id, effective_from, effective_to, schedule:work_schedules(schedule_name, schedule_code, weekdays, start_time, end_time, break_minutes, grace_minutes)')

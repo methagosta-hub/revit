@@ -20,7 +20,7 @@ import { supabase } from '@/lib/supabase';
 
 type RoleScope = 'company' | 'project' | 'both';
 type Role = { id: string; code: string; name: string; scope: RoleScope; description?: string | null };
-type Project = { id: string; title: string; status?: string | null };
+type Project = { id: string; title: string; status?: string | null; project_category?: 'REGULER' | 'PORTOFOLIO' | null };
 type Assignment = {
   id: string;
   user_id: string;
@@ -45,6 +45,7 @@ type ManagedUser = {
   phone: string | null;
   avatar_url: string | null;
   is_active: boolean;
+  is_demo_user: boolean;
   created_at: string;
   updated_at: string;
   email: string;
@@ -75,30 +76,31 @@ function isEffective(item: Assignment, today: string) {
 }
 function blankAssignment(today: string): AssignmentDraft { return { role_id: '', project_id: '', valid_from: today, valid_until: '' }; }
 
-function AssignmentFields({ value, onChange, roles, projects }: {
+function AssignmentFields({ value, onChange, roles, projects, isDemoUser = false }: {
   value: AssignmentDraft;
   onChange: (patch: Partial<AssignmentDraft>) => void;
   roles: Role[];
   projects: Project[];
+  isDemoUser?: boolean;
 }) {
   const role = roles.find((item) => item.id === value.role_id);
   return <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-2">
     <label className={LABEL}>Role
       <select required value={value.role_id} onChange={(e) => onChange({ role_id: e.target.value, project_id: '' })} className={INPUT}>
         <option value="">Pilih role</option>
-        {roles.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.scope}</option>)}
+        {roles.filter((item) => !isDemoUser || item.scope !== 'company').map((item) => <option key={item.id} value={item.id}>{item.name} · {item.scope}</option>)}
       </select>
     </label>
     <label className={LABEL}>Cakupan penugasan
       <select value={value.project_id} onChange={(e) => onChange({ project_id: e.target.value })}
-        disabled={!role || role.scope === 'company'} required={!!role && role.scope === 'project'} className={INPUT}>
+        disabled={!role || role.scope === 'company'} required={isDemoUser || (!!role && role.scope === 'project')} className={INPUT}>
         {role?.scope === 'company' ? <option value="">Seluruh perusahaan</option> : null}
-        {role?.scope === 'both' ? <option value="">Seluruh perusahaan (global)</option> : null}
+        {role?.scope === 'both' && !isDemoUser ? <option value="">Seluruh perusahaan (global)</option> : null}
         {role?.scope === 'project' ? <option value="">Pilih proyek</option> : null}
-        {projects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}
+        {projects.filter((project) => (project.project_category ?? 'REGULER') === (isDemoUser ? 'PORTOFOLIO' : 'REGULER')).map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}
       </select>
       <span className="mt-1 block text-[10px] font-normal text-slate-500">
-        {role?.scope === 'company' ? 'Role ini berlaku untuk seluruh perusahaan.' : role?.scope === 'project' ? 'Wajib pilih proyek. Akses tidak berlaku pada proyek lain.' : role?.scope === 'both' ? 'Pilih perusahaan untuk akses global atau proyek untuk akses terbatas.' : 'Pilih role terlebih dahulu.'}
+        {isDemoUser ? 'Akun PORTOFOLIO hanya mendapat akses pada proyek sampel yang dipilih.' : role?.scope === 'company' ? 'Role ini berlaku untuk seluruh perusahaan.' : role?.scope === 'project' ? 'Wajib pilih proyek. Akses tidak berlaku pada proyek lain.' : role?.scope === 'both' ? 'Pilih perusahaan untuk akses global atau proyek untuk akses terbatas.' : 'Pilih role terlebih dahulu.'}
       </span>
     </label>
     <label className={LABEL}>Tanggal mulai
@@ -128,6 +130,7 @@ function UserManagementContent() {
   const [newPassword, setNewPassword] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newEmployeeCode, setNewEmployeeCode] = useState('');
+  const [newIsDemoUser, setNewIsDemoUser] = useState(false);
   const [newAssignments, setNewAssignments] = useState<AssignmentDraft[]>([]);
 
   const [addOpen, setAddOpen] = useState(false);
@@ -140,6 +143,7 @@ function UserManagementContent() {
   const [profileName, setProfileName] = useState('');
   const [profilePhone, setProfilePhone] = useState('');
   const [profileEmployeeCode, setProfileEmployeeCode] = useState('');
+  const [profileIsDemoUser, setProfileIsDemoUser] = useState(false);
 
   const today = data?.server_date || new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -209,6 +213,7 @@ function UserManagementContent() {
     setProfileName(selectedUser.full_name);
     setProfilePhone(selectedUser.phone ?? '');
     setProfileEmployeeCode(selectedUser.employee_code ?? '');
+    setProfileIsDemoUser(selectedUser.is_demo_user === true);
   }, [selectedUser]);
 
   function notifyError(message: string) { setError(message); setNotice(''); }
@@ -233,12 +238,12 @@ function UserManagementContent() {
         method: 'POST',
         body: JSON.stringify({
           full_name: newName, email: newEmail, password: newPassword,
-          phone: newPhone, employee_code: newEmployeeCode,
+          phone: newPhone, employee_code: newEmployeeCode, is_demo_user: newIsDemoUser,
           role_assignments: assignments,
         }),
       });
       setCreateOpen(false);
-      setNewName(''); setNewEmail(''); setNewPassword(''); setNewPhone(''); setNewEmployeeCode('');
+      setNewName(''); setNewEmail(''); setNewPassword(''); setNewPhone(''); setNewEmployeeCode(''); setNewIsDemoUser(false);
       setNewAssignments([]);
       await load(true);
       setSelectedId(result.user_id);
@@ -249,7 +254,7 @@ function UserManagementContent() {
   }
 
   function openCreate() {
-    setNewName(''); setNewEmail(''); setNewPassword(''); setNewPhone(''); setNewEmployeeCode('');
+    setNewName(''); setNewEmail(''); setNewPassword(''); setNewPhone(''); setNewEmployeeCode(''); setNewIsDemoUser(false);
     setNewAssignments([blankAssignment(today)]);
     setError(''); setNotice(''); setCreateOpen(true);
   }
@@ -334,7 +339,7 @@ function UserManagementContent() {
       await request('/api/admin/users', {
         method: 'PATCH',
         body: JSON.stringify({ action: 'update_profile', user_id: selectedUser.id,
-          full_name: profileName, phone: profilePhone, employee_code: profileEmployeeCode }),
+          full_name: profileName, phone: profilePhone, employee_code: profileEmployeeCode, is_demo_user: profileIsDemoUser }),
       });
       await load(true);
       notifySuccess('Profil pengguna berhasil diperbarui.');
@@ -407,6 +412,7 @@ function UserManagementContent() {
                 <div className={cx('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-bold', user.is_active ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400')}>{user.full_name.trim().slice(0, 1).toLocaleUpperCase('id')}</div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-bold text-slate-900">{user.full_name}</p><span className={cx('rounded-full px-2 py-1 text-[9px] font-bold', user.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500')}>{user.is_active ? 'AKTIF' : 'NONAKTIF'}</span></div>
+                  <span className={cx('mt-1 inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold', user.is_demo_user ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500')}>{user.is_demo_user ? 'PORTOFOLIO / DUMMY' : 'REGULER'}</span>
                   <p className="mt-1 truncate text-xs text-slate-500">{user.email || 'Email tidak tersedia'}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5"><span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">{activeCount} akses aktif</span><span className="text-[10px] text-slate-400">{user.assignments.length} riwayat penugasan</span></div>
                 </div>
@@ -423,7 +429,7 @@ function UserManagementContent() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-lg font-extrabold text-white">{selectedUser.full_name.trim().slice(0, 1).toLocaleUpperCase('id')}</div>
-              <div className="min-w-0"><h2 className="truncate text-lg font-bold text-slate-900">{selectedUser.full_name}</h2><p className="truncate text-xs text-slate-500">{selectedUser.email}</p><p className="mt-1 text-[10px] text-slate-400">ID pengguna: {selectedUser.id}</p></div>
+              <div className="min-w-0"><h2 className="truncate text-lg font-bold text-slate-900">{selectedUser.full_name}</h2><p className="truncate text-xs text-slate-500">{selectedUser.email}</p><div className="mt-1 flex flex-wrap items-center gap-2"><span className={cx('rounded-full px-2 py-0.5 text-[9px] font-bold', selectedUser.is_demo_user ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-600')}>{selectedUser.is_demo_user ? 'PORTOFOLIO / DUMMY' : 'REGULER'}</span><p className="text-[10px] text-slate-400">ID: {selectedUser.id}</p></div></div>
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={toggleUserActive} disabled={busy} className={SECONDARY}>{selectedUser.is_active ? 'Nonaktifkan akun' : 'Aktifkan akun'}</button>
@@ -435,6 +441,10 @@ function UserManagementContent() {
             <label className={LABEL}>Nama lengkap<input value={profileName} onChange={(e) => setProfileName(e.target.value)} className={INPUT}/></label>
             <label className={LABEL}>Nomor karyawan<input value={profileEmployeeCode} onChange={(e) => setProfileEmployeeCode(e.target.value)} className={INPUT}/></label>
             <label className={LABEL}>Nomor telepon<input value={profilePhone} onChange={(e) => setProfilePhone(e.target.value)} className={INPUT}/></label>
+            <label className="flex items-start gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs font-semibold text-violet-900 sm:col-span-2 xl:col-span-3">
+              <input type="checkbox" checked={profileIsDemoUser} onChange={(e) => setProfileIsDemoUser(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-violet-300"/>
+              <span>Akun PORTOFOLIO / Dummy <small className="mt-1 block font-normal text-violet-700">Perubahan mode hanya dapat dilakukan setelah seluruh penugasan role aktif dicabut. Setelah itu, berikan kembali role khusus proyek sesuai kategorinya.</small></span>
+            </label>
             <div className="flex items-end sm:col-span-2 xl:col-span-3"><button type="submit" disabled={busy || !profileName.trim()} className={SECONDARY}><Save className="h-4 w-4"/> Simpan profil</button></div>
           </form>
         </div>
@@ -477,9 +487,15 @@ function UserManagementContent() {
           <label className={LABEL}>Nomor karyawan<input value={newEmployeeCode} onChange={(e) => setNewEmployeeCode(e.target.value)} className={INPUT}/></label>
           <label className={LABEL}>Nomor telepon<input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} className={INPUT}/></label>
         </div>
+        <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3">
+          <label className="flex items-start gap-2 text-xs font-semibold text-violet-900">
+            <input type="checkbox" checked={newIsDemoUser} onChange={(e) => { setNewIsDemoUser(e.target.checked); setNewAssignments((rows) => rows.map((row) => ({ ...row, role_id: '', project_id: '' }))); }} className="mt-0.5 h-4 w-4 rounded border-violet-300"/>
+            <span>Akun PORTOFOLIO / Dummy <small className="mt-1 block font-normal text-violet-700">Hanya melihat dan mengelola proyek kategori PORTOFOLIO yang ditugaskan. Tidak memiliki akses ke proyek REGULER maupun data perusahaan.</small></span>
+          </label>
+        </div>
         <div className="space-y-3 border-t border-slate-100 pt-4">
           <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-bold text-slate-900">Susun penugasan awal</h3><p className="mt-1 text-xs text-slate-500">Tambahkan beberapa role untuk beberapa proyek, atau satu role global perusahaan.</p></div><button type="button" onClick={() => setNewAssignments((rows) => [...rows, blankAssignment(today)])} className={SECONDARY}><Plus className="h-4 w-4"/> Tambah baris</button></div>
-          {newAssignments.map((row, index) => <div key={index} className="relative"><AssignmentFields value={row} onChange={(patch) => updateNewAssignment(index, patch)} roles={data?.roles ?? []} projects={data?.projects ?? []}/>{newAssignments.length > 1 ? <button type="button" onClick={() => setNewAssignments((rows) => rows.filter((_, i) => i !== index))} className="mt-2 text-[11px] font-semibold text-rose-700">Hapus baris penugasan</button> : null}</div>)}
+          {newAssignments.map((row, index) => <div key={index} className="relative"><AssignmentFields value={row} onChange={(patch) => updateNewAssignment(index, patch)} roles={data?.roles ?? []} projects={data?.projects ?? []} isDemoUser={newIsDemoUser}/>{newAssignments.length > 1 ? <button type="button" onClick={() => setNewAssignments((rows) => rows.filter((_, i) => i !== index))} className="mt-2 text-[11px] font-semibold text-rose-700">Hapus baris penugasan</button> : null}</div>)}
           {!newAssignments.length ? <div className="rounded-xl border border-dashed border-slate-300 p-4 text-xs text-slate-500">Belum ada penugasan. Tambahkan minimal satu role.</div> : null}
         </div>
         <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end"><button type="button" onClick={() => setCreateOpen(false)} disabled={busy} className={SECONDARY}>Batal</button><button type="submit" disabled={busy || !newAssignments.length} className={PRIMARY}><Save className="h-4 w-4"/>{busy ? 'Membuat akun...' : 'Buat akun & penugasan'}</button></div>
@@ -487,7 +503,7 @@ function UserManagementContent() {
     </Modal> : null}
 
     {addOpen && selectedUser ? <Modal title="Tambah penugasan role" subtitle={`Tambahkan akses baru untuk ${selectedUser.full_name}. Penugasan sebelumnya tidak akan diubah.`} onClose={() => !busy && setAddOpen(false)}>
-      <form onSubmit={addAssignment} className="space-y-4"><AssignmentFields value={addDraft} onChange={(patch) => setAddDraft((old) => ({ ...old, ...patch }))} roles={data?.roles ?? []} projects={data?.projects ?? []}/><div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setAddOpen(false)} className={SECONDARY}>Batal</button><button type="submit" disabled={busy || !addDraft.role_id} className={PRIMARY}><Save className="h-4 w-4"/>{busy ? 'Menyimpan...' : 'Simpan penugasan'}</button></div></form>
+      <form onSubmit={addAssignment} className="space-y-4"><AssignmentFields value={addDraft} onChange={(patch) => setAddDraft((old) => ({ ...old, ...patch }))} roles={data?.roles ?? []} projects={data?.projects ?? []} isDemoUser={selectedUser.is_demo_user}/><div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setAddOpen(false)} className={SECONDARY}>Batal</button><button type="submit" disabled={busy || !addDraft.role_id} className={PRIMARY}><Save className="h-4 w-4"/>{busy ? 'Menyimpan...' : 'Simpan penugasan'}</button></div></form>
     </Modal> : null}
 
     {editAssignment ? <Modal title="Ubah masa berlaku" subtitle="Perubahan ini berlaku untuk penugasan terpilih dan akan dicatat pada audit log." onClose={() => !busy && setEditAssignment(null)}>

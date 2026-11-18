@@ -50,6 +50,7 @@ export async function fetchWorkAssignmentPageData(): Promise<WorkAssignmentPageD
       .order('full_name'),
     supabase.from('projects')
       .select('id, title, client')
+      .eq('status', 'DIKERJAKAN')
       .order('title'),
     supabase.from('rab_divisions')
       .select('id, project_id, name, code, sort_order')

@@ -63,7 +63,7 @@ export async function createSubcontractor(input: NewSubcontractorInput): Promise
 export async function fetchProjectExecutionWorkspace(projectId: string): Promise<ProjectExecutionWorkspace> {
   if (!projectId) throw new Error('ID proyek tidak ditemukan.');
   const [projectResult, divisionResult, packagesResult, subcontractorResult] = await Promise.all([
-    supabase.from('projects').select('id, title, client, location, status').eq('id', projectId).single(),
+    supabase.from('projects').select('id, title, client, location, status, project_category').eq('id', projectId).single(),
     supabase.from('rab_divisions').select('id, project_id, code, name, sort_order').eq('project_id', projectId).order('sort_order', { ascending: true }),
     supabase.from('project_work_packages').select('id, package_number, project_id, division_id, package_name, description, planned_start_date, planned_end_date, status, created_at').eq('project_id', projectId).order('created_at', { ascending: false }),
     supabase.from('subcontractors').select('id, subcontractor_number, legal_name, contact_person, phone, email, status').eq('status', 'active').order('legal_name'),
@@ -74,6 +74,9 @@ export async function fetchProjectExecutionWorkspace(projectId: string): Promise
   if (subcontractorResult.error) throw explain(subcontractorResult.error, 'Gagal memuat master subkontraktor');
 
   const project = projectResult.data as ExecutionProject;
+  if (!['DIKERJAKAN', 'SELESAI'].includes(String(project.status ?? ''))) {
+    throw new Error(`Modul pelaksanaan hanya tersedia setelah proyek berstatus DIKERJAKAN. Status proyek saat ini: ${project.status || 'DRAFT'}.`);
+  }
   const divisions = (divisionResult.data ?? []) as ExecutionDivision[];
   const packages = (packagesResult.data ?? []) as WorkPackage[];
   const subcontractors = (subcontractorResult.data ?? []) as Subcontractor[];

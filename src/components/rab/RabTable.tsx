@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  GripVertical,
   Link2,
   ListTree,
   Loader2,
@@ -89,6 +90,11 @@ type Props = {
   onUpdateComponents?: (id: string, changes: RabComponentsUpdate) => Promise<void>;
   onDelete: (item: RabTableItem) => Promise<void>;
   onVolumeUpdated?: () => void | Promise<void>;
+  /** Persists a complete manual row order within this location. */
+  onReorder?: (orderedIds: string[]) => Promise<void>;
+  /** Allows reordering at FINAL RAB while normal editing remains locked. */
+  canReorder?: boolean;
+  readOnly?: boolean;
 };
 
 type EditForm = {
@@ -559,7 +565,7 @@ function collectSubitemComponents(items: RabSubitemSnapshot[]): RabComponentSnap
   ]);
 }
 
-export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete, onVolumeUpdated }: Props) {
+export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete, onVolumeUpdated, onReorder, canReorder = false, readOnly = false }: Props) {
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EditForm>({ code: '', name: '', volume: '', unitPrice: '' });
@@ -567,6 +573,9 @@ export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
   const [volumeItem, setVolumeItem] = useState<VolumeBackupRabItem | null>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   useEffect(() => {
     if (editingId && !items.some((item) => item.id === editingId)) setEditingId(null);
@@ -605,7 +614,36 @@ export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete
     }
   };
 
+  const handleReorder = async (targetId: string) => {
+    if (!canReorder || !onReorder || !draggedId || draggedId === targetId || reordering) return;
+    const orderedItems = [...items];
+    const fromIndex = orderedItems.findIndex((item) => item.id === draggedId);
+    const toIndex = orderedItems.findIndex((item) => item.id === targetId);
+    if (fromIndex < 0 || toIndex < 0) return;
+
+    const [movedItem] = orderedItems.splice(fromIndex, 1);
+    orderedItems.splice(toIndex, 0, movedItem);
+    if (orderedItems.every((item, index) => item.id === items[index]?.id)) {
+      setDraggedId(null);
+      setDropTargetId(null);
+      return;
+    }
+
+    setReordering(true);
+    setFormError('');
+    setDraggedId(null);
+    setDropTargetId(null);
+    try {
+      await onReorder(orderedItems.map((item) => item.id));
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Gagal menyimpan urutan item RAB.');
+    } finally {
+      setReordering(false);
+    }
+  };
+
   const handleDelete = async (item: RabTableItem) => {
+    if (reordering) return;
     const confirmed = window.confirm(`Hapus "${item.code} - ${item.name}" dari RAB proyek ini?`);
     if (!confirmed || deletingId) return;
     setDeletingId(item.id);
@@ -625,12 +663,12 @@ export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete
       <table className="w-full min-w-[1050px] border-collapse text-left">
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50/40 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            <th className="w-14 px-4 py-3">No</th><th className="w-32 px-3 py-3">Kode</th><th className="px-3 py-3">Uraian Pekerjaan</th><th className="w-28 px-3 py-3 text-right">Volume</th><th className="w-20 px-3 py-3 text-center">Sat</th><th className="w-40 px-3 py-3 text-right">Harga Satuan</th><th className="w-44 px-4 py-3 text-right">Total Harga</th><th className="w-32 px-3 py-3 text-center">Aksi</th>
+            <th className="w-20 px-3 py-3">Urutan</th><th className="w-32 px-3 py-3">Kode</th><th className="px-3 py-3">Uraian Pekerjaan</th><th className="w-28 px-3 py-3 text-right">Volume</th><th className="w-20 px-3 py-3 text-center">Sat</th><th className="w-40 px-3 py-3 text-right">Harga Satuan</th><th className="w-44 px-4 py-3 text-right">Total Harga</th><th className="w-32 px-3 py-3 text-center">Aksi</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 text-sm">
           {items.length ? items.map((item, index) => {
-            const isEditing = editingId === item.id;
+            const isEditing = !readOnly && editingId === item.id;
             const previewTotal = Math.max(0, Number(form.volume) || 0) * Math.max(0, Number(form.unitPrice) || 0);
             const hasDetails = Boolean((item.components_snapshot?.length ?? 0) || (item.subitems_snapshot?.length ?? 0));
             const detailsOpen = expandedDetails[item.id] ?? false;
@@ -641,13 +679,57 @@ export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete
             };
             return (
               <Fragment key={item.id}>
-                <tr className="align-top transition-colors hover:bg-slate-50/70">
-                  <td className="px-4 py-3.5 text-xs text-slate-400">{index + 1}</td>
+                <tr
+                  onDragOver={(event) => {
+                    if (!canReorder || !draggedId || draggedId === item.id || reordering) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                    setDropTargetId(item.id);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    void handleReorder(item.id);
+                  }}
+                  className={`align-top transition-colors hover:bg-slate-50/70 ${draggedId === item.id ? 'opacity-40' : ''} ${dropTargetId === item.id ? 'bg-emerald-50 ring-2 ring-inset ring-emerald-300' : ''}`}
+                >
+                  <td className="px-3 py-3.5 text-xs text-slate-400">
+                    <div className="flex items-center gap-1.5">
+                      {canReorder && onReorder && (
+                        <span
+                          draggable={!reordering && !editingId && !deletingId}
+                          onDragStart={(event) => {
+                            if (!canReorder || !onReorder || reordering || editingId || deletingId) {
+                              event.preventDefault();
+                              return;
+                            }
+                            setDraggedId(item.id);
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', item.id);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedId(null);
+                            setDropTargetId(null);
+                          }}
+                          title="Tarik untuk mengubah urutan"
+                          aria-label={`Tarik untuk mengurutkan ${item.name}`}
+                          className={`inline-flex cursor-grab touch-none items-center rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:cursor-grabbing ${reordering ? 'opacity-40' : ''}`}
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </span>
+                      )}
+                      <span className="min-w-4 tabular-nums">{index + 1}</span>
+                    </div>
+                  </td>
                   <td className="px-3 py-3.5">
                     {isEditing ? <input value={form.code} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))} className={INPUT_CLASS} aria-label="Kode pekerjaan" /> : <div><span className="font-mono text-xs text-slate-600">{item.code || '-'}</span>{item.master_ahsp_id && <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700"><Link2 className="h-3 w-3" />Master AHSP</span>}</div>}
                   </td>
                   <td className="px-3 py-3.5">
-                    {isEditing ? <textarea rows={2} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} className={`${INPUT_CLASS} resize-y`} aria-label="Uraian pekerjaan" /> : <span className="font-medium leading-5 text-slate-900">{item.name}</span>}
+                    {isEditing ? <textarea rows={2} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} className={`${INPUT_CLASS} resize-y`} aria-label="Uraian pekerjaan" /> : (
+                      <div>
+                        {item.work_group_name?.trim() && <span className="mb-1 inline-flex rounded-md border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">{item.work_group_name}</span>}
+                        <span className="block font-medium leading-5 text-slate-900">{item.name}</span>
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-3.5 text-right">
                     {isEditing ? <input type="number" min="0" step="any" value={form.volume} onChange={(event) => setForm((current) => ({ ...current, volume: event.target.value }))} className={`${INPUT_CLASS} text-right tabular-nums`} aria-label="Volume" /> : <span className="tabular-nums text-slate-700">{fmtNumber(Number(item.volume))}</span>}
@@ -660,14 +742,14 @@ export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete
                   <td className="px-3 py-3.5"><div className="flex items-center justify-center gap-1">
                     {isEditing ? <><button type="button" onClick={() => void saveEdit(item.id)} disabled={saving} title="Simpan perubahan" className="rounded-lg p-2 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}</button><button type="button" onClick={() => { setEditingId(null); setFormError(''); }} disabled={saving} title="Batal" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button></> : <>
                       {hasDetails && <button type="button" onClick={() => setExpandedDetails((current) => ({ ...current, [item.id]: !detailsOpen }))} aria-expanded={detailsOpen} title={detailsOpen ? 'Tutup rincian AHSP' : 'Buka rincian AHSP'} className="rounded-lg p-2 text-violet-700 hover:bg-violet-50">{detailsOpen ? <ChevronDown className="h-4 w-4" /> : <ListTree className="h-4 w-4" />}</button>}
-                      <button type="button" onClick={() => setVolumeItem(volumeTarget)} disabled={Boolean(editingId) || Boolean(deletingId)} title="Backup volume" className="rounded-lg p-2 text-emerald-700 hover:bg-emerald-50 disabled:opacity-40"><Ruler className="h-4 w-4" /></button>
-                      <button type="button" onClick={() => beginEdit(item)} disabled={Boolean(editingId) || Boolean(deletingId)} title="Edit item RAB" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-40"><Pencil className="h-4 w-4" /></button>
-                      <button type="button" onClick={() => void handleDelete(item)} disabled={Boolean(editingId) || deletingId === item.id} title="Hapus item RAB" className="rounded-lg p-2 text-rose-600 hover:bg-rose-50 disabled:opacity-40">{deletingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button>
+                      {!readOnly && <button type="button" onClick={() => setVolumeItem(volumeTarget)} disabled={Boolean(editingId) || Boolean(deletingId) || reordering} title="Backup volume" className="rounded-lg p-2 text-emerald-700 hover:bg-emerald-50 disabled:opacity-40"><Ruler className="h-4 w-4" /></button>}
+                      {!readOnly && <button type="button" onClick={() => beginEdit(item)} disabled={Boolean(editingId) || Boolean(deletingId) || reordering} title="Edit item RAB" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-40"><Pencil className="h-4 w-4" /></button>}
+                      {!readOnly && <button type="button" onClick={() => void handleDelete(item)} disabled={Boolean(editingId) || deletingId === item.id || reordering} title="Hapus item RAB" className="rounded-lg p-2 text-rose-600 hover:bg-rose-50 disabled:opacity-40">{deletingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button>}
                     </>}
                   </div></td>
                 </tr>
                 {hasDetails && detailsOpen && (
-                  <tr className="bg-violet-50/20"><td colSpan={8} className="px-4 py-3 sm:px-6"><CompositionEditor item={item} onSave={onUpdateComponents ? (changes) => onUpdateComponents(item.id, changes) : undefined} onOpenVolume={(target) => setVolumeItem(target)} /></td></tr>
+                  <tr className="bg-violet-50/20"><td colSpan={8} className="px-4 py-3 sm:px-6"><CompositionEditor item={item} onSave={!readOnly && onUpdateComponents ? (changes) => onUpdateComponents(item.id, changes) : undefined} onOpenVolume={(target) => { if (!readOnly) setVolumeItem(target); }} /></td></tr>
                 )}
               </Fragment>
             );
@@ -676,7 +758,7 @@ export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete
         {items.length > 0 && <tfoot><tr className="border-t border-slate-200 bg-slate-50/70"><td colSpan={7} className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-600">Subtotal kelompok</td><td className="whitespace-nowrap px-4 py-3 text-right text-sm font-bold tabular-nums text-slate-900">{formatRupiah(items.reduce((sum, item) => sum + Number(item.total_price || 0), 0))}</td></tr></tfoot>}
       </table>
       <VolumeBackupDrawer
-        open={Boolean(volumeItem)}
+        open={!readOnly && Boolean(volumeItem)}
         item={volumeItem}
         onClose={() => setVolumeItem(null)}
         onSaved={async () => { await onVolumeUpdated?.(); }}

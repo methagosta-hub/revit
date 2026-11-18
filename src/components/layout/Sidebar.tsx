@@ -117,6 +117,13 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, access, loading, signOut, can } = useAuth();
+  const isPortfolioAccount = access?.profile?.is_demo_user === true;
+  const visibleNavGroups = isPortfolioAccount
+    ? navGroups.slice(0, 1).map((group) => ({
+        ...group,
+        items: group.items.filter((item) => item.href !== '/proyek/baru'),
+      }))
+    : navGroups;
   const [signingOut, setSigningOut] = useState(false);
   const [masterOpen, setMasterOpen] = useState(() => pathname.startsWith('/master/'));
 
@@ -191,7 +198,7 @@ export default function Sidebar() {
         aria-label="Navigasi utama"
         className="relative z-10 flex-1 space-y-6 overflow-y-auto px-3.5 py-5 [scrollbar-color:rgba(148,163,184,0.25)_transparent] [scrollbar-width:thin]"
       >
-        {navGroups.map((group) => {
+        {visibleNavGroups.map((group) => {
           const visibleItems = group.items.filter(
             (item) => !item.permission || (!loading && can(item.permission)),
           );
@@ -244,93 +251,97 @@ export default function Sidebar() {
           );
         })}
 
-        {/* Master Data: satu grup induk dengan empat submenu. */}
-        <section>
-          <SectionLabel>Database & Referensi</SectionLabel>
-          <div
-            className={`rounded-[18px] border p-2 transition-all duration-200 ${
-              masterIsActive
-                ? 'border-emerald-300/25 bg-gradient-to-br from-emerald-400/[0.12] to-cyan-400/[0.055] shadow-[0_8px_28px_rgba(16,185,129,0.07)]'
-                : 'border-white/[0.08] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.04]'
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => setMasterOpen((open) => !open)}
-              aria-expanded={masterOpen}
-              aria-controls="sidebar-master-submenu"
-              className="group flex w-full items-center gap-3 rounded-[13px] px-1.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/70"
-            >
-              <span
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border transition-colors ${
-                  masterIsActive
-                    ? 'border-emerald-200/20 bg-emerald-300/15 text-emerald-200'
-                    : 'border-white/[0.07] bg-white/[0.045] text-slate-400 group-hover:text-emerald-200'
-                }`}
-              >
-                <Database className="h-[19px] w-[19px]" strokeWidth={1.8} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[13px] font-bold text-slate-100">Master Data</span>
-                <span className="mt-0.5 block text-[10px] font-medium text-slate-500">
-                  Referensi & komponen proyek
-                </span>
-              </span>
-              <span className="mr-1 flex h-6 min-w-6 items-center justify-center rounded-lg border border-white/[0.08] bg-black/10 px-1.5 text-[9px] font-bold tabular-nums text-slate-400">
-                04
-              </span>
-              <ChevronDown
-                className={`mr-1 h-4 w-4 shrink-0 text-slate-500 transition-transform duration-300 ${
-                  masterOpen ? 'rotate-180 text-emerald-300' : ''
-                }`}
-              />
-            </button>
-
+        {!isPortfolioAccount ? (
+          <>
+          <section>
+            <SectionLabel>Database & Referensi</SectionLabel>
             <div
-              id="sidebar-master-submenu"
-              className={`grid transition-all duration-300 ease-in-out ${
-                masterOpen
-                  ? 'mt-1 grid-rows-[1fr] opacity-100'
-                  : 'grid-rows-[0fr] opacity-0'
+              className={`rounded-[18px] border p-2 transition-all duration-200 ${
+                masterIsActive
+                  ? 'border-emerald-300/25 bg-gradient-to-br from-emerald-400/[0.12] to-cyan-400/[0.055] shadow-[0_8px_28px_rgba(16,185,129,0.07)]'
+                  : 'border-white/[0.08] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.04]'
               }`}
             >
-              <div className="overflow-hidden">
-                <div className="ml-6 space-y-1 border-l border-emerald-300/20 pb-1 pl-3 pt-1">
-                  {masterItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = isItemActive(pathname, item.href);
-
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        aria-current={isActive ? 'page' : undefined}
-                        className={`group flex min-h-[39px] items-center gap-2.5 rounded-[10px] px-2.5 text-[11.5px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/70 ${
-                          isActive
-                            ? 'bg-emerald-300/15 text-emerald-100 shadow-[inset_0_0_0_1px_rgba(110,231,183,0.13)]'
-                            : 'text-slate-400 hover:bg-white/[0.055] hover:text-white'
-                        }`}
-                      >
-                        <Icon
-                          className={`h-4 w-4 shrink-0 ${
+              <button
+                type="button"
+                onClick={() => setMasterOpen((open) => !open)}
+                aria-expanded={masterOpen}
+                aria-controls="sidebar-master-submenu"
+                className="group flex w-full items-center gap-3 rounded-[13px] px-1.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/70"
+              >
+                <span
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border transition-colors ${
+                    masterIsActive
+                      ? 'border-emerald-200/20 bg-emerald-300/15 text-emerald-200'
+                      : 'border-white/[0.07] bg-white/[0.045] text-slate-400 group-hover:text-emerald-200'
+                  }`}
+                >
+                  <Database className="h-[19px] w-[19px]" strokeWidth={1.8} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-bold text-slate-100">Master Data</span>
+                  <span className="mt-0.5 block text-[10px] font-medium text-slate-500">
+                    Referensi & komponen proyek
+                  </span>
+                </span>
+                <span className="mr-1 flex h-6 min-w-6 items-center justify-center rounded-lg border border-white/[0.08] bg-black/10 px-1.5 text-[9px] font-bold tabular-nums text-slate-400">
+                  04
+                </span>
+                <ChevronDown
+                  className={`mr-1 h-4 w-4 shrink-0 text-slate-500 transition-transform duration-300 ${
+                    masterOpen ? 'rotate-180 text-emerald-300' : ''
+                  }`}
+                />
+              </button>
+  
+              <div
+                id="sidebar-master-submenu"
+                className={`grid transition-all duration-300 ease-in-out ${
+                  masterOpen
+                    ? 'mt-1 grid-rows-[1fr] opacity-100'
+                    : 'grid-rows-[0fr] opacity-0'
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="ml-6 space-y-1 border-l border-emerald-300/20 pb-1 pl-3 pt-1">
+                    {masterItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = isItemActive(pathname, item.href);
+  
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={`group flex min-h-[39px] items-center gap-2.5 rounded-[10px] px-2.5 text-[11.5px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/70 ${
                             isActive
-                              ? 'text-emerald-300'
-                              : 'text-slate-500 group-hover:text-emerald-200'
+                              ? 'bg-emerald-300/15 text-emerald-100 shadow-[inset_0_0_0_1px_rgba(110,231,183,0.13)]'
+                              : 'text-slate-400 hover:bg-white/[0.055] hover:text-white'
                           }`}
-                          strokeWidth={1.9}
-                        />
-                        <span className="min-w-0 flex-1 truncate">{item.name}</span>
-                        {isActive ? (
-                          <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_8px_rgba(110,231,183,0.8)]" />
-                        ) : null}
-                      </Link>
-                    );
-                  })}
+                        >
+                          <Icon
+                            className={`h-4 w-4 shrink-0 ${
+                              isActive
+                                ? 'text-emerald-300'
+                                : 'text-slate-500 group-hover:text-emerald-200'
+                            }`}
+                            strokeWidth={1.9}
+                          />
+                          <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                          {isActive ? (
+                            <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_8px_rgba(110,231,183,0.8)]" />
+                          ) : null}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+          </>
+        ) : null}
+
       </nav>
 
       {/* Profil, logout, dan status workspace */}
@@ -387,7 +398,7 @@ export default function Sidebar() {
           <div className="flex items-center gap-2">
             <Activity className="h-3.5 w-3.5 text-emerald-300" />
             <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-emerald-100">
-              Company Workspace
+              {isPortfolioAccount ? 'PORTOFOLIO / DUMMY' : 'Company Workspace'}
             </p>
             <span className="ml-auto rounded-md border border-emerald-300/15 bg-emerald-300/10 px-1.5 py-0.5 text-[8px] font-bold text-emerald-200">
               ONLINE

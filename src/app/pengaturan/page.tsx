@@ -23,7 +23,6 @@ type AppSettings = {
   company_logo_url: string | null;
   default_tax_rate: number;
   default_profit_margin: number;
-  default_project_status: 'Draft' | 'Review' | 'Final';
   currency_code: string;
   currency_locale: string;
   price_decimal_places: number;
@@ -52,7 +51,6 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   company_logo_url: null,
   default_tax_rate: 11,
   default_profit_margin: 10,
-  default_project_status: 'Draft',
   currency_code: 'IDR',
   currency_locale: 'id-ID',
   price_decimal_places: 0,
@@ -316,7 +314,7 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div><label className={labelClass}>PPN / Pajak default (%)</label><div className="relative"><input className={`${inputClass} pr-10`} type="number" min="0" max="100" step="0.01" value={settings.default_tax_rate} onChange={(e) => updateField('default_tax_rate', Number(e.target.value))}/><Percent className="absolute right-3 top-4 h-4 w-4 text-slate-400"/></div></div>
                 <div><label className={labelClass}>Margin keuntungan default (%)</label><div className="relative"><input className={`${inputClass} pr-10`} type="number" min="0" max="100" step="0.01" value={settings.default_profit_margin} onChange={(e) => updateField('default_profit_margin', Number(e.target.value))}/><Percent className="absolute right-3 top-4 h-4 w-4 text-slate-400"/></div></div>
-                <div><label className={labelClass}>Status awal proyek baru</label><select className={inputClass} value={settings.default_project_status} onChange={(e) => updateField('default_project_status', e.target.value as AppSettings['default_project_status'])}><option value="Draft">Draft</option><option value="Review">Review</option><option value="Final">Final</option></select></div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><label className={labelClass}>Status awal proyek baru</label><p className="mt-1 text-sm font-bold text-slate-900">DRAFT</p><p className="mt-1 text-xs text-slate-500">Semua proyek baru dimulai dari DRAFT. Perubahan status dilakukan melalui alur persetujuan pada halaman pengelolaan proyek.</p></div>
                 <div><label className={labelClass}>Mata uang</label><select className={inputClass} value={settings.currency_code} onChange={(e) => updateField('currency_code', e.target.value)}><option value="IDR">Rupiah (IDR)</option></select></div>
                 <div><label className={labelClass}>Locale format</label><select className={inputClass} value={settings.currency_locale} onChange={(e) => updateField('currency_locale', e.target.value)}><option value="id-ID">Indonesia (id-ID)</option></select></div>
                 <div><label className={labelClass}>Jumlah angka desimal harga</label><select className={inputClass} value={String(settings.price_decimal_places)} onChange={(e) => updateField('price_decimal_places', Number(e.target.value))}>{[0,1,2,3,4].map((n) => <option key={n} value={n}>{n} digit</option>)}</select></div>

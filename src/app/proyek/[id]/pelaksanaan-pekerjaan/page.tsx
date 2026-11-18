@@ -248,13 +248,14 @@ function ProjectExecutionContent() {
       setData(workspace);
       setSelectedPackageId((current) => current && workspace.packages.some((p) => p.id === current)
         ? current : workspace.packages[0]?.id ?? '');
-      const manage = hasPermission(access, 'project.manage', projectId);
+      const projectIsActive = workspace.project.status === 'DIKERJAKAN';
+      const manage = projectIsActive && hasPermission(access, 'project.manage', projectId);
       const canPayDetails = hasPermission(access, 'payroll.read')
         || hasPermission(access, 'execution.payment.read')
         || hasPermission(access, 'execution.payment.manage');
       const canSeeContract = manage || canPayDetails;
-      const review = hasPermission(access, 'execution.progress.review', projectId) || manage;
-      const report = hasPermission(access, 'execution.report.create', projectId) || manage;
+      const review = projectIsActive && (hasPermission(access, 'execution.progress.review', projectId) || manage);
+      const report = projectIsActive && (hasPermission(access, 'execution.report.create', projectId) || manage);
       setCanManage(manage);
       setCanReview(review);
       setCanReport(report);

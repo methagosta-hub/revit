@@ -23,6 +23,7 @@ import {
 import { fetchProjects } from '@/lib/services/projectService';
 import { formatRupiah } from '@/lib/format';
 import RequireAuth from '@/components/auth/RequireAuth';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 type DashboardProject = {
   id: string;
@@ -48,10 +49,14 @@ function formatDate(value?: string | null): string {
 
 function statusClass(status?: string | null): string {
   switch (status) {
-    case 'Final':
+    case 'DIKERJAKAN':
       return 'bg-emerald-50 text-emerald-700 ring-emerald-600/20';
-    case 'Review':
+    case 'FINAL RAB':
+      return 'bg-blue-50 text-blue-700 ring-blue-600/20';
+    case 'REVIEW':
       return 'bg-amber-50 text-amber-700 ring-amber-600/20';
+    case 'SELESAI':
+      return 'bg-violet-50 text-violet-700 ring-violet-600/20';
     default:
       return 'bg-slate-100 text-slate-600 ring-slate-500/20';
   }
@@ -120,6 +125,8 @@ const quickLinks = [
 ];
 
 function CompanyDashboardContent() {
+  const { access } = useAuth();
+  const isPortfolioAccount = access?.profile?.is_demo_user === true;
   const [projects, setProjects] = useState<DashboardProject[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -152,11 +159,13 @@ function CompanyDashboardContent() {
       (sum, project) => sum + Number(project.total_value ?? 0),
       0,
     );
-    const draft = projects.filter((project) => project.status === 'Draft').length;
-    const review = projects.filter((project) => project.status === 'Review').length;
-    const final = projects.filter((project) => project.status === 'Final').length;
+    const draft = projects.filter((project) => project.status === 'DRAFT').length;
+    const review = projects.filter((project) => project.status === 'REVIEW').length;
+    const final = projects.filter((project) => project.status === 'FINAL RAB').length;
+    const inProgress = projects.filter((project) => project.status === 'DIKERJAKAN').length;
+    const completed = projects.filter((project) => project.status === 'SELESAI').length;
 
-    return { totalValue, draft, review, final };
+    return { totalValue, draft, review, final, inProgress, completed };
   }, [projects]);
 
   const filteredProjects = useMemo(() => {
@@ -179,7 +188,7 @@ function CompanyDashboardContent() {
               DAHLIA Construction
             </div>
             <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-              Dashboard Perusahaan
+              {isPortfolioAccount ? 'Dashboard Portofolio' : 'Dashboard Perusahaan'}
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-slate-500">
               Ringkasan proyek dan akses cepat ke aktivitas operasional perusahaan.
@@ -195,6 +204,7 @@ function CompanyDashboardContent() {
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               Segarkan
             </button>
+            {!isPortfolioAccount ? (
             <Link
               href="/proyek/baru"
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
@@ -202,6 +212,7 @@ function CompanyDashboardContent() {
               <Plus className="h-4 w-4" />
               Buat Proyek
             </Link>
+            ) : null}
           </div>
         </header>
 
@@ -238,11 +249,25 @@ function CompanyDashboardContent() {
             iconClass="bg-amber-50 text-amber-700"
           />
           <StatCard
-            label="RAB Final"
+            label="FINAL RAB"
             value={loading ? '—' : String(summary.final)}
-            note="Proyek dengan status Final"
+            note="RAB yang telah ditetapkan"
             icon={CheckCircle2}
             iconClass="bg-violet-50 text-violet-700"
+          />
+          <StatCard
+            label="Sedang Dikerjakan"
+            value={loading ? '—' : String(summary.inProgress)}
+            note="Proyek yang sudah masuk pelaksanaan"
+            icon={Activity}
+            iconClass="bg-emerald-50 text-emerald-700"
+          />
+          <StatCard
+            label="Selesai"
+            value={loading ? '—' : String(summary.completed)}
+            note="Proyek yang sudah ditutup"
+            icon={CheckCircle2}
+            iconClass="bg-slate-100 text-slate-600"
           />
         </section>
 
@@ -289,7 +314,7 @@ function CompanyDashboardContent() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate text-sm font-bold text-slate-900">{project.title}</p>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset ${statusClass(project.status)}`}>
-                          {project.status || 'Draft'}
+                          {project.status || 'DRAFT'}
                         </span>
                       </div>
                       <p className="mt-1 truncate text-xs text-slate-500">
@@ -320,7 +345,7 @@ function CompanyDashboardContent() {
                 <p className="mt-1 text-xs text-slate-500">
                   {search ? 'Coba kata kunci lain.' : 'Buat proyek pertama untuk mulai menggunakan ruang kerja perusahaan.'}
                 </p>
-                {!search ? (
+                {!search && !isPortfolioAccount ? (
                   <Link href="/proyek/baru" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800">
                     <Plus className="h-3.5 w-3.5" /> Buat Proyek
                   </Link>
@@ -330,6 +355,7 @@ function CompanyDashboardContent() {
           </div>
 
           <aside className="space-y-5">
+            {!isPortfolioAccount ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4">
                 <h2 className="font-bold text-slate-900">Akses Operasional</h2>
@@ -357,6 +383,7 @@ function CompanyDashboardContent() {
                 })}
               </div>
             </div>
+            ) : null}
 
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex items-center gap-2">
@@ -393,14 +420,14 @@ function CompanyDashboardContent() {
                 </div>
               </div>
               <p className="mt-3 text-[10px] leading-relaxed text-slate-400">
-                Status ini mengikuti kolom status proyek yang tersedia saat ini (Draft, Review, Final).
+                Status proyek mengikuti alur DRAFT → REVIEW → FINAL RAB → DIKERJAKAN → SELESAI.
               </p>
             </div>
           </aside>
         </section>
 
         <footer className="flex flex-col gap-2 border-t border-slate-200 pt-4 text-[11px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-          <span>DAHLIA Construction · Company Management Hub</span>
+          <span>{isPortfolioAccount ? 'DAHLIA Construction · PORTOFOLIO' : 'DAHLIA Construction · Company Management Hub'}</span>
           <span>Ringkasan berdasarkan data proyek dan nilai RAB yang tersimpan.</span>
         </footer>
       </div>
@@ -410,8 +437,11 @@ function CompanyDashboardContent() {
 
 
 export default function CompanyDashboardPage() {
+  // Dashboard hanya memerlukan sesi aktif. Daftar proyek dan seluruh angka
+  // tetap mengikuti RLS, sehingga akun PORTOFOLIO hanya melihat proyek sampel
+  // yang memang ditugaskan kepadanya.
   return (
-    <RequireAuth permission="company.dashboard.read">
+    <RequireAuth>
       <CompanyDashboardContent />
     </RequireAuth>
   );
