@@ -96,6 +96,43 @@ create table if not exists public.project_status_history (
 create index if not exists project_status_history_project_date_idx
   on public.project_status_history(project_id, changed_at desc);
 
+-- Only the trusted administrator API (service role) may change the account
+-- category. Any non-revoked role assignment must first be removed so that a
+-- user's effective scope cannot silently change under existing assignments.
+create or replace function public.dahlia_guard_user_demo_mode()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+begin
+  if tg_op = 'INSERT' then
+    if new.is_demo_user is true and coalesce(auth.role(), '') <> 'service_role' then
+      raise exception 'Hanya administrator yang dapat membuat akun PORTOFOLIO.' using errcode = '42501';
+    end if;
+    return new;
+  end if;
+
+  if new.is_demo_user is distinct from old.is_demo_user then
+    if coalesce(auth.role(), '') <> 'service_role' then
+      raise exception 'Hanya administrator yang dapat mengubah kategori akun.' using errcode = '42501';
+    end if;
+    if exists (
+      select 1 from public.user_role_assignments
+      where user_id = new.id and revoked_at is null
+    ) then
+      raise exception 'Cabut seluruh penugasan role sebelum mengubah kategori akun.' using errcode = '23514';
+    end if;
+  end if;
+  return new;
+end;
+$;
+
+drop trigger if exists user_profiles_demo_mode_guard on public.user_profiles;
+create trigger user_profiles_demo_mode_guard
+before insert or update of is_demo_user on public.user_profiles
+for each row execute function public.dahlia_guard_user_demo_mode();
+
 -- Scope project visibility by the account mode. Demo accounts can only access
 -- PORTOFOLIO projects; regular accounts can only access REGULER projects.
 create or replace function public.dahlia_project_category_value_access(p_project_category text)
