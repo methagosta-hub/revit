@@ -19,6 +19,16 @@ begin
   if to_regprocedure('public.is_company_admin()') is null then
     raise exception 'Fungsi is_company_admin belum tersedia. Pastikan modul pengelolaan pengguna sudah terpasang.';
   end if;
+  if exists (
+    select 1
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname in ('projects', 'rab_divisions', 'rab_items')
+      and c.relrowsecurity = false
+  ) then
+    raise exception 'RLS proyek/RAB belum aktif. Jalankan migration access-control projects dan RAB sebelum migration lifecycle PORTOFOLIO.';
+  end if;
 end;
 $preflight$;
 
@@ -395,12 +405,8 @@ declare
   ];
 begin
   foreach v_table in array v_tables loop
-    if to_regclass(format('public.%I', v_table)) is not null
-       and exists (
-         select 1 from pg_class c
-         join pg_namespace n on n.oid = c.relnamespace
-         where n.nspname = 'public' and c.relname = v_table and c.relrowsecurity
-       ) then
+    if to_regclass(format('public.%I', v_table)) is not null then
+      execute format('alter table public.%I enable row level security', v_table);
       execute format('drop policy if exists %I on public.%I', v_table || '_category_scope_restrictive', v_table);
       execute format(
         'create policy %I on public.%I as restrictive for all to authenticated using (public.dahlia_project_row_category_access(to_jsonb(%I))) with check (public.dahlia_project_row_category_write_access(to_jsonb(%I)))',
@@ -494,6 +500,28 @@ begin
     select project_category into v_category from public.projects where id = new.project_id;
     if v_category is distinct from case when v_is_demo then 'PORTOFOLIO' else 'REGULER' end then
       raise exception 'Penugasan akun hanya boleh menggunakan kategori proyek yang sesuai dengan jenis akunnya.' using errcode = '42501';
+    end if;
+  end if;
+
+  if v_is_demo then
+    if exists (
+      select 1 from public.app_roles ar
+      where ar.id = new.role_id and ar.scope = 'company'
+    ) then
+      raise exception 'Akun PORTOFOLIO tidak boleh menerima role global perusahaan.' using errcode = '42501';
+    end if;
+    if not exists (
+      select 1
+      from public.role_permissions rp
+      join public.app_permissions ap on ap.id = rp.permission_id
+      where rp.role_id = new.role_id and ap.code like '%.read'
+    ) or exists (
+      select 1
+      from public.role_permissions rp
+      join public.app_permissions ap on ap.id = rp.permission_id
+      where rp.role_id = new.role_id and ap.code not like '%.read'
+    ) then
+      raise exception 'Role akun PORTOFOLIO hanya boleh berisi permission baca-saja dengan akhiran .read.' using errcode = '42501';
     end if;
   end if;
   return new;
