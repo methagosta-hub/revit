@@ -122,10 +122,13 @@ const exportFonts = [
   "Work Sans", "Source Sans 3", "Ubuntu", "Rubik", "Outfit",
   "Space Grotesk", "Urbanist", "Mulish", "Figtree", "IBM Plex Sans",
 ] as const;
-const parseDecimal = (value: string) => Number(value.trim().replace(/\\./g, "").replace(",", ".")) || 0;
+const parseDecimal = (value: string) => Number(value.trim().replace(",", ".")) || 0;
 const detailLineTotal = (line: DetailLine) => Math.round(parseDecimal(line.unit_price) * parseDecimal(line.volume));
 const draftDetailsTotal = (draft: Draft) => draft.details.reduce((sum, line) => sum + detailLineTotal(line), 0);
-const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char] || char));
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => {
+  const replacements: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+  return replacements[char] || char;
+});
 const fieldClass = "mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50";
 
 function categoryLabel(value: string) {
