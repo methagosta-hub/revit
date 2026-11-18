@@ -104,7 +104,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $dahlia_profile_guard$
 begin
   if tg_op = 'INSERT' then
     if new.is_demo_user is true and coalesce(auth.role(), '') <> 'service_role' then
@@ -126,7 +126,7 @@ begin
   end if;
   return new;
 end;
-$;
+$dahlia_profile_guard$;
 
 drop trigger if exists user_profiles_demo_mode_guard on public.user_profiles;
 create trigger user_profiles_demo_mode_guard
