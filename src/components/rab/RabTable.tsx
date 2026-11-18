@@ -89,6 +89,7 @@ type Props = {
   onUpdateComponents?: (id: string, changes: RabComponentsUpdate) => Promise<void>;
   onDelete: (item: RabTableItem) => Promise<void>;
   onVolumeUpdated?: () => void | Promise<void>;
+  readOnly?: boolean;
 };
 
 type EditForm = {
@@ -559,7 +560,7 @@ function collectSubitemComponents(items: RabSubitemSnapshot[]): RabComponentSnap
   ]);
 }
 
-export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete, onVolumeUpdated }: Props) {
+export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete, onVolumeUpdated, readOnly = false }: Props) {
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EditForm>({ code: '', name: '', volume: '', unitPrice: '' });
@@ -630,7 +631,7 @@ export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete
         </thead>
         <tbody className="divide-y divide-slate-100 text-sm">
           {items.length ? items.map((item, index) => {
-            const isEditing = editingId === item.id;
+            const isEditing = !readOnly && editingId === item.id;
             const previewTotal = Math.max(0, Number(form.volume) || 0) * Math.max(0, Number(form.unitPrice) || 0);
             const hasDetails = Boolean((item.components_snapshot?.length ?? 0) || (item.subitems_snapshot?.length ?? 0));
             const detailsOpen = expandedDetails[item.id] ?? false;
@@ -660,14 +661,14 @@ export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete
                   <td className="px-3 py-3.5"><div className="flex items-center justify-center gap-1">
                     {isEditing ? <><button type="button" onClick={() => void saveEdit(item.id)} disabled={saving} title="Simpan perubahan" className="rounded-lg p-2 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}</button><button type="button" onClick={() => { setEditingId(null); setFormError(''); }} disabled={saving} title="Batal" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button></> : <>
                       {hasDetails && <button type="button" onClick={() => setExpandedDetails((current) => ({ ...current, [item.id]: !detailsOpen }))} aria-expanded={detailsOpen} title={detailsOpen ? 'Tutup rincian AHSP' : 'Buka rincian AHSP'} className="rounded-lg p-2 text-violet-700 hover:bg-violet-50">{detailsOpen ? <ChevronDown className="h-4 w-4" /> : <ListTree className="h-4 w-4" />}</button>}
-                      <button type="button" onClick={() => setVolumeItem(volumeTarget)} disabled={Boolean(editingId) || Boolean(deletingId)} title="Backup volume" className="rounded-lg p-2 text-emerald-700 hover:bg-emerald-50 disabled:opacity-40"><Ruler className="h-4 w-4" /></button>
-                      <button type="button" onClick={() => beginEdit(item)} disabled={Boolean(editingId) || Boolean(deletingId)} title="Edit item RAB" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-40"><Pencil className="h-4 w-4" /></button>
-                      <button type="button" onClick={() => void handleDelete(item)} disabled={Boolean(editingId) || deletingId === item.id} title="Hapus item RAB" className="rounded-lg p-2 text-rose-600 hover:bg-rose-50 disabled:opacity-40">{deletingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button>
+                      {!readOnly && <button type="button" onClick={() => setVolumeItem(volumeTarget)} disabled={Boolean(editingId) || Boolean(deletingId)} title="Backup volume" className="rounded-lg p-2 text-emerald-700 hover:bg-emerald-50 disabled:opacity-40"><Ruler className="h-4 w-4" /></button>}
+                      {!readOnly && <button type="button" onClick={() => beginEdit(item)} disabled={Boolean(editingId) || Boolean(deletingId)} title="Edit item RAB" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-40"><Pencil className="h-4 w-4" /></button>}
+                      {!readOnly && <button type="button" onClick={() => void handleDelete(item)} disabled={Boolean(editingId) || deletingId === item.id} title="Hapus item RAB" className="rounded-lg p-2 text-rose-600 hover:bg-rose-50 disabled:opacity-40">{deletingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button>}
                     </>}
                   </div></td>
                 </tr>
                 {hasDetails && detailsOpen && (
-                  <tr className="bg-violet-50/20"><td colSpan={8} className="px-4 py-3 sm:px-6"><CompositionEditor item={item} onSave={onUpdateComponents ? (changes) => onUpdateComponents(item.id, changes) : undefined} onOpenVolume={(target) => setVolumeItem(target)} /></td></tr>
+                  <tr className="bg-violet-50/20"><td colSpan={8} className="px-4 py-3 sm:px-6"><CompositionEditor item={item} onSave={!readOnly && onUpdateComponents ? (changes) => onUpdateComponents(item.id, changes) : undefined} onOpenVolume={(target) => { if (!readOnly) setVolumeItem(target); }} /></td></tr>
                 )}
               </Fragment>
             );
@@ -676,7 +677,7 @@ export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete
         {items.length > 0 && <tfoot><tr className="border-t border-slate-200 bg-slate-50/70"><td colSpan={7} className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-600">Subtotal kelompok</td><td className="whitespace-nowrap px-4 py-3 text-right text-sm font-bold tabular-nums text-slate-900">{formatRupiah(items.reduce((sum, item) => sum + Number(item.total_price || 0), 0))}</td></tr></tfoot>}
       </table>
       <VolumeBackupDrawer
-        open={Boolean(volumeItem)}
+        open={!readOnly && Boolean(volumeItem)}
         item={volumeItem}
         onClose={() => setVolumeItem(null)}
         onSaved={async () => { await onVolumeUpdated?.(); }}
