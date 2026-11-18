@@ -995,7 +995,6 @@ export default function ProjectWorkspacePage() {
           // Kolom unit tidak disertakan: satuan RAB adalah snapshot terkunci
           // dari Master AHSP ketika item pertama kali dimasukkan.
           volume: changes.volume,
-          unit_price: changes.unit_price,
           total_price: changes.total_price,
         })
         .eq('id', itemId);
