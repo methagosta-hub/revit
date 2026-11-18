@@ -1102,17 +1102,38 @@ function StatCard({ label, value, icon, color, compact }: { label: string; value
   const colors: Record<string, string> = { green: "bg-emerald-50 text-emerald-800", blue: "bg-sky-50 text-sky-800", violet: "bg-violet-50 text-violet-800", amber: "bg-amber-50 text-amber-800" };
   return <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between"><p className="text-xs font-semibold text-slate-500">{label}</p><span className={"flex h-9 w-9 items-center justify-center rounded-xl " + colors[color]}>{icon}</span></div><p className={"mt-3 font-black tracking-tight text-slate-900 " + (compact ? "text-base sm:text-lg" : "text-xl sm:text-2xl")}>{value}</p></div>;
 }
-function TransactionCard({ tx, balance, onEvidence }: { tx: Transaction; balance?: { cash: number; bank: number; total: number }; onEvidence: (path: string) => void }) {
+function TransactionCard({
+  tx, balance, onEvidence, onEdit, onCopy, onDelete,
+}: {
+  tx: Transaction;
+  balance?: { cash: number; bank: number; total: number };
+  onEvidence: (path: string) => void;
+  onEdit: (tx: Transaction) => void;
+  onCopy: (tx: Transaction) => void;
+  onDelete: (tx: Transaction) => void;
+}) {
   const incoming = tx.transaction_type === "IN";
   const transfer = tx.transaction_type === "TRANSFER";
   return <article className="rounded-xl border border-slate-100 p-3">
     <div className="flex items-start justify-between gap-3">
       <div className="flex min-w-0 items-start gap-2.5">
         <span className={"mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg " + (transfer ? "bg-blue-50 text-blue-700" : incoming ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700")}>{transfer ? <ArrowLeftRight size={16} /> : incoming ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}</span>
-        <div className="min-w-0"><p className="break-words text-sm font-bold text-slate-800">{tx.description}</p><p className="mt-0.5 text-[11px] text-slate-400">{categoryLabel(tx.category)} · {transfer ? tx.from_account + " → " + tx.to_account : tx.account === "BANK" ? "Bank / non-tunai" : "Tunai"}</p>{tx.receipt_number && <p className="mt-1 text-[11px] text-slate-500">Nota: {tx.receipt_number}</p>}{tx.details?.length ? <p className="mt-1 text-[10px] text-slate-500">{tx.details.length} rincian: {tx.details.slice(0, 3).map((line) => line.name).join(", ")}{tx.details.length > 3 ? "…" : ""}</p> : null}</div>
+        <div className="min-w-0">
+          <p className="break-words text-sm font-bold text-slate-800">{tx.description}</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">{categoryLabel(tx.category)} · {transfer ? tx.from_account + " → " + tx.to_account : tx.account === "BANK" ? "Bank / non-tunai" : "Tunai"}</p>
+          {tx.store_name && <p className="mt-1 text-[11px] font-semibold text-slate-600">Toko / pihak: {tx.store_name}</p>}
+          {tx.receipt_number && <p className="mt-1 text-[11px] text-slate-500">Nota: {tx.receipt_number}</p>}
+          {tx.details?.length ? <div className="mt-2 space-y-0.5 text-[10px] text-slate-500">{tx.details.slice(0, 5).map((line, i) => <p key={i}>{line.name} · {Number(line.volume).toLocaleString("id-ID")} {line.unit} × {money(Number(line.unit_price))} = <strong>{money(Number(line.line_total || line.volume * line.unit_price))}</strong></p>)}{tx.details.length > 5 && <p>+ {tx.details.length - 5} material lainnya</p>}</div> : null}
+        </div>
       </div>
       <div className="shrink-0 text-right"><p className={"text-sm font-black " + (transfer ? "text-blue-700" : incoming ? "text-emerald-700" : "text-rose-700")}>{incoming ? "+" : transfer ? "↔" : "-"}{money(Number(tx.amount))}</p>{balance && <p className="mt-1 text-[10px] text-slate-400">Saldo {money(balance.total)}</p>}</div>
     </div>
-    {tx.evidence_path && <button onClick={() => onEvidence(tx.evidence_path as string)} className="mt-2 text-xs font-semibold text-emerald-700 hover:underline">Lihat bukti</button>}
+    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
+      {tx.evidence_path && <button onClick={() => onEvidence(tx.evidence_path as string)} className="mr-auto text-xs font-semibold text-emerald-700 hover:underline">Lihat bukti</button>}
+      {!tx.evidence_path && <span className="mr-auto text-[10px] text-slate-400">Nota #{tx.entry_no}</span>}
+      <button onClick={() => onEdit(tx)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Ubah</button>
+      <button onClick={() => onCopy(tx)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Copy size={13}/>Salin</button>
+      <button onClick={() => onDelete(tx)} className="flex items-center gap-1 rounded-lg border border-rose-100 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"><Trash2 size={13}/>Hapus</button>
+    </div>
   </article>;
 }
