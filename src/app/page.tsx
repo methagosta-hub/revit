@@ -28,7 +28,7 @@ type ProjectRow = {
   title: string;
   client: string;
   location: string;
-  status: 'Draft' | 'Review' | 'Final';
+  status: 'DRAFT' | 'REVIEW' | 'FINAL RAB' | 'DIKERJAKAN' | 'SELESAI';
   total_value: number;
   updated_at: string;
 };
@@ -155,9 +155,11 @@ export default function DashboardPage() {
 
   const statusCount = useMemo(
     () => ({
-      draft: projects.filter((project) => project.status === 'Draft').length,
-      review: projects.filter((project) => project.status === 'Review').length,
-      final: projects.filter((project) => project.status === 'Final').length,
+      draft: projects.filter((project) => project.status === 'DRAFT').length,
+      review: projects.filter((project) => project.status === 'REVIEW').length,
+      finalRab: projects.filter((project) => project.status === 'FINAL RAB').length,
+      inProgress: projects.filter((project) => project.status === 'DIKERJAKAN').length,
+      completed: projects.filter((project) => project.status === 'SELESAI').length,
     }),
     [projects],
   );
@@ -294,13 +296,37 @@ export default function DashboardPage() {
 
           <article className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div>
-              <p className="text-xs font-medium text-slate-500">Final</p>
+              <p className="text-xs font-medium text-slate-500">FINAL RAB</p>
               <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
-                {loading ? '—' : statusCount.final}
+                {loading ? '—' : statusCount.finalRab}
                 <span className="ml-1.5 text-sm font-medium text-slate-400">proyek</span>
               </p>
             </div>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+              <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+            </div>
+          </article>
+          <article className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div>
+              <p className="text-xs font-medium text-slate-500">DIKERJAKAN</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
+                {loading ? '—' : statusCount.inProgress}
+                <span className="ml-1.5 text-sm font-medium text-slate-400">proyek</span>
+              </p>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+              <Wrench className="h-5 w-5" aria-hidden="true" />
+            </div>
+          </article>
+          <article className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div>
+              <p className="text-xs font-medium text-slate-500">SELESAI</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
+                {loading ? '—' : statusCount.completed}
+                <span className="ml-1.5 text-sm font-medium text-slate-400">proyek</span>
+              </p>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
               <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
             </div>
           </article>
@@ -400,16 +426,20 @@ export default function DashboardPage() {
               ) : filteredProjects.length > 0 ? (
                 filteredProjects.map((project) => {
                   const statusClass =
-                    project.status === 'Final'
+                    project.status === 'DIKERJAKAN'
                       ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      : project.status === 'Review'
+                      : project.status === 'FINAL RAB'
                         ? 'border-blue-200 bg-blue-50 text-blue-700'
-                        : 'border-amber-200 bg-amber-50 text-amber-700';
+                        : project.status === 'REVIEW'
+                          ? 'border-violet-200 bg-violet-50 text-violet-700'
+                          : project.status === 'SELESAI'
+                            ? 'border-slate-200 bg-slate-100 text-slate-600'
+                            : 'border-amber-200 bg-amber-50 text-amber-700';
 
                   const StatusIcon =
-                    project.status === 'Final'
+                    project.status === 'DIKERJAKAN' || project.status === 'FINAL RAB' || project.status === 'SELESAI'
                       ? CheckCircle2
-                      : project.status === 'Review'
+                      : project.status === 'REVIEW'
                         ? AlertCircle
                         : Clock;
 
@@ -438,7 +468,7 @@ export default function DashboardPage() {
                       <td className="px-5 py-4">
                         <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass}`}>
                           <StatusIcon className="h-3 w-3" />
-                          {project.status || 'Draft'}
+                          {project.status || 'DRAFT'}
                         </span>
                       </td>
                       <td className="px-5 py-4 text-right font-semibold tabular-nums text-slate-900">
