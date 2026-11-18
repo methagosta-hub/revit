@@ -92,23 +92,39 @@ create index if not exists project_status_history_project_date_idx
 
 -- Scope project visibility by the account mode. Demo accounts can only access
 -- PORTOFOLIO projects; regular accounts can only access REGULER projects.
+create or replace function public.dahlia_project_category_value_access(p_project_category text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $
+  select exists (
+    select 1
+    from public.user_profiles up
+    where up.id = auth.uid()
+      and up.is_active = true
+      and p_project_category = case when up.is_demo_user then 'PORTOFOLIO' else 'REGULER' end
+  );
+$;
+
 create or replace function public.dahlia_project_category_access(p_project_id uuid)
 returns boolean
 language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $$
+as $
   select exists (
     select 1
     from public.projects p
-    join public.user_profiles up on up.id = auth.uid()
     where p.id = p_project_id
-      and p.project_category = case when up.is_demo_user then 'PORTOFOLIO' else 'REGULER' end
-      and up.is_active = true
+      and public.dahlia_project_category_value_access(p.project_category)
   );
-$$;
+$;
 
+revoke all on function public.dahlia_project_category_value_access(text) from public, anon;
+grant execute on function public.dahlia_project_category_value_access(text) to authenticated;
 revoke all on function public.dahlia_project_category_access(uuid) from public, anon;
 grant execute on function public.dahlia_project_category_access(uuid) to authenticated;
 
@@ -119,12 +135,7 @@ create policy projects_category_scope_restrictive
   on public.projects as restrictive
   for all to authenticated
   using (public.dahlia_project_category_access(id))
-  with check (
-    project_category = case
-      when exists (select 1 from public.user_profiles up where up.id = auth.uid() and up.is_demo_user) then 'PORTOFOLIO'
-      else 'REGULER'
-    end
-  );
+  with check (public.dahlia_project_category_value_access(project_category));
 
 -- Preserve the existing effective role-assignment logic while enforcing the
 -- REGULER/PORTOFOLIO account boundary across project-scoped RLS checks.
