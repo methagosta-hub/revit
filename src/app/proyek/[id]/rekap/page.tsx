@@ -80,6 +80,7 @@ const PDF_GOOGLE_FONTS_URL =
   '&display=swap';
 
 type JsonRecord = Record<string, unknown>;
+type PdfSigner = { role: string; name: string; identifier: string };
 type SnapshotComponent = {
   name: string;
   unit: string;
@@ -200,6 +201,79 @@ function parseComponents(snapshot: unknown): SnapshotComponent[] {
       raw: row,
     };
   }).filter((item) => item.name !== 'Komponen tanpa nama' || item.coefficient !== 0 || item.unitPrice !== 0);
+}
+
+type ManualWorkGroup = {
+  key: string;
+  name: string;
+  items: RABItem[];
+};
+
+function groupWorkItemsInManualOrder(items: RABItem[]): ManualWorkGroup[] {
+  const ordered = [...items].sort(
+    (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
+  );
+  const groups: ManualWorkGroup[] = [];
+  for (const item of ordered) {
+    const name = getWorkSubcategory(item.code || '');
+    const last = groups[groups.length - 1];
+    if (last?.name === name) {
+      last.items.push(item);
+    } else {
+      groups.push({ key: `${name}-${groups.length}`, name, items: [item] });
+    }
+  }
+  return groups;
+}
+
+/**
+ * Reads the analysis saved with a RAB item. Nested AHSP sub-items are expanded
+ * recursively and their coefficients are multiplied through each parent level.
+ * No Master AHSP lookup is performed during report generation.
+ */
+function parseRabItemComponents(item: RABItem): SnapshotComponent[] {
+  const direct = parseComponents(item.components_snapshot);
+  const subitems = asArray(item.subitems_snapshot);
+
+  const expand = (
+    entries: unknown[],
+    multiplier: number,
+    parentNames: string[],
+  ): SnapshotComponent[] => entries.flatMap((entry) => {
+    const row = asRecord(entry);
+    const subitemName = textValue(firstValue(row, ['name', 'item_name', 'description', 'uraian']), 'Sub-item AHSP');
+    const coefficient = numberValue(firstValue(row, ['coefficient', 'coef', 'koefisien', 'volume'], 0));
+    const lineMultiplier = multiplier * coefficient;
+    const pathNames = [...parentNames, subitemName];
+    const ownComponents = parseComponents(firstValue(row, ['components', 'items', 'details', 'data'], []));
+    const children = asArray(row.subitems);
+
+    if (ownComponents.length > 0 || children.length > 0) {
+      return [
+        ...ownComponents.map((component) => ({
+          ...component,
+          name: `${pathNames.join(' / ')} — ${component.name}`,
+          coefficient: component.coefficient * lineMultiplier,
+          subtotal: component.coefficient * lineMultiplier * component.unitPrice,
+        })),
+        ...expand(children, lineMultiplier, pathNames),
+      ];
+    }
+
+    const unitPrice = numberValue(firstValue(row, ['unit_price', 'unitPrice', 'price', 'harga_satuan'], 0));
+    if (unitPrice <= 0 || lineMultiplier <= 0) return [];
+    return [{
+      name: pathNames.join(' / '),
+      unit: textValue(firstValue(row, ['unit', 'unit_name', 'satuan']), '-'),
+      coefficient: lineMultiplier,
+      unitPrice,
+      subtotal: lineMultiplier * unitPrice,
+      type: 'other' as const,
+      raw: row,
+    }];
+  });
+
+  return [...direct, ...expand(subitems, 1, [])];
 }
 
 function classifyCode(code: string) {
@@ -450,6 +524,12 @@ export default function RekapRABPage() {
   const [pdfTheme, setPdfTheme] = useState<PdfThemeKey>('emerald');
   const [pdfFont, setPdfFont] = useState<PdfFontKey>('robotoCondensed');
   const [pdfBoldWeight, setPdfBoldWeight] = useState<PdfBoldWeight>(800);
+  const [pdfSignatureCount, setPdfSignatureCount] = useState<1 | 2 | 3>(2);
+  const [pdfSigners, setPdfSigners] = useState<PdfSigner[]>([
+    { role: 'Disusun oleh', name: '', identifier: '' },
+    { role: 'Mengetahui', name: '', identifier: '' },
+    { role: 'Menyetujui', name: '', identifier: '' },
+  ]);
   const activeTheme = PDF_THEMES[pdfTheme];
 
   const loadData = useCallback(async (refresh = false) => {
@@ -476,6 +556,14 @@ export default function RekapRABPage() {
 
   useEffect(() => { void loadData(); }, [loadData]);
   useEffect(() => {
+    if (!project) return;
+    setPdfSigners([
+      { role: 'Disusun oleh', name: project.planning_consultant || '', identifier: project.planning_consultant_skk || '' },
+      { role: 'Mengetahui', name: project.principal_name || '', identifier: project.principal_nip || '' },
+      { role: 'Menyetujui', name: project.supervisory_consultant || '', identifier: project.supervisory_consultant_skk || '' },
+    ]);
+  }, [project?.id]);
+  useEffect(() => {
     const existing = document.getElementById('pdf-google-fonts') as HTMLLinkElement | null;
     if (existing) return;
     const link = document.createElement('link');
@@ -487,9 +575,20 @@ export default function RekapRABPage() {
   }, []);
 
   const divisions = project?.divisions ?? [];
-  const allItems = useMemo(() => divisions.flatMap((division) =>
+  const orderedDivisions = useMemo(
+    () => [...divisions]
+      .sort((left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0))
+      .map((division) => ({
+        ...division,
+        items: [...(division.items ?? [])].sort(
+          (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
+        ),
+      })),
+    [divisions],
+  );
+  const allItems = useMemo(() => orderedDivisions.flatMap((division) =>
     (division.items ?? []).map((item) => ({ ...item, divisionName: division.name, divisionId: division.id })),
-  ), [divisions]);
+  ), [orderedDivisions]);
 
   const totalRAB = useMemo(() => allItems.reduce((sum, item) => sum + numberValue(item.total_price), 0), [allItems]);
   const taxRate = numberValue(project?.tax_rate ?? 11);
@@ -498,24 +597,24 @@ export default function RekapRABPage() {
   const profitAmount = totalRAB * profitRate / 100;
   const grandTotal = totalRAB + taxAmount + profitAmount;
 
-  const summaryRows = useMemo(() => divisions.map((division) => {
-    const categories = new Map<string, { name: string; total: number; count: number; order: number }>();
-    (division.items ?? []).forEach((item, index) => {
-      const categoryName = getWorkSubcategory(item.code || '');
-      const current = categories.get(categoryName) ?? { name: categoryName, total: 0, count: 0, order: index };
-      current.total += numberValue(item.total_price);
-      current.count += 1;
-      categories.set(categoryName, current);
-    });
-    const rows = Array.from(categories.values()).sort((a, b) => a.order - b.order);
-    return { name: division.name, code: division.code, rows,
+  const summaryRows = useMemo(() => orderedDivisions.map((division) => {
+    const rows = groupWorkItemsInManualOrder(division.items ?? []).map((group) => ({
+      name: group.name,
+      count: group.items.length,
+      total: group.items.reduce((sum, item) => sum + numberValue(item.total_price), 0),
+    }));
+    return {
+      name: division.name,
+      code: division.code,
+      rows,
       total: rows.reduce((sum, row) => sum + row.total, 0),
-      count: rows.reduce((sum, row) => sum + row.count, 0) };
-  }).filter((division) => division.rows.length > 0), [divisions]);
+      count: rows.reduce((sum, row) => sum + row.count, 0),
+    };
+  }).filter((division) => division.rows.length > 0), [orderedDivisions]);
 
   const materialRows = useMemo(() => {
     const map = new Map<string, { name: string; units: Set<string>; volume: number; total: number; unitPrice: number }>();
-    allItems.forEach((item) => parseComponents(item.components_snapshot).filter((c) => c.type === 'material').forEach((component) => {
+    allItems.forEach((item) => parseRabItemComponents(item).filter((c) => c.type === 'material').forEach((component) => {
       // Satu nama material hanya satu baris walaupun digunakan di banyak pekerjaan.
       const key = component.name.trim().toLocaleLowerCase('id-ID');
       const current = map.get(key) ?? { name: component.name.trim(), units: new Set<string>(), volume: 0, total: 0, unitPrice: component.unitPrice };
@@ -534,7 +633,7 @@ export default function RekapRABPage() {
 
   const laborRows = useMemo(() => {
     const map = new Map<string, { name: string; unit: string; coefficient: number; volume: number; unitPrice: number; total: number }>();
-    allItems.forEach((item) => parseComponents(item.components_snapshot).filter((c) => c.type === 'labor').forEach((component) => {
+    allItems.forEach((item) => parseRabItemComponents(item).filter((c) => c.type === 'labor').forEach((component) => {
       const key = `${component.name.toLowerCase()}|${component.unit.toLowerCase()}`;
       const current = map.get(key) ?? { name: component.name, unit: component.unit, coefficient: 0, volume: 0, unitPrice: component.unitPrice, total: 0 };
       current.coefficient += component.coefficient;
@@ -625,6 +724,41 @@ export default function RekapRABPage() {
             <span className="rounded-md px-3 py-1.5 text-[10px] font-bold text-white" style={{ background: activeTheme.accent }}>A4 PORTRAIT</span>
           </div>
         </div>
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Pengaturan Tanda Tangan PDF</h3>
+              <p className="mt-1 text-xs text-slate-500">Pilih satu hingga tiga penandatangan dan lengkapi nama serta jabatannya.</p>
+            </div>
+            <label className="text-xs font-semibold text-slate-600">
+              Jumlah penandatangan
+              <select value={pdfSignatureCount} onChange={(event) => setPdfSignatureCount(Number(event.target.value) as 1 | 2 | 3)} className="mt-1 block rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                <option value={1}>1 orang · kanan bawah</option>
+                <option value={2}>2 orang · kiri dan kanan</option>
+                <option value={3}>3 orang · sejajar tengah</option>
+              </select>
+            </label>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {pdfSigners.slice(0,pdfSignatureCount).map((signer,index) => (
+              <div key={index} className="rounded-xl border border-slate-200 p-3">
+                <p className="mb-2 text-xs font-bold text-slate-700">Penandatangan {index + 1}</p>
+                <label className="block text-xs font-medium text-slate-600">
+                  Jabatan / keterangan
+                  <input value={signer.role} onChange={(event) => setPdfSigners((current) => current.map((entry,entryIndex) => entryIndex === index ? {...entry,role:event.target.value} : entry))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                </label>
+                <label className="mt-2 block text-xs font-medium text-slate-600">
+                  Nama penandatangan
+                  <input value={signer.name} onChange={(event) => setPdfSigners((current) => current.map((entry,entryIndex) => entryIndex === index ? {...entry,name:event.target.value} : entry))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Nama lengkap" />
+                </label>
+                <label className="mt-2 block text-xs font-medium text-slate-600">
+                  NIP / SKK / identitas (opsional)
+                  <input value={signer.identifier} onChange={(event) => setPdfSigners((current) => current.map((entry,entryIndex) => entryIndex === index ? {...entry,identifier:event.target.value} : entry))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="NIP, SKK, atau keterangan" />
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       <div id="rekap-print-report" style={{ fontFamily: PDF_FONTS[pdfFont].css, fontWeight: 400, color: '#1e293b' }}>
@@ -653,9 +787,14 @@ export default function RekapRABPage() {
           <div className="cover-total" style={{ background: activeTheme.soft, borderColor: activeTheme.border }}>
             <span>TOTAL RENCANA ANGGARAN</span><strong style={{ color: activeTheme.accent }}>{formatRupiah(grandTotal)}</strong>
           </div>
-          <div className="cover-signatures">
-            <div><span>Disusun oleh</span><strong>{textValue(project.planning_consultant, 'Konsultan Perencana')}</strong><small>{textValue(project.planning_consultant_skk, ' ')}</small></div>
-            <div><span>Mengetahui</span><strong>{textValue(project.principal_name, 'Penanggung Jawab')}</strong><small>{textValue(project.principal_nip, ' ')}</small></div>
+          <div className={`cover-signatures signature-count-${pdfSignatureCount}`}>
+            {pdfSigners.slice(0, pdfSignatureCount).map((signer,index) => (
+              <div key={index}>
+                <span>{signer.role || `Penandatangan ${index + 1}`}</span>
+                <strong>{signer.name || ' '}</strong>
+                <small>{signer.identifier || ' '}</small>
+              </div>
+            ))}
           </div>
           <div className="cover-footer">DOKUMEN RAB · {textValue(project.client)} · {textValue(project.kabupaten_kota)}</div>
         </section>
@@ -686,17 +825,35 @@ export default function RekapRABPage() {
         {/* 3. RINCIAN PEKERJAAN */}
         <section className="report-page">
           <SectionHeading letter="B" title="RINCIAN PEKERJAAN" theme={activeTheme} />
-          {divisions.map((division, divisionIndex) => {
+          {orderedDivisions.map((division, divisionIndex) => {
             const rows = division.items ?? [];
+            const groups = groupWorkItemsInManualOrder(rows);
+            let itemNumber = 0;
             return <section className="report-subsection" key={division.id}>
-              <h3 style={{background:activeTheme.soft,borderColor:activeTheme.border,color:activeTheme.text}}>{divisionIndex+1}. {division.name}</h3>
+              <h3 style={{background:activeTheme.soft,borderColor:activeTheme.border,color:activeTheme.text}}>{divisionIndex + 1}. {division.name}</h3>
               <table className="report-table compact">
                 <thead><tr><th style={{width:'5%'}}>No.</th><th style={{width:'13%'}}>Kode</th><th>Uraian Pekerjaan</th><th style={{width:'7%'}}>Sat.</th><th style={{width:'9%'}}>Volume</th><th style={{width:'19%'}}>Harga Satuan</th><th style={{width:'20%'}}>Jumlah Harga</th></tr></thead>
                 <tbody>
-                  {rows.map((item,index)=><tr key={item.id}><td className="center">{index+1}</td><td>{item.code || '-'}</td><td>{item.name}</td><td className="center">{item.unit || '-'}</td><td className="number">{formatNumber(numberValue(item.volume),3)}</td><td className="number">{formatRupiah(numberValue(item.unit_price))}</td><td className="number">{formatRupiah(numberValue(item.total_price))}</td></tr>)}
-                  {rows.length===0 && <tr><td colSpan={7} className="center">Belum ada rincian pada tahapan ini.</td></tr>}
+                  {groups.map((group) => (
+                    <Fragment key={group.key}>
+                      <tr className="summary-division"><td colSpan={7}><strong>{group.name}</strong></td></tr>
+                      {group.items.map((item) => {
+                        itemNumber += 1;
+                        return <tr key={item.id}>
+                          <td className="center">{itemNumber}</td>
+                          <td>{item.code || '-'}</td>
+                          <td>{item.name}</td>
+                          <td className="center">{item.unit || '-'}</td>
+                          <td className="number">{formatNumber(numberValue(item.volume),3)}</td>
+                          <td className="number">{formatRupiah(numberValue(item.unit_price))}</td>
+                          <td className="number">{formatRupiah(numberValue(item.total_price))}</td>
+                        </tr>;
+                      })}
+                    </Fragment>
+                  ))}
+                  {rows.length === 0 && <tr><td colSpan={7} className="center">Belum ada rincian pada tahapan ini.</td></tr>}
                 </tbody>
-                <tfoot><tr><th colSpan={6}>JUMLAH {division.name.toUpperCase()}</th><th className="number">{formatRupiah(rows.reduce((s,item)=>s+numberValue(item.total_price),0))}</th></tr></tfoot>
+                <tfoot><tr><th colSpan={6}>JUMLAH {division.name.toUpperCase()}</th><th className="number">{formatRupiah(rows.reduce((sum,item)=>sum+numberValue(item.total_price),0))}</th></tr></tfoot>
               </table>
             </section>;
           })}
@@ -705,24 +862,49 @@ export default function RekapRABPage() {
         {/* 4. RINCIAN AHSP BERDASARKAN SNAPSHOT RAB */}
         <section className="report-page">
           <SectionHeading letter="C" title="RINCIAN ANALISIS HARGA SATUAN PEKERJAAN" theme={activeTheme} />
-          <p className="report-intro">Setiap AHSP ditampilkan sebagai analisis untuk volume 1, menggunakan snapshot komponen yang tersimpan pada RAB proyek saat disusun. Dokumen ini tidak mengambil ulang komponen dari Master AHSP.</p>
-          {allItems.map((item,index)=>{
-            const components = parseComponents(item.components_snapshot);
-            const grouped = ['material','labor','equipment','other'].map(type=>({type, rows:components.filter(c=>c.type===type)})).filter(group=>group.rows.length);
-            return <section className="report-subsection ahsp-block" key={item.id}>
-              <h3 style={{background:activeTheme.soft,borderColor:activeTheme.border,color:activeTheme.text}}>{index+1}. {item.code || '-'} — {item.name}</h3>
-              <div className="ahsp-meta"><span>Satuan pekerjaan: <strong>{item.unit || '-'}</strong></span><span>Volume analisis: <strong>1 {item.unit || ''}</strong></span><span>Harga satuan AHSP: <strong>{formatRupiah(numberValue(item.unit_price))}</strong></span></div>
-              {grouped.map(group=><Fragment key={group.type}>
-                <div className="component-label" style={{color:activeTheme.accent}}>{componentTypeLabel(group.type as SnapshotComponent['type'])}</div>
-                <table className="report-table compact">
-                  <thead><tr><th style={{width:'6%'}}>No.</th><th>Uraian</th><th style={{width:'10%'}}>Sat.</th><th style={{width:'14%'}}>Koefisien</th><th style={{width:'14%'}}>Vol. (1 AHSP)</th><th style={{width:'19%'}}>Harga Satuan</th><th style={{width:'19%'}}>Jumlah</th></tr></thead>
-                  <tbody>{group.rows.map((component,ci)=><tr key={`${component.name}-${ci}`}><td className="center">{ci+1}</td><td>{component.name}</td><td className="center">{component.unit}</td><td className="number">{formatNumber(component.coefficient,5)}</td><td className="number">{formatNumber(component.coefficient,5)}</td><td className="number">{formatRupiah(component.unitPrice)}</td><td className="number">{formatRupiah(component.coefficient*component.unitPrice)}</td></tr>)}</tbody>
-                  <tfoot><tr><th colSpan={6}>SUBTOTAL {componentTypeLabel(group.type as SnapshotComponent['type'])}</th><th className="number">{formatRupiah(group.rows.reduce((s,c)=>s+c.coefficient*c.unitPrice,0))}</th></tr></tfoot>
-                </table>
-              </Fragment>)}
-              {components.length===0 && <p className="empty-note">Snapshot komponen AHSP tidak tersedia pada item ini.</p>}
-              <div className="ahsp-total"><span>HARGA SATUAN PEKERJAAN</span><strong>{formatRupiah(numberValue(item.unit_price))}</strong></div>
-            </section>;
+          <p className="report-intro">Setiap analisa diambil dari snapshot AHSP yang benar-benar tersimpan pada item RAB. Nama pekerjaan mengikuti uraian yang Anda tetapkan di RAB dan seluruh urutan mengikuti susunan manual per lokasi.</p>
+          {orderedDivisions.map((division, divisionIndex) => {
+            const rows = division.items ?? [];
+            return (
+              <section className="report-subsection ahsp-menu" key={division.id}>
+                <h3 style={{background:activeTheme.soft,borderColor:activeTheme.border,color:activeTheme.text}}>
+                  {divisionIndex + 1}. {division.name}
+                </h3>
+                {rows.map((item,index) => {
+                  const components = parseRabItemComponents(item);
+                  const grouped = ['material','labor','equipment','other']
+                    .map((type) => ({type, rows:components.filter((component) => component.type === type)}))
+                    .filter((group) => group.rows.length > 0);
+                  return (
+                    <section className="report-subsection ahsp-block" key={item.id}>
+                      <h4 className="ahsp-item-heading" style={{background:activeTheme.soft,borderColor:activeTheme.border,color:activeTheme.text}}>
+                        {index + 1}. {item.name}
+                        {item.code ? <small style={{marginLeft:6,fontWeight:500}}>({item.code})</small> : null}
+                      </h4>
+                      {item.work_group_name?.trim() && <p className="ahsp-work-group">Kelompok item: <strong>{item.work_group_name}</strong></p>}
+                      <div className="ahsp-meta">
+                        <span>Satuan pekerjaan: <strong>{item.unit || '-'}</strong></span>
+                        <span>Volume RAB: <strong>{formatNumber(numberValue(item.volume),4)} {item.unit || ''}</strong></span>
+                        <span>Harga satuan RAB: <strong>{formatRupiah(numberValue(item.unit_price))}</strong></span>
+                      </div>
+                      {grouped.map((group) => (
+                        <Fragment key={group.type}>
+                          <div className="component-label" style={{color:activeTheme.accent}}>{componentTypeLabel(group.type as SnapshotComponent['type'])}</div>
+                          <table className="report-table compact">
+                            <thead><tr><th style={{width:'6%'}}>No.</th><th>Uraian</th><th style={{width:'10%'}}>Sat.</th><th style={{width:'14%'}}>Koefisien</th><th style={{width:'14%'}}>Vol. (1 AHSP)</th><th style={{width:'19%'}}>Harga Satuan</th><th style={{width:'19%'}}>Jumlah</th></tr></thead>
+                            <tbody>{group.rows.map((component,ci)=><tr key={`${component.name}-${ci}`}><td className="center">{ci+1}</td><td>{component.name}</td><td className="center">{component.unit}</td><td className="number">{formatNumber(component.coefficient,5)}</td><td className="number">{formatNumber(component.coefficient,5)}</td><td className="number">{formatRupiah(component.unitPrice)}</td><td className="number">{formatRupiah(component.subtotal)}</td></tr>)}</tbody>
+                            <tfoot><tr><th colSpan={6}>SUBTOTAL {componentTypeLabel(group.type as SnapshotComponent['type'])}</th><th className="number">{formatRupiah(group.rows.reduce((sum,component)=>sum+component.subtotal,0))}</th></tr></tfoot>
+                          </table>
+                        </Fragment>
+                      ))}
+                      {components.length===0 && <p className="empty-note">Snapshot komponen AHSP tidak tersedia pada item ini.</p>}
+                      <div className="ahsp-total"><span>HARGA SATUAN PEKERJAAN</span><strong>{formatRupiah(numberValue(item.unit_price))}</strong></div>
+                    </section>
+                  );
+                })}
+                {rows.length===0 && <p className="empty-note">Belum ada item AHSP pada lokasi ini.</p>}
+              </section>
+            );
           })}
         </section>
 
@@ -753,10 +935,14 @@ export default function RekapRABPage() {
 
         <footer className="report-footer" style={{borderTop:`2px solid ${activeTheme.accent}`}}>
           <div><strong>REVIT CONSULTANT MANAGEMENT</strong><span>Rekapitulasi Rencana Anggaran Biaya · {project.title}</span></div>
-          <div className="signature-grid">
-            <div><span>Konsultan Perencana</span><strong>{textValue(project.planning_consultant, ' ')}</strong><small>{textValue(project.planning_consultant_skk, ' ')}</small></div>
-            <div><span>Mengetahui / Penanggung Jawab</span><strong>{textValue(project.principal_name, ' ')}</strong><small>{textValue(project.principal_nip, ' ')}</small></div>
-            <div><span>Konsultan Pengawas</span><strong>{textValue(project.supervisory_consultant, ' ')}</strong><small>{textValue(project.supervisory_consultant_skk, ' ')}</small></div>
+          <div className={`signature-grid signature-count-${pdfSignatureCount}`}>
+            {pdfSigners.slice(0,pdfSignatureCount).map((signer,index) => (
+              <div key={index}>
+                <span>{signer.role || `Penandatangan ${index + 1}`}</span>
+                <strong>{signer.name || ' '}</strong>
+                <small>{signer.identifier || ' '}</small>
+              </div>
+            ))}
           </div>
         </footer>
       </div>
@@ -781,7 +967,13 @@ export default function RekapRABPage() {
         .cover-total { display:flex; flex-direction:column; gap:5px; padding:14px 16px; border:1px solid; margin-top:24px; }
         .cover-total span { font-size:8pt; font-weight:700; letter-spacing:1px; }
         .cover-total strong { font-size:20pt; font-weight:900; }
-        .cover-signatures { display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-top:35px; }
+        .cover-signatures { display:grid; gap:28px; margin-top:35px; }
+        .cover-signatures.signature-count-1 { grid-template-columns:1fr; justify-items:end; }
+        .cover-signatures.signature-count-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .cover-signatures.signature-count-3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
+        .cover-signatures.signature-count-1 div { width:48%; }
+        .ahsp-item-heading { margin:0 0 5px; padding:5px 7px; border:1px solid; font-size:8pt; font-weight:800; }
+        .ahsp-work-group { margin:0 0 4px; color:#64748b; font-size:7pt; }
         .cover-signatures div { display:flex; flex-direction:column; min-height:25mm; gap:4px; }
         .cover-signatures strong { margin-top:auto; font-size:9pt; }
         .cover-signatures small { font-size:7pt; color:#64748b; }
@@ -811,7 +1003,11 @@ export default function RekapRABPage() {
         .report-footer { margin-top:22px; padding-top:9px; break-inside:avoid; page-break-inside:avoid; }
         .report-footer>div:first-child { display:flex; flex-direction:column; gap:2px; font-size:8pt; }
         .report-footer>div:first-child span { color:#64748b; font-size:7pt; }
-        .signature-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:20px; }
+        .signature-grid { display:grid; gap:12px; margin-top:20px; }
+        .signature-grid.signature-count-1 { grid-template-columns:1fr; justify-items:end; }
+        .signature-grid.signature-count-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .signature-grid.signature-count-3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
+        .signature-grid.signature-count-1 div { width:48%; }
         .signature-grid div { display:flex; flex-direction:column; min-height:24mm; gap:3px; }
         .signature-grid span,.signature-grid small { color:#64748b; font-size:6.5pt; }
         .signature-grid strong { margin-top:auto; font-size:7.5pt; }
