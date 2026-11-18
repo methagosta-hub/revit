@@ -409,6 +409,13 @@ begin
         v_table,
         v_table
       );
+      execute format('drop policy if exists %I on public.%I', v_table || '_delete_write_guard', v_table);
+      execute format(
+        'create policy %I on public.%I as restrictive for delete to authenticated using (public.dahlia_project_write_access() and public.dahlia_project_row_category_access(to_jsonb(%I)))',
+        v_table || '_delete_write_guard',
+        v_table,
+        v_table
+      );
     end if;
   end loop;
 end;
@@ -422,6 +429,12 @@ create policy projects_category_scope_restrictive
   for all to authenticated
   using (public.dahlia_project_category_access(id))
   with check (public.dahlia_project_category_write_value_access(project_category));
+
+drop policy if exists projects_delete_write_guard on public.projects;
+create policy projects_delete_write_guard
+  on public.projects as restrictive
+  for delete to authenticated
+  using (public.dahlia_project_write_access() and public.dahlia_project_category_access(id));
 
 -- Preserve the existing effective role-assignment logic while enforcing the
 -- REGULER/PORTOFOLIO account boundary across project-scoped RLS checks.
@@ -499,8 +512,16 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $$
+as $
 begin
+  if not public.dahlia_project_write_access() then
+    raise exception 'Akun PORTOFOLIO hanya memiliki akses baca. Perubahan proyek sampel dikelola administrator perusahaan.' using errcode = '42501';
+  end if;
+
+  if not public.dahlia_project_category_value_access(new.project_category) then
+    raise exception 'Akun ini tidak dapat menulis data pada kategori proyek tersebut.' using errcode = '42501';
+  end if;
+
   if tg_op = 'INSERT' then
     if upper(coalesce(new.status, '')) <> 'DRAFT' then
       raise exception 'Proyek baru harus dimulai dengan status DRAFT.' using errcode = '23514';
@@ -518,7 +539,7 @@ begin
   end if;
   return new;
 end;
-$$;
+$;
 
 create or replace function public.transition_project_status(
   p_project_id uuid,
@@ -588,7 +609,7 @@ $$;
 
 drop trigger if exists projects_status_transition_guard on public.projects;
 create trigger projects_status_transition_guard
-before insert or update of status, project_category on public.projects
+before insert or update on public.projects
 for each row execute function public.dahlia_guard_project_status_change();
 
 -- Atomic category ordering: every item ID passed must belong to this division.
@@ -877,6 +898,10 @@ begin
   end if;
   if not public.dahlia_project_write_access() then
     raise exception 'Akun PORTOFOLIO hanya memiliki akses baca terhadap dokumen sampel.' using errcode = '42501';
+  end if;
+  if not public.dahlia_has_project_execution_permission(v_project_id, 'rab.manage')
+     and not public.dahlia_has_project_execution_permission(v_project_id, 'project.manage') then
+    raise exception 'Tidak memiliki izin mengubah RAB proyek ini.' using errcode = '42501';
   end if;
   select * into v_project from public.projects where id = v_project_id;
 
