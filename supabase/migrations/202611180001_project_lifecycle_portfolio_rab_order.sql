@@ -406,7 +406,13 @@ declare
 begin
   foreach v_table in array v_tables loop
     if to_regclass(format('public.%I', v_table)) is not null then
-      execute format('alter table public.%I enable row level security', v_table);
+      if not exists (
+        select 1 from pg_class c
+        join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public' and c.relname = v_table and c.relrowsecurity
+      ) then
+        raise exception 'RLS belum aktif pada tabel public.%. Jalankan access-control migration tabel tersebut sebelum isolasi PORTOFOLIO.', v_table;
+      end if;
       execute format('drop policy if exists %I on public.%I', v_table || '_category_scope_restrictive', v_table);
       execute format(
         'create policy %I on public.%I as restrictive for all to authenticated using (public.dahlia_project_row_category_access(to_jsonb(%I))) with check (public.dahlia_project_row_category_write_access(to_jsonb(%I)))',
@@ -734,6 +740,10 @@ declare
   v_payment_transaction_id uuid;
   v_project public.projects;
 begin
+  if not public.dahlia_project_write_access() then
+    raise exception 'Akun PORTOFOLIO hanya memiliki akses baca dan tidak dapat membuat, mengubah, atau menghapus transaksi.' using errcode = '42501';
+  end if;
+
   v_project_id := coalesce(nullif(v_row->>'project_id', '')::uuid, nullif(v_row->>'record_origin_project_id', '')::uuid);
   v_package_id := nullif(v_row->>'package_id', '')::uuid;
   v_segment_id := nullif(v_row->>'segment_id', '')::uuid;
@@ -816,9 +826,6 @@ begin
   end if;
   if not public.dahlia_project_category_access(v_project_id) then
     raise exception 'Akun ini tidak dapat menulis transaksi pada kategori proyek tersebut.' using errcode = '42501';
-  end if;
-  if not public.dahlia_project_write_access() then
-    raise exception 'Akun PORTOFOLIO hanya memiliki akses baca. Transaksi sampel dikelola oleh administrator perusahaan.' using errcode = '42501';
   end if;
   if v_project.status <> 'DIKERJAKAN' then
     raise exception 'Perubahan transaksi proyek hanya diperbolehkan saat status DIKERJAKAN. Status sekarang: %.', v_project.status using errcode = '23514';
