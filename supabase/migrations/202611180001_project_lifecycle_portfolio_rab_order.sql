@@ -1,0 +1,415 @@
+-- Dahlia Management System: project lifecycle, PORTOFOLIO isolation, and RAB ordering
+-- Apply this migration in Supabase after the existing Company Access migrations.
+
+do $preflight$
+begin
+  if to_regclass('public.projects') is null
+     or to_regclass('public.user_profiles') is null
+     or to_regclass('public.user_role_assignments') is null
+     or to_regclass('public.role_permissions') is null
+     or to_regclass('public.app_permissions') is null
+     or to_regclass('public.rab_divisions') is null
+     or to_regclass('public.rab_items') is null then
+    raise exception 'Migration membutuhkan tabel projects, user_profiles, akses peran, rab_divisions, dan rab_items.';
+  end if;
+  if to_regprocedure('public.dahlia_role_assignment_is_effective(date,date,timestamptz)') is null then
+    raise exception 'Helper dahlia_role_assignment_is_effective belum tersedia. Jalankan migration akses pengguna terlebih dahulu.';
+  end if;
+end;
+$preflight$;
+
+alter table public.user_profiles
+  add column if not exists is_demo_user boolean not null default false;
+
+alter table public.projects
+  add column if not exists project_category text;
+
+update public.projects
+set project_category = coalesce(nullif(upper(trim(project_category)), ''), 'REGULER');
+
+alter table public.projects
+  alter column project_category set default 'REGULER',
+  alter column project_category set not null;
+
+alter table public.projects
+  drop constraint if exists projects_project_category_check;
+
+alter table public.projects
+  add constraint projects_project_category_check
+  check (project_category in ('REGULER', 'PORTOFOLIO'));
+
+-- Normalisasi tiga status lama tanpa mengubah proyek yang sudah memiliki
+-- status baru. Nilai yang tidak dikenal dihentikan agar tidak diam-diam hilang.
+do $normalize_status$
+begin
+  if exists (
+    select 1
+    from public.projects
+    where upper(trim(coalesce(status, ''))) not in (
+      '', 'DRAFT', 'REVIEW', 'FINAL', 'FINAL RAB', 'DIKERJAKAN', 'SELESAI'
+    )
+  ) then
+    raise exception 'Ditemukan status proyek yang belum dikenal. Periksa data projects.status sebelum menjalankan migrasi.';
+  end if;
+end;
+$normalize_status$;
+
+update public.projects
+set status = case upper(trim(coalesce(status, '')))
+  when '' then 'DRAFT'
+  when 'DRAFT' then 'DRAFT'
+  when 'REVIEW' then 'REVIEW'
+  when 'FINAL' then 'FINAL RAB'
+  when 'FINAL RAB' then 'FINAL RAB'
+  when 'DIKERJAKAN' then 'DIKERJAKAN'
+  when 'SELESAI' then 'SELESAI'
+  else 'DRAFT'
+end;
+
+alter table public.projects
+  alter column status set default 'DRAFT',
+  alter column status set not null;
+
+alter table public.projects
+  drop constraint if exists projects_status_check;
+
+alter table public.projects
+  add constraint projects_status_check
+  check (status in ('DRAFT', 'REVIEW', 'FINAL RAB', 'DIKERJAKAN', 'SELESAI'));
+
+create table if not exists public.project_status_history (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  old_status text,
+  new_status text not null check (new_status in ('DRAFT', 'REVIEW', 'FINAL RAB', 'DIKERJAKAN', 'SELESAI')),
+  reason text,
+  changed_by uuid references auth.users(id) on delete set null,
+  changed_at timestamptz not null default now()
+);
+
+create index if not exists project_status_history_project_date_idx
+  on public.project_status_history(project_id, changed_at desc);
+
+-- Scope project visibility by the account mode. Demo accounts can only access
+-- PORTOFOLIO projects; regular accounts can only access REGULER projects.
+create or replace function public.dahlia_project_category_access(p_project_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1
+    from public.projects p
+    join public.user_profiles up on up.id = auth.uid()
+    where p.id = p_project_id
+      and p.project_category = case when up.is_demo_user then 'PORTOFOLIO' else 'REGULER' end
+      and up.is_active = true
+  );
+$$;
+
+revoke all on function public.dahlia_project_category_access(uuid) from public, anon;
+grant execute on function public.dahlia_project_category_access(uuid) to authenticated;
+
+-- Restrictive policy adds a category boundary even when an older permissive
+-- projects policy grants broad company-level project visibility.
+drop policy if exists projects_category_scope_restrictive on public.projects;
+create policy projects_category_scope_restrictive
+  on public.projects as restrictive
+  for all to authenticated
+  using (public.dahlia_project_category_access(id))
+  with check (
+    project_category = case
+      when exists (select 1 from public.user_profiles up where up.id = auth.uid() and up.is_demo_user) then 'PORTOFOLIO'
+      else 'REGULER'
+    end
+  );
+
+-- Preserve the existing effective role-assignment logic while enforcing the
+-- REGULER/PORTOFOLIO account boundary across project-scoped RLS checks.
+create or replace function public.dahlia_has_project_execution_permission(
+  p_project_id uuid,
+  p_permission_code text
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select p_project_id is not null
+     and p_permission_code is not null
+     and public.dahlia_project_category_access(p_project_id)
+     and exists (
+       select 1
+       from public.user_role_assignments ura
+       join public.app_roles ar on ar.id = ura.role_id
+       join public.role_permissions rp on rp.role_id = ar.id
+       join public.app_permissions ap on ap.id = rp.permission_id
+       join public.user_profiles up on up.id = ura.user_id
+       where ura.user_id = auth.uid()
+         and (ura.project_id is null or ura.project_id = p_project_id)
+         and up.is_active = true
+         and ap.code = p_permission_code
+         and public.dahlia_role_assignment_is_effective(ura.valid_from, ura.valid_until, ura.revoked_at)
+     );
+$$;
+
+revoke all on function public.dahlia_has_project_execution_permission(uuid, text) from public, anon;
+grant execute on function public.dahlia_has_project_execution_permission(uuid, text) to authenticated;
+
+-- Demo users must be assigned to an individual PORTOFOLIO project, never to a
+-- company-wide role assignment that could expose operational data.
+create or replace function public.dahlia_guard_demo_role_assignment()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_is_demo boolean;
+  v_category text;
+begin
+  select coalesce(is_demo_user, false)
+    into v_is_demo
+    from public.user_profiles
+   where id = new.user_id;
+
+  if v_is_demo then
+    if new.project_id is null then
+      raise exception 'Akun dummy harus menggunakan penugasan khusus proyek PORTOFOLIO.' using errcode = '42501';
+    end if;
+    select project_category into v_category from public.projects where id = new.project_id;
+    if v_category <> 'PORTOFOLIO' then
+      raise exception 'Akun dummy hanya boleh ditugaskan ke proyek PORTOFOLIO.' using errcode = '42501';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists user_role_assignments_demo_scope on public.user_role_assignments;
+create trigger user_role_assignments_demo_scope
+before insert or update of user_id, project_id on public.user_role_assignments
+for each row execute function public.dahlia_guard_demo_role_assignment();
+
+-- Change project status only through this audited transition function.
+create or replace function public.transition_project_status(
+  p_project_id uuid,
+  p_new_status text,
+  p_reason text default null
+)
+returns public.projects
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_project public.projects;
+  v_new_status text := upper(trim(coalesce(p_new_status, '')));
+  v_allowed boolean := false;
+begin
+  select * into v_project
+  from public.projects
+  where id = p_project_id
+  for update;
+
+  if v_project.id is null then
+    raise exception 'Proyek tidak ditemukan.' using errcode = 'P0002';
+  end if;
+  if not public.dahlia_has_project_execution_permission(p_project_id, 'project.manage') then
+    raise exception 'Tidak memiliki izin mengubah status proyek.' using errcode = '42501';
+  end if;
+  if v_new_status not in ('DRAFT', 'REVIEW', 'FINAL RAB', 'DIKERJAKAN', 'SELESAI') then
+    raise exception 'Status proyek tidak valid.' using errcode = '22023';
+  end if;
+
+  v_allowed := case v_project.status
+    when 'DRAFT' then v_new_status in ('DRAFT', 'REVIEW')
+    when 'REVIEW' then v_new_status in ('REVIEW', 'DRAFT', 'FINAL RAB')
+    when 'FINAL RAB' then v_new_status in ('FINAL RAB', 'REVIEW', 'DIKERJAKAN')
+    when 'DIKERJAKAN' then v_new_status in ('DIKERJAKAN', 'SELESAI')
+    when 'SELESAI' then v_new_status = 'SELESAI'
+    else false
+  end;
+
+  if not v_allowed then
+    raise exception 'Perpindahan status dari % ke % tidak diizinkan.', v_project.status, v_new_status using errcode = '23514';
+  end if;
+
+  if v_project.status = v_new_status then
+    return v_project;
+  end if;
+
+  update public.projects
+     set status = v_new_status,
+         updated_at = now()
+   where id = p_project_id
+   returning * into v_project;
+
+  insert into public.project_status_history(project_id, old_status, new_status, reason, changed_by)
+  values (p_project_id, (select status from public.projects where id = p_project_id) /* overwritten below */, v_new_status, nullif(trim(coalesce(p_reason, '')), ''), auth.uid());
+
+  -- Correct old_status using the prior locked row value.
+  update public.project_status_history
+     set old_status = case v_new_status when v_new_status then
+       (case v_new_status
+          when 'REVIEW' then 'DRAFT'
+          when 'FINAL RAB' then 'REVIEW'
+          when 'DIKERJAKAN' then 'FINAL RAB'
+          when 'SELESAI' then 'DIKERJAKAN'
+          else null
+        end)
+       else null end
+   where id = (
+     select id from public.project_status_history
+      where project_id = p_project_id and changed_by is not distinct from auth.uid()
+      order by changed_at desc limit 1
+   );
+
+  return v_project;
+end;
+$$;
+
+revoke all on function public.transition_project_status(uuid, text, text) from public, anon;
+grant execute on function public.transition_project_status(uuid, text, text) to authenticated;
+
+-- Atomic category ordering: every item ID passed must belong to this division.
+-- Other grouped work items retain their relative precedence; the reordered
+-- AHSP category items are assigned consecutive sort_order values after them.
+create or replace function public.reorder_project_rab_categories(
+  p_division_id uuid,
+  p_item_ids uuid[]
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_project_id uuid;
+  v_item_count integer;
+  v_ordered_count integer;
+  v_offset integer;
+begin
+  select project_id into v_project_id
+  from public.rab_divisions
+  where id = p_division_id;
+
+  if v_project_id is null then
+    raise exception 'Lokasi RAB tidak ditemukan.' using errcode = 'P0002';
+  end if;
+  if not public.dahlia_has_project_execution_permission(v_project_id, 'rab.manage')
+     and not public.dahlia_has_project_execution_permission(v_project_id, 'project.manage') then
+    raise exception 'Tidak memiliki izin mengubah urutan kategori RAB.' using errcode = '42501';
+  end if;
+  if p_item_ids is null or cardinality(p_item_ids) = 0 then
+    raise exception 'Daftar item urutan RAB tidak boleh kosong.' using errcode = '22023';
+  end if;
+  if cardinality(p_item_ids) <> (select count(distinct item_id) from unnest(p_item_ids) as item_id) then
+    raise exception 'Daftar item urutan RAB mengandung ID ganda.' using errcode = '22023';
+  end if;
+
+  select count(*) into v_item_count
+  from public.rab_items
+  where division_id = p_division_id
+    and id = any(p_item_ids);
+
+  v_ordered_count := cardinality(p_item_ids);
+  if v_item_count <> v_ordered_count then
+    raise exception 'Sebagian item tidak termasuk dalam lokasi RAB yang dipilih.' using errcode = '23514';
+  end if;
+
+  select coalesce(max(sort_order), 0) into v_offset
+  from public.rab_items
+  where division_id = p_division_id
+    and not (id = any(p_item_ids));
+
+  update public.rab_items ri
+     set sort_order = v_offset + ordered.ordinality
+    from unnest(p_item_ids) with ordinality as ordered(item_id, ordinality)
+   where ri.id = ordered.item_id
+     and ri.division_id = p_division_id;
+
+  return v_ordered_count;
+end;
+$$;
+
+revoke all on function public.reorder_project_rab_categories(uuid, uuid[]) from public, anon;
+grant execute on function public.reorder_project_rab_categories(uuid, uuid[]) to authenticated;
+
+-- Every listed project transaction is write-enabled only while the project is
+-- DIKERJAKAN. Global/company entries with a null project_id remain supported.
+create or replace function public.dahlia_guard_active_project_transaction()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_project_id uuid;
+  v_project public.projects;
+begin
+  v_project_id := nullif(to_jsonb(new)->>'project_id', '')::uuid;
+  if v_project_id is null then
+    return new;
+  end if;
+
+  select * into v_project from public.projects where id = v_project_id;
+  if v_project.id is null then
+    raise exception 'Proyek transaksi tidak ditemukan.' using errcode = '23503';
+  end if;
+
+  if not public.dahlia_project_category_access(v_project_id) then
+    raise exception 'Akun ini tidak dapat menulis transaksi pada kategori proyek tersebut.' using errcode = '42501';
+  end if;
+  if v_project.status <> 'DIKERJAKAN' then
+    raise exception 'Transaksi baru hanya diperbolehkan untuk proyek berstatus DIKERJAKAN. Status sekarang: %.', v_project.status using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+do $install_transaction_guards$
+declare
+  v_table text;
+  v_tables text[] := array[
+    'project_purchase_orders',
+    'project_supplier_payments',
+    'company_cash_transactions',
+    'employee_daily_assignments',
+    'project_work_assignments',
+    'attendance_records',
+    'project_daily_reports',
+    'project_material_usages',
+    'material_issues',
+    'goods_receipts',
+    'payment_obligations'
+  ];
+begin
+  foreach v_table in array v_tables loop
+    if to_regclass(format('public.%I', v_table)) is not null
+       and exists (
+         select 1 from information_schema.columns
+         where table_schema='public' and table_name=v_table and column_name='project_id'
+       ) then
+      execute format('drop trigger if exists %I on public.%I', v_table || '_active_project_guard', v_table);
+      execute format(
+        'create trigger %I before insert on public.%I for each row execute function public.dahlia_guard_active_project_transaction()',
+        v_table || '_active_project_guard',
+        v_table
+      );
+    end if;
+  end loop;
+end;
+$install_transaction_guards$;
+
+alter table public.project_status_history enable row level security;
+drop policy if exists project_status_history_read on public.project_status_history;
+create policy project_status_history_read
+  on public.project_status_history for select to authenticated
+  using (
+    public.dahlia_has_project_execution_permission(project_id, 'project.read')
+    or public.dahlia_has_project_execution_permission(project_id, 'project.manage')
+  );
