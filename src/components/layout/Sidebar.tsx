@@ -205,7 +205,7 @@ export default function Sidebar() {
       <aside
         id="dahlia-primary-sidebar"
         aria-label="Menu utama DAHLIA"
-        className={`fixed inset-y-14 left-0 z-50 flex h-[calc(100dvh-3.5rem)] w-[min(86vw,300px)] shrink-0 select-none flex-col overflow-hidden border-r border-white/[0.08] bg-[#071321] text-slate-100 shadow-[12px_0_40px_rgba(2,8,23,0.16)] transition-transform duration-300 xl:sticky xl:top-0 xl:h-screen xl:w-[clamp(216px,17vw,280px)] xl:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        className={`fixed bottom-0 left-0 top-14 z-50 flex h-auto w-[min(86vw,300px)] shrink-0 select-none flex-col overflow-hidden border-r border-white/[0.08] bg-[#071321] text-slate-100 shadow-[12px_0_40px_rgba(2,8,23,0.16)] transition-transform duration-300 xl:sticky xl:bottom-auto xl:top-0 xl:h-screen xl:w-[clamp(216px,17vw,280px)] xl:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Ambient glow dekoratif, tidak mengganggu interaksi menu. */}
       <div
         aria-hidden="true"
