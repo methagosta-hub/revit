@@ -203,7 +203,6 @@ export default function BkuPage() {
   const [exportFont, setExportFont] = useState<string>("Inter");
   const [drafts, setDrafts] = useState<Draft[]>([blankDraft()]);
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState<"calendar" | "ledger">("calendar");
 
   useEffect(() => {
     if (!supabase) {
@@ -881,18 +880,20 @@ export default function BkuPage() {
             </section>
 
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex rounded-xl bg-slate-200/70 p-1">
-                <button onClick={() => setTab("calendar")} className={"rounded-lg px-4 py-2 text-sm font-bold " + (tab === "calendar" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600")}>Kalender</button>
-                <button onClick={() => setTab("ledger")} className={"rounded-lg px-4 py-2 text-sm font-bold " + (tab === "ledger" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600")}>Buku transaksi</button>
+              <div className="flex flex-wrap rounded-xl bg-slate-200/70 p-1">
+                <button onClick={() => setView("calendar")} className={"rounded-lg px-4 py-2 text-sm font-bold " + (view === "calendar" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600")}>Kalender</button>
+                <button onClick={() => setView("ledger")} className={"rounded-lg px-4 py-2 text-sm font-bold " + (view === "ledger" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600")}>Buku transaksi</button>
+                <button onClick={() => setView("profile")} className={"flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-bold " + (view === "profile" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600")}><Settings size={14}/>Profil lembaga</button>
               </div>
-              <p className="text-xs text-slate-500">Satu baris untuk setiap nota / transaksi sebenarnya.</p>
+              <p className="text-xs text-slate-500">{view === "calendar" ? "Geser penanda tanggal mulai ke tanggal target untuk memindahkan seluruh jadwal nota." : view === "ledger" ? "Daftar seluruh nota dan transaksi yang sudah dicatat." : "Perbarui identitas dan informasi lembaga."}</p>
             </div>
 
-            {tab === "calendar" ? (
+            {view === "calendar" ? (
               <section className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,.65fr)]">
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Kalender pembukuan</p><h3 className="mt-1 text-xl font-black capitalize">{new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(month)}</h3></div>
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Kalender pembukuan</p><h3 className="mt-1 text-xl font-black capitalize">{new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(month)}</h3><p className="mt-1 text-[11px] text-slate-500">Tanggal mulai: {new Intl.DateTimeFormat("id-ID",{day:"numeric",month:"long",year:"numeric"}).format(new Date(book.start_date+"T00:00:00"))}</p></div>
+                    <div draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", "bku-project-start")} className="cursor-grab rounded-xl border border-dashed border-emerald-500 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 active:cursor-grabbing" title="Seret penanda ini ke tanggal target pada kalender">↕ Seret tanggal mulai proyek</div>
                     <div className="flex gap-1">
                       <button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50" aria-label="Bulan sebelumnya"><ChevronLeft size={18} /></button>
                       <button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50" aria-label="Bulan berikutnya"><ChevronRight size={18} /></button>
@@ -906,8 +907,8 @@ export default function BkuPage() {
                       const totals = dayTotals[key];
                       const active = key === selectedDate;
                       return (
-                        <button key={key} onClick={() => { setSelectedDate(key); setDrafts([blankDraft()]); setShowEntry(true); }} className={"min-h-[88px] rounded-xl border p-1.5 text-left transition sm:min-h-[110px] sm:p-2 " + (active ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100" : "border-slate-100 bg-white hover:border-emerald-200 hover:bg-slate-50")}>
-                          <span className={"flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold " + (active ? "bg-emerald-700 text-white" : "text-slate-700")}>{day}</span>
+                        <button key={key} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (event.dataTransfer.getData("text/plain") === "bku-project-start") void shiftProjectStart(key); }} onClick={() => { setSelectedDate(key); if (!dayTotals[key]?.count) { setEditingTransactionId(null); setDrafts([blankDraft()]); setShowEntry(true); } else { setShowEntry(false); } }} className={"min-h-[88px] rounded-xl border p-1.5 text-left transition sm:min-h-[110px] sm:p-2 " + (active ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100" : "border-slate-100 bg-white hover:border-emerald-200 hover:bg-slate-50")}>
+                          <span className={"flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold " + (active ? "bg-emerald-700 text-white" : "text-slate-700")}>{day}</span>{key === book.start_date && <span className="ml-1 rounded bg-emerald-700 px-1 py-0.5 text-[8px] font-bold text-white">MULAI</span>}
                           {totals ? <div className="mt-2 space-y-1">
                             {totals.incoming > 0 && <p className="truncate rounded-md bg-emerald-50 px-1 py-0.5 text-[9px] font-bold text-emerald-800 sm:text-[10px]">+{shortMoney(totals.incoming)}</p>}
                             {totals.outgoing > 0 && <p className="truncate rounded-md bg-rose-50 px-1 py-0.5 text-[9px] font-bold text-rose-800 sm:text-[10px]">-{shortMoney(totals.outgoing)}</p>}
@@ -926,12 +927,12 @@ export default function BkuPage() {
                     <button onClick={() => { setDrafts([blankDraft()]); setShowEntry(true); }} className="flex h-9 items-center gap-1 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white"><Plus size={14} />Tambah</button>
                   </div>
                   <div className="mt-4 space-y-2">
-                    {selectedRows.length === 0 ? <div className="rounded-xl bg-slate-50 p-6 text-center"><CalendarDays className="mx-auto text-slate-300" size={26} /><p className="mt-2 text-sm font-semibold text-slate-600">Belum ada transaksi</p><p className="mt-1 text-xs text-slate-400">Tambah beberapa nota sekaligus untuk tanggal ini.</p></div> : selectedRows.map((tx) => <TransactionCard key={tx.id} tx={tx} balance={balances.rows[tx.id]} onEvidence={openEvidence} />)}
+                    {selectedRows.length === 0 ? <div className="rounded-xl bg-slate-50 p-6 text-center"><CalendarDays className="mx-auto text-slate-300" size={26} /><p className="mt-2 text-sm font-semibold text-slate-600">Belum ada transaksi</p><p className="mt-1 text-xs text-slate-400">Tambah beberapa nota sekaligus untuk tanggal ini.</p></div> : selectedRows.map((tx) => <TransactionCard key={tx.id} tx={tx} balance={balances.rows[tx.id]} onEvidence={openEvidence} onEdit={openEditTransaction} onCopy={openCopyTransaction} onDelete={deleteTransaction} />)}
                   </div>
                   {lastSelectedBalance && <div className="mt-4 rounded-xl bg-slate-900 p-4 text-white"><p className="text-xs text-slate-400">Saldo setelah transaksi terakhir hari ini</p><p className="mt-1 text-xl font-black">{money(lastSelectedBalance.total)}</p><p className="mt-1 text-xs text-slate-400">Tunai {money(lastSelectedBalance.cash)} · Bank {money(lastSelectedBalance.bank)}</p></div>}
                 </div>
               </section>
-            ) : (
+            ) : view === "ledger" ? (
               <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4"><div><h3 className="font-black">Buku transaksi</h3><p className="text-xs text-slate-500">Urut berdasarkan tanggal dan waktu pencatatan</p></div><span className="text-xs font-semibold text-slate-500">{ordered.length} transaksi</span></div>
                 <div className="overflow-x-auto">
@@ -952,6 +953,23 @@ export default function BkuPage() {
                     </tbody>
                   </table>
                 </div>
+              </section>
+            ) : (
+              <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-5"><p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Pengaturan lembaga</p><h3 className="mt-1 text-xl font-black">Profil sekolah / lembaga</h3><p className="mt-1 text-sm text-slate-500">Identitas ini digunakan pada header laporan dan dokumen PDF BKU.</p></div>
+                <form onSubmit={saveProfile} className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Nama Sekolah / Lembaga"><input required value={book.name} onChange={(e) => setBook((current) => current ? {...current,name:e.target.value} : current)} className={fieldClass}/></Field>
+                    <Field label="NPSN (opsional)"><input value={profileNpsn} onChange={(e) => setProfileNpsn(e.target.value)} className={fieldClass} placeholder="Nomor Pokok Sekolah Nasional"/></Field>
+                    <Field label="Nama Kepala Sekolah"><input value={book.school_head} onChange={(e) => setBook((current) => current ? {...current,school_head:e.target.value} : current)} className={fieldClass}/></Field>
+                    <Field label="Nama Perencana"><input value={book.planner} onChange={(e) => setBook((current) => current ? {...current,planner:e.target.value} : current)} className={fieldClass}/></Field>
+                    <Field label="Nama Pengawas"><input value={book.supervisor} onChange={(e) => setBook((current) => current ? {...current,supervisor:e.target.value} : current)} className={fieldClass}/></Field>
+                    <Field label="Nama P2SP"><input value={book.p2sp} onChange={(e) => setBook((current) => current ? {...current,p2sp:e.target.value} : current)} className={fieldClass}/></Field>
+                    <Field label="Nomor telepon lembaga"><input value={profilePhone} onChange={(e) => setProfilePhone(e.target.value)} className={fieldClass} placeholder="Nomor kontak"/></Field>
+                    <Field label="Alamat lembaga"><input value={profileAddress} onChange={(e) => setProfileAddress(e.target.value)} className={fieldClass} placeholder="Alamat lengkap"/></Field>
+                  </div>
+                  <div className="flex justify-end border-t border-slate-100 pt-4"><button disabled={saving} className="rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60">{saving ? "Menyimpan..." : "Simpan profil lembaga"}</button></div>
+                </form>
               </section>
             )}
           </>
