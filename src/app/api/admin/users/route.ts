@@ -98,6 +98,35 @@ async function validateAssignments(
   const byId = new Map<string, RoleRow>((roles ?? []).map((role: RoleRow) => [role.id, role]));
   if (byId.size !== roleIds.length) return { rows: [], error: 'Salah satu peran tidak ditemukan.' };
 
+  if (isDemoUser) {
+    const { data: rolePermissions, error: permissionError } = await admin
+      .from('role_permissions')
+      .select('role_id, permission:app_permissions(code)')
+      .in('role_id', roleIds);
+    if (permissionError) return { rows: [], error: `Gagal memeriksa izin role PORTOFOLIO: ${permissionError.message}` };
+
+    const permissionsByRole = new Map<string, string[]>();
+    for (const row of rolePermissions ?? []) {
+      const permission = Array.isArray(row.permission) ? row.permission[0] : row.permission;
+      const code = String((permission as { code?: string | null } | null)?.code ?? '').trim();
+      if (!code) continue;
+      const current = permissionsByRole.get(row.role_id) ?? [];
+      current.push(code);
+      permissionsByRole.set(row.role_id, current);
+    }
+    for (const roleId of roleIds) {
+      const role = byId.get(roleId);
+      const codes = permissionsByRole.get(roleId) ?? [];
+      if (codes.length === 0) {
+        return { rows: [], error: `Role ${role?.name ?? 'terpilih'} belum memiliki izin baca yang dapat digunakan akun PORTOFOLIO.` };
+      }
+      const writePermission = codes.find((code) => !code.endsWith('.read'));
+      if (writePermission) {
+        return { rows: [], error: `Akun PORTOFOLIO hanya boleh menerima role baca-saja. Role ${role?.name ?? 'terpilih'} memiliki izin ${writePermission}.` };
+      }
+    }
+  }
+
   const projectIds = [...new Set(requested
     .map((item) => item?.project_id)
     .filter((id): id is string => typeof id === 'string' && Boolean(id.trim()))
