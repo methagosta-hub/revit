@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, CalendarDays,
-  ChevronLeft, ChevronRight, Download, FileUp, LockKeyhole, LogOut, Plus,
-  RefreshCw, ShieldCheck, Wallet, X,
+  ChevronLeft, ChevronRight, Copy, Download, FileUp, LockKeyhole, LogOut, Plus,
+  RefreshCw, Settings, ShieldCheck, Store as StoreIcon, Trash2, Wallet, X,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { getBkuSupabase } from "@/lib/supabase";
@@ -18,6 +18,9 @@ type Book = {
   planner: string;
   supervisor: string;
   p2sp: string;
+  address: string;
+  phone: string;
+  npsn: string;
   start_date: string;
   opening_cash: number;
   opening_bank: number;
@@ -27,8 +30,10 @@ type DetailLine = {
   unit_price: string;
   volume: string;
   unit: string;
+  material_id: string;
 };
 type StoredDetail = {
+  material_id?: string | null;
   name: string;
   unit_price: number;
   volume: number;
@@ -51,6 +56,15 @@ type Transaction = {
   receipt_number: string | null;
   evidence_path: string | null;
   details: StoredDetail[] | null;
+  store_id: string | null;
+  store_name: string;
+};
+type Material = {
+  id: string; book_id: string | null; category: string; name: string; unit: string;
+  unit_price: number; price_basis: string; is_seed: boolean; is_active: boolean;
+};
+type SchoolStore = {
+  id: string; book_id: string; name: string; address: string; phone: string;
 };
 type Draft = {
   transaction_type: TxType;
@@ -62,6 +76,8 @@ type Draft = {
   to_account: Account;
   receipt_number: string;
   file: File | null;
+  store_id: string;
+  store_name: string;
   details: DetailLine[];
 };
 
@@ -77,8 +93,8 @@ const amountValue = (value: string) => Number(value.replace(/[^0-9]/g, ""));
 const blankDraft = (): Draft => ({
   transaction_type: "OUT", category: "material", description: "",
   amount: "", account: "CASH", from_account: "CASH", to_account: "BANK",
-  receipt_number: "", file: null,
-  details: [{ name: "", unit_price: "", volume: "", unit: "pcs" }],
+  receipt_number: "", file: null, store_id: "", store_name: "",
+  details: [{ name: "", unit_price: "", volume: "", unit: "pcs", material_id: "" }],
 });
 const expenseCategories = [
   ["material", "Pembelian material"],
@@ -167,6 +183,18 @@ export default function BkuPage() {
   const [planner, setPlanner] = useState("");
   const [supervisor, setSupervisor] = useState("");
   const [p2sp, setP2sp] = useState("");
+  const [profileAddress, setProfileAddress] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileNpsn, setProfileNpsn] = useState("");
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [stores, setStores] = useState<SchoolStore[]>([]);
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+  const [copySource, setCopySource] = useState<Transaction | null>(null);
+  const [copyTargetDate, setCopyTargetDate] = useState(() => dateKey(new Date()));
+  const [view, setView] = useState<"calendar" | "ledger" | "profile">("calendar");
+  const [shiftingSchedule, setShiftingSchedule] = useState(false);
+  const [signatureCount, setSignatureCount] = useState("4");
+  const [signatoryRoles, setSignatoryRoles] = useState<string[]>(["school_head", "p2sp", "supervisor", "planner"]);
   const [startDate, setStartDate] = useState(() => dateKey(new Date()));
   const [openingCash, setOpeningCash] = useState("0");
   const [openingBank, setOpeningBank] = useState("0");
@@ -204,7 +232,7 @@ export default function BkuPage() {
     setPageError("");
     const { data, error } = await supabase
       .from("bku_books")
-      .select("id,name,school_head,planner,supervisor,p2sp,start_date,opening_cash,opening_bank")
+      .select("id,name,school_head,planner,supervisor,p2sp,address,phone,npsn,start_date,opening_cash,opening_bank")
       .order("created_at", { ascending: false });
     if (error) setPageError(error.message);
     const nextBooks = (data || []) as Book[];
@@ -217,7 +245,7 @@ export default function BkuPage() {
     if (!supabase) return;
     const { data, error } = await supabase
       .from("bku_transactions")
-      .select("id,book_id,transaction_date,created_at,entry_no,transaction_type,category,description,amount,account,from_account,to_account,receipt_number,evidence_path,details")
+      .select("id,book_id,transaction_date,created_at,entry_no,transaction_type,category,description,amount,account,from_account,to_account,receipt_number,evidence_path,details,store_id,store_name")
       .eq("book_id", bookId)
       .order("transaction_date", { ascending: true })
       .order("entry_no", { ascending: true });
@@ -225,11 +253,33 @@ export default function BkuPage() {
     setTransactions((data || []) as Transaction[]);
   }, [supabase]);
 
+  const loadSchoolResources = useCallback(async (bookId: string) => {
+    if (!supabase) return;
+    const [materialResult, storeResult] = await Promise.all([
+      supabase.from("bku_materials").select("id,book_id,category,name,unit,unit_price,price_basis,is_seed,is_active")
+        .eq("is_active", true).or(`book_id.is.null,book_id.eq.${bookId}`).order("category").order("name"),
+      supabase.from("bku_stores").select("id,book_id,name,address,phone").eq("book_id", bookId).order("name"),
+    ]);
+    if (materialResult.error) setPageError(materialResult.error.message);
+    if (storeResult.error) setPageError(storeResult.error.message);
+    setMaterials((materialResult.data || []) as Material[]);
+    setStores((storeResult.data || []) as SchoolStore[]);
+  }, [supabase]);
+
   useEffect(() => { void loadBooks(); }, [loadBooks]);
   useEffect(() => {
-    if (book?.id) void loadTransactions(book.id);
-    else setTransactions([]);
-  }, [book?.id, loadTransactions]);
+    if (book?.id) {
+      void loadTransactions(book.id);
+      void loadSchoolResources(book.id);
+      setProfileAddress(book.address || "");
+      setProfilePhone(book.phone || "");
+      setProfileNpsn(book.npsn || "");
+    } else {
+      setTransactions([]);
+      setMaterials([]);
+      setStores([]);
+    }
+  }, [book?.id, loadTransactions, loadSchoolResources]);
 
   const ordered = useMemo(() => [...transactions].sort((a, b) =>
     a.transaction_date.localeCompare(b.transaction_date) ||
@@ -327,11 +377,14 @@ export default function BkuPage() {
       planner: planner.trim(),
       supervisor: supervisor.trim(),
       p2sp: p2sp.trim(),
+      address: "",
+      phone: "",
+      npsn: "",
       start_date: startDate,
       opening_cash: amountValue(openingCash),
       opening_bank: amountValue(openingBank),
       created_by: session.user.id,
-    }).select("id,name,school_head,planner,supervisor,p2sp,start_date,opening_cash,opening_bank").single();
+    }).select("id,name,school_head,planner,supervisor,p2sp,address,phone,npsn,start_date,opening_cash,opening_bank").single();
     setSaving(false);
     if (error) {
       setPageError(error.message);
@@ -341,6 +394,8 @@ export default function BkuPage() {
     setBooks((current) => [created, ...current]);
     setBook(created);
     setTransactions([]);
+    await loadSchoolResources(created.id);
+    setView("calendar");
     setShowNewBook(false);
     setBookName("");
     setSchoolHead("");
