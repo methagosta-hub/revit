@@ -149,6 +149,7 @@ declare
   v_issue_id uuid;
   v_receipt_id uuid;
   v_division_id uuid;
+  v_rab_item_id uuid;
 begin
   select coalesce(is_demo_user, false)
     into v_is_demo
@@ -169,6 +170,7 @@ begin
   v_issue_id := nullif(p_row->>'issue_id', '')::uuid;
   v_receipt_id := nullif(p_row->>'receipt_id', '')::uuid;
   v_division_id := nullif(p_row->>'division_id', '')::uuid;
+  v_rab_item_id := nullif(p_row->>'rab_item_id', '')::uuid;
 
   if v_project_id is null and v_package_id is not null then
     select project_id into v_project_id from public.project_work_packages where id = v_package_id;
@@ -203,6 +205,12 @@ begin
   end if;
   if v_project_id is null and v_division_id is not null then
     select project_id into v_project_id from public.rab_divisions where id = v_division_id;
+  end if;
+  if v_project_id is null and v_rab_item_id is not null then
+    select d.project_id into v_project_id
+      from public.rab_items ri
+      join public.rab_divisions d on d.id = ri.division_id
+     where ri.id = v_rab_item_id;
   end if;
 
   if v_project_id is null then
@@ -249,7 +257,12 @@ declare
     'subcontract_payment_terms',
     'subcontract_payment_requests',
     'payment_obligations',
-    'payroll_cost_allocations'
+    'payroll_cost_allocations',
+    'rab_divisions',
+    'rab_items',
+    'volume_details',
+    'user_role_assignments',
+    'finance_recap_documents'
   ];
 begin
   foreach v_table in array v_tables loop
@@ -646,7 +659,7 @@ begin
        and exists (
          select 1 from information_schema.columns
          where table_schema='public' and table_name=v_table
-           and column_name in ('project_id','package_id','segment_id','segment_item_id','contract_id','purchase_order_id')
+           and column_name in ('project_id','package_id','segment_id','segment_item_id','contract_id','purchase_order_id','report_id','issue_id','receipt_id')
        ) then
       execute format('drop trigger if exists %I on public.%I', v_table || '_active_project_guard', v_table);
       execute format(
