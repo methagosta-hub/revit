@@ -48,10 +48,14 @@ function formatDate(value?: string | null): string {
 
 function statusClass(status?: string | null): string {
   switch (status) {
-    case 'Final':
+    case 'DIKERJAKAN':
       return 'bg-emerald-50 text-emerald-700 ring-emerald-600/20';
-    case 'Review':
+    case 'FINAL RAB':
+      return 'bg-blue-50 text-blue-700 ring-blue-600/20';
+    case 'REVIEW':
       return 'bg-amber-50 text-amber-700 ring-amber-600/20';
+    case 'SELESAI':
+      return 'bg-violet-50 text-violet-700 ring-violet-600/20';
     default:
       return 'bg-slate-100 text-slate-600 ring-slate-500/20';
   }
@@ -152,11 +156,13 @@ function CompanyDashboardContent() {
       (sum, project) => sum + Number(project.total_value ?? 0),
       0,
     );
-    const draft = projects.filter((project) => project.status === 'Draft').length;
-    const review = projects.filter((project) => project.status === 'Review').length;
-    const final = projects.filter((project) => project.status === 'Final').length;
+    const draft = projects.filter((project) => project.status === 'DRAFT').length;
+    const review = projects.filter((project) => project.status === 'REVIEW').length;
+    const final = projects.filter((project) => project.status === 'FINAL RAB').length;
+    const inProgress = projects.filter((project) => project.status === 'DIKERJAKAN').length;
+    const completed = projects.filter((project) => project.status === 'SELESAI').length;
 
-    return { totalValue, draft, review, final };
+    return { totalValue, draft, review, final, inProgress, completed };
   }, [projects]);
 
   const filteredProjects = useMemo(() => {
@@ -238,11 +244,25 @@ function CompanyDashboardContent() {
             iconClass="bg-amber-50 text-amber-700"
           />
           <StatCard
-            label="RAB Final"
+            label="FINAL RAB"
             value={loading ? '—' : String(summary.final)}
-            note="Proyek dengan status Final"
+            note="RAB yang telah ditetapkan"
             icon={CheckCircle2}
             iconClass="bg-violet-50 text-violet-700"
+          />
+          <StatCard
+            label="Sedang Dikerjakan"
+            value={loading ? '—' : String(summary.inProgress)}
+            note="Proyek yang sudah masuk pelaksanaan"
+            icon={Activity}
+            iconClass="bg-emerald-50 text-emerald-700"
+          />
+          <StatCard
+            label="Selesai"
+            value={loading ? '—' : String(summary.completed)}
+            note="Proyek yang sudah ditutup"
+            icon={CheckCircle2}
+            iconClass="bg-slate-100 text-slate-600"
           />
         </section>
 
@@ -289,7 +309,7 @@ function CompanyDashboardContent() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate text-sm font-bold text-slate-900">{project.title}</p>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset ${statusClass(project.status)}`}>
-                          {project.status || 'Draft'}
+                          {project.status || 'DRAFT'}
                         </span>
                       </div>
                       <p className="mt-1 truncate text-xs text-slate-500">
@@ -393,7 +413,7 @@ function CompanyDashboardContent() {
                 </div>
               </div>
               <p className="mt-3 text-[10px] leading-relaxed text-slate-400">
-                Status ini mengikuti kolom status proyek yang tersedia saat ini (Draft, Review, Final).
+                Status proyek mengikuti alur DRAFT → REVIEW → FINAL RAB → DIKERJAKAN → SELESAI.
               </p>
             </div>
           </aside>
