@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, CalendarDays,
-  ChevronLeft, ChevronRight, FileUp, LockKeyhole, LogOut, Plus,
+  ChevronLeft, ChevronRight, Download, FileUp, LockKeyhole, LogOut, Plus,
   RefreshCw, ShieldCheck, Wallet, X,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
@@ -14,9 +14,26 @@ type TxType = "IN" | "OUT" | "TRANSFER";
 type Book = {
   id: string;
   name: string;
+  school_head: string;
+  planner: string;
+  supervisor: string;
+  p2sp: string;
   start_date: string;
   opening_cash: number;
   opening_bank: number;
+};
+type DetailLine = {
+  name: string;
+  unit_price: string;
+  volume: string;
+  unit: string;
+};
+type StoredDetail = {
+  name: string;
+  unit_price: number;
+  volume: number;
+  unit: string;
+  line_total: number;
 };
 type Transaction = {
   id: string;
@@ -33,6 +50,7 @@ type Transaction = {
   to_account: Account | null;
   receipt_number: string | null;
   evidence_path: string | null;
+  details: StoredDetail[] | null;
 };
 type Draft = {
   transaction_type: TxType;
@@ -44,6 +62,7 @@ type Draft = {
   to_account: Account;
   receipt_number: string;
   file: File | null;
+  details: DetailLine[];
 };
 
 const money = (value: number) => new Intl.NumberFormat("id-ID", {
@@ -59,6 +78,7 @@ const blankDraft = (): Draft => ({
   transaction_type: "OUT", category: "material", description: "",
   amount: "", account: "CASH", from_account: "CASH", to_account: "BANK",
   receipt_number: "", file: null,
+  details: [{ name: "", unit_price: "", volume: "", unit: "pcs" }],
 });
 const expenseCategories = [
   ["material", "Pembelian material"],
@@ -74,6 +94,38 @@ const incomeCategories = [
   ["pengembalian", "Pengembalian dana"],
   ["lainnya", "Pemasukan lainnya"],
 ];
+const exportThemes = [
+  { id: "emerald", label: "Emerald Modern", primary: "#047857", soft: "#ecfdf5", ink: "#102f2c", accent: "#34d399", border: "#cdeee1" },
+  { id: "ocean", label: "Ocean Blue", primary: "#0369a1", soft: "#f0f9ff", ink: "#0c2940", accent: "#38bdf8", border: "#ccecff" },
+  { id: "midnight", label: "Midnight Navy", primary: "#1e3a8a", soft: "#eff6ff", ink: "#172554", accent: "#60a5fa", border: "#dbeafe" },
+  { id: "royal", label: "Royal Blue", primary: "#3730a3", soft: "#eef2ff", ink: "#1e1b4b", accent: "#818cf8", border: "#dfe3ff" },
+  { id: "violet", label: "Violet Luxe", primary: "#6d28d9", soft: "#f5f3ff", ink: "#2e1065", accent: "#a78bfa", border: "#e9ddff" },
+  { id: "plum", label: "Plum", primary: "#7e22ce", soft: "#faf5ff", ink: "#3b0764", accent: "#c084fc", border: "#efdafa" },
+  { id: "rose", label: "Rose", primary: "#be123c", soft: "#fff1f2", ink: "#4c0519", accent: "#fb7185", border: "#ffe0e5" },
+  { id: "coral", label: "Coral", primary: "#c2410c", soft: "#fff7ed", ink: "#431407", accent: "#fb923c", border: "#ffdfc7" },
+  { id: "amber", label: "Amber", primary: "#b45309", soft: "#fffbeb", ink: "#451a03", accent: "#fbbf24", border: "#f8e9c7" },
+  { id: "gold", label: "Champagne Gold", primary: "#92702c", soft: "#fbf7ec", ink: "#3f321b", accent: "#d6b56d", border: "#eadfbe" },
+  { id: "slate", label: "Slate Minimal", primary: "#475569", soft: "#f8fafc", ink: "#0f172a", accent: "#94a3b8", border: "#e2e8f0" },
+  { id: "charcoal", label: "Charcoal", primary: "#334155", soft: "#f1f5f9", ink: "#111827", accent: "#64748b", border: "#dbe1e8" },
+  { id: "forest", label: "Forest Green", primary: "#166534", soft: "#f0fdf4", ink: "#052e16", accent: "#4ade80", border: "#d2f2d9" },
+  { id: "sage", label: "Sage", primary: "#5f7664", soft: "#f4f7f2", ink: "#26352b", accent: "#a3b18a", border: "#dce5d8" },
+  { id: "mint", label: "Mint Fresh", primary: "#0f766e", soft: "#f0fdfa", ink: "#134e4a", accent: "#5eead4", border: "#c8f2eb" },
+  { id: "teal", label: "Teal Executive", primary: "#0f6b78", soft: "#effbfc", ink: "#12343b", accent: "#5dc8d4", border: "#ccecef" },
+  { id: "sky", label: "Sky Light", primary: "#0284c7", soft: "#f0f9ff", ink: "#082f49", accent: "#7dd3fc", border: "#d5efff" },
+  { id: "cobalt", label: "Cobalt", primary: "#1d4ed8", soft: "#eff6ff", ink: "#172554", accent: "#93c5fd", border: "#d8e7ff" },
+  { id: "burgundy", label: "Burgundy Elegant", primary: "#881337", soft: "#fff1f2", ink: "#3f0a1c", accent: "#d18a9e", border: "#f2d8e0" },
+  { id: "monochrome", label: "Black & White", primary: "#18181b", soft: "#f4f4f5", ink: "#18181b", accent: "#a1a1aa", border: "#e4e4e7" },
+] as const;
+const exportFonts = [
+  "Inter", "Roboto", "Open Sans", "Lato", "Montserrat",
+  "Poppins", "Nunito Sans", "Manrope", "DM Sans", "Plus Jakarta Sans",
+  "Work Sans", "Source Sans 3", "Ubuntu", "Rubik", "Outfit",
+  "Space Grotesk", "Urbanist", "Mulish", "Figtree", "IBM Plex Sans",
+] as const;
+const parseDecimal = (value: string) => Number(value.trim().replace(/\\./g, "").replace(",", ".")) || 0;
+const detailLineTotal = (line: DetailLine) => Math.round(parseDecimal(line.unit_price) * parseDecimal(line.volume));
+const draftDetailsTotal = (draft: Draft) => draft.details.reduce((sum, line) => sum + detailLineTotal(line), 0);
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char] || char));
 const fieldClass = "mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50";
 
 function categoryLabel(value: string) {
@@ -108,9 +160,16 @@ export default function BkuPage() {
   const [showNewBook, setShowNewBook] = useState(false);
   const [showEntry, setShowEntry] = useState(false);
   const [bookName, setBookName] = useState("");
+  const [schoolHead, setSchoolHead] = useState("");
+  const [planner, setPlanner] = useState("");
+  const [supervisor, setSupervisor] = useState("");
+  const [p2sp, setP2sp] = useState("");
   const [startDate, setStartDate] = useState(() => dateKey(new Date()));
   const [openingCash, setOpeningCash] = useState("0");
   const [openingBank, setOpeningBank] = useState("0");
+  const [showExport, setShowExport] = useState(false);
+  const [exportTheme, setExportTheme] = useState<string>("emerald");
+  const [exportFont, setExportFont] = useState<string>("Inter");
   const [drafts, setDrafts] = useState<Draft[]>([blankDraft()]);
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<"calendar" | "ledger">("calendar");
@@ -142,7 +201,7 @@ export default function BkuPage() {
     setPageError("");
     const { data, error } = await supabase
       .from("bku_books")
-      .select("id,name,start_date,opening_cash,opening_bank")
+      .select("id,name,school_head,planner,supervisor,p2sp,start_date,opening_cash,opening_bank")
       .order("created_at", { ascending: false });
     if (error) setPageError(error.message);
     const nextBooks = (data || []) as Book[];
@@ -155,7 +214,7 @@ export default function BkuPage() {
     if (!supabase) return;
     const { data, error } = await supabase
       .from("bku_transactions")
-      .select("id,book_id,transaction_date,created_at,entry_no,transaction_type,category,description,amount,account,from_account,to_account,receipt_number,evidence_path")
+      .select("id,book_id,transaction_date,created_at,entry_no,transaction_type,category,description,amount,account,from_account,to_account,receipt_number,evidence_path,details")
       .eq("book_id", bookId)
       .order("transaction_date", { ascending: true })
       .order("entry_no", { ascending: true });
@@ -261,11 +320,15 @@ export default function BkuPage() {
     setPageError("");
     const { data, error } = await supabase.from("bku_books").insert({
       name: bookName.trim(),
+      school_head: schoolHead.trim(),
+      planner: planner.trim(),
+      supervisor: supervisor.trim(),
+      p2sp: p2sp.trim(),
       start_date: startDate,
       opening_cash: amountValue(openingCash),
       opening_bank: amountValue(openingBank),
       created_by: session.user.id,
-    }).select("id,name,start_date,opening_cash,opening_bank").single();
+    }).select("id,name,school_head,planner,supervisor,p2sp,start_date,opening_cash,opening_bank").single();
     setSaving(false);
     if (error) {
       setPageError(error.message);
@@ -277,6 +340,10 @@ export default function BkuPage() {
     setTransactions([]);
     setShowNewBook(false);
     setBookName("");
+    setSchoolHead("");
+    setPlanner("");
+    setSupervisor("");
+    setP2sp("");
     setOpeningCash("0");
     setOpeningBank("0");
   }
@@ -284,9 +351,19 @@ export default function BkuPage() {
   async function saveEntries(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !book || !session?.user) return;
-    const valid = drafts.filter((draft) => draft.description.trim() && amountValue(draft.amount) > 0);
+    const valid = drafts.filter((draft) => draft.transaction_type === "OUT"
+      ? draft.details.some((line) => line.name.trim() && parseDecimal(line.unit_price) > 0 && parseDecimal(line.volume) > 0)
+      : draft.description.trim() && amountValue(draft.amount) > 0);
     if (!valid.length) {
-      setPageError("Isi minimal satu uraian dan nominal transaksi.");
+      setPageError("Untuk pengeluaran, isi minimal satu rincian material dengan harga satuan dan volume. Untuk pemasukan / transfer, isi uraian dan nominal.");
+      return;
+    }
+    const hasIncompleteDetail = valid.some((draft) => draft.transaction_type === "OUT" && draft.details.some((line) =>
+      (line.name.trim() || line.unit_price.trim() || line.volume.trim()) &&
+      (!line.name.trim() || parseDecimal(line.unit_price) <= 0 || parseDecimal(line.volume) <= 0)
+    ));
+    if (hasIncompleteDetail) {
+      setPageError("Lengkapi nama material, harga satuan, dan volume pada setiap baris nota yang digunakan.");
       return;
     }
     if (valid.some((draft) => draft.transaction_type === "TRANSFER" && draft.from_account === draft.to_account)) {
@@ -315,8 +392,21 @@ export default function BkuPage() {
           entry_no: firstEntryNo + index,
           transaction_type: draft.transaction_type,
           category: draft.category,
-          description: draft.description.trim(),
-          amount: amountValue(draft.amount),
+          description: draft.transaction_type === "OUT"
+            ? (draft.description.trim() || draft.details.filter((line) => line.name.trim()).map((line) => line.name.trim()).join(", ").slice(0, 250))
+            : draft.description.trim(),
+          amount: draft.transaction_type === "OUT"
+            ? draft.details.reduce((sum, line) => sum + detailLineTotal(line), 0)
+            : amountValue(draft.amount),
+          details: draft.transaction_type === "OUT"
+            ? draft.details.filter((line) => line.name.trim() && parseDecimal(line.unit_price) > 0 && parseDecimal(line.volume) > 0).map((line) => ({
+                name: line.name.trim(),
+                unit_price: parseDecimal(line.unit_price),
+                volume: parseDecimal(line.volume),
+                unit: line.unit.trim(),
+                line_total: detailLineTotal(line),
+              }))
+            : [],
           account: draft.transaction_type === "TRANSFER" ? null : draft.account,
           from_account: draft.transaction_type === "TRANSFER" ? draft.from_account : null,
           to_account: draft.transaction_type === "TRANSFER" ? draft.to_account : null,
@@ -335,6 +425,83 @@ export default function BkuPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function exportBkuPdf() {
+    if (!book) return;
+    const popup = window.open("", "_blank");
+    if (!popup) {
+      setPageError("Jendela PDF diblokir browser. Izinkan pop-up untuk situs BKU lalu coba kembali.");
+      return;
+    }
+    const theme = exportThemes.find((item) => item.id === exportTheme) || exportThemes[0];
+    const font = exportFonts.find((item) => item === exportFont) || "Inter";
+    const dateFormat = (value: string) => new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(value + "T00:00:00"));
+    const transactionRows = ordered.map((tx) => {
+      const balance = balances.rows[tx.id];
+      const detailRows = (tx.details || []).map((line) =>
+        `<div class="line"><span>${escapeHtml(line.name)}</span><span>${money(Number(line.unit_price))} × ${Number(line.volume).toLocaleString("id-ID")} ${escapeHtml(line.unit || "")}</span><strong>${money(Number(line.line_total ?? Number(line.unit_price) * Number(line.volume)))}</strong></div>`
+      ).join("");
+      const description = tx.transaction_type === "OUT"
+        ? (detailRows || `<div class="desc">${escapeHtml(tx.description)}</div>`)
+        : `<div class="desc">${escapeHtml(tx.description)}</div>`;
+      const type = tx.transaction_type === "IN" ? "Pemasukan" : tx.transaction_type === "OUT" ? "Pengeluaran" : "Transfer";
+      const method = tx.transaction_type === "TRANSFER" ? `${tx.from_account === "BANK" ? "Bank" : "Tunai"} → ${tx.to_account === "BANK" ? "Bank" : "Tunai"}` : tx.account === "BANK" ? "Bank" : "Tunai";
+      return `<tr><td class="nowrap">${dateFormat(tx.transaction_date)}</td><td><strong>${escapeHtml(tx.receipt_number || "—")}</strong><div class="muted">${type} · ${method}</div></td><td>${description}</td><td class="num in">${tx.transaction_type === "IN" ? money(Number(tx.amount)) : "—"}</td><td class="num out">${tx.transaction_type === "OUT" ? money(Number(tx.amount)) : "—"}</td><td class="num balance">${money(balance?.total || 0)}</td></tr>`;
+    }).join("");
+    const rangeEnd = ordered.length ? ordered[ordered.length - 1].transaction_date : dateKey(new Date());
+    const closingCash = money(balances.cash);
+    const closingBank = money(balances.bank);
+    const html = `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Laporan BKU - ${escapeHtml(book.name)}</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(font).replace(/%20/g, "+")}:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+      <style>
+        @page{size:A4 portrait;margin:14mm 12mm 16mm}
+        *{box-sizing:border-box}body{margin:0;background:#f1f5f9;color:${theme.ink};font-family:"${font}",Arial,sans-serif;font-size:10px;line-height:1.45}
+        .sheet{max-width:210mm;margin:22px auto;background:#fff;padding:13mm;box-shadow:0 8px 36px rgba(15,23,42,.12)}
+        .top{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;border-bottom:3px solid ${theme.primary};padding-bottom:15px}
+        .brand{font-size:9px;font-weight:800;letter-spacing:2px;color:${theme.primary};text-transform:uppercase}.title{font-size:24px;line-height:1.1;font-weight:800;margin:5px 0 4px}.subtitle{font-size:10px;color:#64748b}
+        .pill{background:${theme.soft};color:${theme.primary};padding:7px 10px;border-radius:8px;font-size:9px;font-weight:700;white-space:nowrap}
+        .identity{display:grid;grid-template-columns:1fr 1fr;gap:7px 18px;padding:13px 0;border-bottom:1px solid ${theme.border};font-size:9px}.identity span{color:#64748b;display:inline-block;min-width:98px}.identity strong{color:${theme.ink}}
+        .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:15px 0}.stat{background:${theme.soft};border:1px solid ${theme.border};border-radius:9px;padding:10px}.stat small{display:block;color:#64748b;font-size:8px}.stat strong{display:block;color:${theme.primary};font-size:12px;margin-top:3px}
+        .section{margin:17px 0 8px;font-size:12px;font-weight:800;color:${theme.primary}}.table-wrap{width:100%}table{width:100%;border-collapse:collapse;font-size:8.5px}thead{display:table-header-group}th{background:${theme.primary};color:#fff;text-align:left;padding:8px 6px;font-size:8px;text-transform:uppercase;letter-spacing:.3px}td{border-bottom:1px solid ${theme.border};padding:7px 6px;vertical-align:top}tbody tr:nth-child(even){background:${theme.soft}}.nowrap{white-space:nowrap}.num{text-align:right;white-space:nowrap;font-weight:700}.in{color:#047857}.out{color:#be123c}.balance{color:${theme.primary}}.muted{color:#64748b;font-size:7.5px;margin-top:2px}.desc{font-weight:600}.line{display:grid;grid-template-columns:minmax(90px,1fr) auto auto;gap:6px;padding:2px 0;border-bottom:1px dotted ${theme.border}}.line:last-child{border:0}.line span:nth-child(2){color:#64748b;font-size:7.5px}.line strong{white-space:nowrap;font-size:8px}
+        .closing{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px}.closing div{border:1px solid ${theme.border};border-radius:8px;padding:9px}.closing small{display:block;color:#64748b}.closing strong{display:block;margin-top:3px;color:${theme.primary};font-size:11px}
+        .signatures{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:34px;text-align:center;font-size:8.5px}.signatures div{min-height:64px}.signatures .line-sign{margin-top:42px;border-top:1px solid #94a3b8;padding-top:5px}
+        .foot{margin-top:20px;border-top:1px solid ${theme.border};padding-top:8px;color:#64748b;font-size:8px;display:flex;justify-content:space-between}
+        .printbar{display:flex;justify-content:flex-end;max-width:210mm;margin:12px auto}.printbar button{border:0;border-radius:8px;padding:10px 16px;background:${theme.primary};color:white;font-weight:700;cursor:pointer}
+        @media print{body{background:#fff}.sheet{max-width:none;margin:0;padding:0;box-shadow:none}.printbar{display:none}tr,.stat,.closing div,.identity{break-inside:avoid}.section{break-after:avoid}}
+        @media screen and (max-width:700px){.sheet{margin:0;padding:18px}.summary{grid-template-columns:1fr 1fr}.identity{grid-template-columns:1fr}.table-wrap{overflow-x:auto}table{min-width:720px}}
+      </style></head><body>
+      <div class="printbar"><button onclick="window.print()">Cetak / Simpan sebagai PDF</button></div>
+      <main class="sheet">
+        <header class="top"><div><div class="brand">Dahlia Management System · Buku Kas Eksternal</div><h1 class="title">Laporan Buku Kas Umum</h1><div class="subtitle">Periode ${dateFormat(book.start_date)} – ${dateFormat(rangeEnd)}</div></div><div class="pill">DOKUMEN PEMBUKUAN</div></header>
+        <section class="identity">
+          <div><span>Nama Sekolah</span><strong>${escapeHtml(book.name)}</strong></div>
+          <div><span>Kepala Sekolah</span><strong>${escapeHtml(book.school_head || "—")}</strong></div>
+          <div><span>Perencana</span><strong>${escapeHtml(book.planner || "—")}</strong></div>
+          <div><span>Pengawas</span><strong>${escapeHtml(book.supervisor || "—")}</strong></div>
+          <div><span>P2SP</span><strong>${escapeHtml(book.p2sp || "—")}</strong></div>
+          <div><span>Tanggal cetak</span><strong>${dateFormat(dateKey(new Date()))}</strong></div>
+        </section>
+        <section class="summary">
+          <div class="stat"><small>Saldo awal</small><strong>${money(Number(book.opening_cash) + Number(book.opening_bank))}</strong></div>
+          <div class="stat"><small>Total pemasukan</small><strong>${money(balances.incoming)}</strong></div>
+          <div class="stat"><small>Total pengeluaran</small><strong>${money(balances.outgoing)}</strong></div>
+          <div class="stat"><small>Saldo akhir</small><strong>${money(balances.total)}</strong></div>
+        </section>
+        <div class="section">Rincian transaksi dan nota</div>
+        <div class="table-wrap"><table><thead><tr><th style="width:12%">Tanggal</th><th style="width:13%">No. Nota / Jenis</th><th style="width:38%">Uraian / Rincian Material</th><th style="width:12%;text-align:right">Masuk</th><th style="width:12%;text-align:right">Keluar</th><th style="width:13%;text-align:right">Saldo</th></tr></thead><tbody>${transactionRows || '<tr><td colspan="6" style="text-align:center;padding:22px;color:#64748b">Belum ada transaksi pada buku kas ini.</td></tr>'}</tbody></table></div>
+        <div class="section">Posisi saldo akhir</div>
+        <section class="closing"><div><small>Saldo tunai</small><strong>${closingCash}</strong></div><div><small>Saldo bank / non-tunai</small><strong>${closingBank}</strong></div><div><small>Total saldo</small><strong>${money(balances.total)}</strong></div></section>
+        <section class="signatures"><div><strong>Mengetahui,<br>Kepala Sekolah</strong><div class="line-sign">${escapeHtml(book.school_head || "Nama & tanda tangan")}</div></div><div><strong>Perencana</strong><div class="line-sign">${escapeHtml(book.planner || "Nama & tanda tangan")}</div></div><div><strong>Pengawas</strong><div class="line-sign">${escapeHtml(book.supervisor || "Nama & tanda tangan")}</div></div></section>
+        <footer class="foot"><span>BKU Eksternal · Database terpisah</span><span>Dicetak ${dateFormat(dateKey(new Date()))}</span></footer>
+      </main></body></html>`;
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    popup.focus();
+    window.setTimeout(() => popup.print(), 900);
+    setShowExport(false);
   }
 
   async function openEvidence(path: string) {
@@ -430,10 +597,11 @@ export default function BkuPage() {
       <div className="mx-auto max-w-[1500px] px-5 py-6 lg:px-8">
         {pageError && <div role="alert" className="mb-5 flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><span>{pageError}</span><button onClick={() => setPageError("")} aria-label="Tutup pesan"><X size={17} /></button></div>}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div><p className="text-sm text-slate-500">Pembukuan proyek eksternal</p><h2 className="mt-1 text-2xl font-black">{book?.name || "Belum ada buku kas"}</h2></div>
+          <div><p className="text-sm text-slate-500">Pembukuan sekolah / proyek eksternal</p><h2 className="mt-1 text-2xl font-black">{book?.name || "Belum ada buku kas"}</h2>{book && <p className="mt-1 text-xs leading-5 text-slate-500">Kepala Sekolah: {book.school_head || "—"} · Perencana: {book.planner || "—"} · Pengawas: {book.supervisor || "—"} · P2SP: {book.p2sp || "—"}</p>}</div>
           <div className="flex flex-wrap gap-2">
             {books.length > 0 && <select value={book?.id || ""} onChange={(e) => setBook(books.find((item) => item.id === e.target.value) || null)} className="h-11 max-w-[240px] rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"><option value="">Pilih buku kas</option>{books.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}
             <button onClick={() => setShowNewBook(true)} className="flex h-11 items-center gap-2 rounded-xl border border-emerald-700 px-4 text-sm font-bold text-emerald-800 hover:bg-emerald-50"><Plus size={17} />Buku kas baru</button>
+            {book && <button onClick={() => setShowExport(true)} className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><Download size={17} />Export PDF</button>}
             {book && <button onClick={() => { setDrafts([blankDraft()]); setShowEntry(true); }} className="flex h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white shadow-sm hover:bg-emerald-800"><Plus size={17} />Catat transaksi</button>}
           </div>
         </div>
@@ -537,9 +705,24 @@ export default function BkuPage() {
         </div>
       </div>
 
+      {showExport && book && <Modal title="Export laporan BKU ke PDF" subtitle="Pilih gaya dokumen sebelum mencetak atau menyimpan sebagai PDF." onClose={() => setShowExport(false)}>
+        <div className="space-y-4">
+          <Field label="Tema dokumen (20 pilihan)"><select value={exportTheme} onChange={(e) => setExportTheme(e.target.value)} className={fieldClass}>{exportThemes.map((theme) => <option key={theme.id} value={theme.id}>{theme.label}</option>)}</select></Field>
+          <Field label="Font dokumen (20 pilihan)"><select value={exportFont} onChange={(e) => setExportFont(e.target.value)} className={fieldClass}>{exportFonts.map((font) => <option key={font} value={font}>{font}</option>)}</select></Field>
+          <div className="rounded-xl border border-slate-200 p-3"><p className="text-xs font-bold text-slate-700">Pratinjau gaya</p><div className="mt-2 flex items-center gap-3 rounded-lg p-3" style={{ background: exportThemes.find((item) => item.id === exportTheme)?.soft }}><span className="h-9 w-2 rounded-full" style={{ background: exportThemes.find((item) => item.id === exportTheme)?.primary }} /><div><p className="text-sm font-bold" style={{ color: exportThemes.find((item) => item.id === exportTheme)?.primary }}>Laporan Buku Kas Umum</p><p className="text-xs text-slate-500" style={{ fontFamily: exportFont }}>Font: {exportFont} · Tema: {exportThemes.find((item) => item.id === exportTheme)?.label}</p></div></div></div>
+          <p className="text-xs leading-5 text-slate-500">PDF memuat identitas sekolah, ringkasan saldo, seluruh transaksi, rincian material per nota, dan kolom tanda tangan. Pada dialog cetak, pilih tujuan “Save as PDF / Simpan sebagai PDF”.</p>
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setShowExport(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600">Batal</button><button type="button" onClick={exportBkuPdf} className="flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white"><Download size={16} />Buat PDF</button></div>
+        </div>
+      </Modal>}
       {showNewBook && <Modal title="Buat buku kas baru" onClose={() => setShowNewBook(false)}>
         <form onSubmit={createBook} className="space-y-4">
-          <Field label="Nama proyek / buku kas"><input required autoFocus value={bookName} onChange={(e) => setBookName(e.target.value)} placeholder="Contoh: Renovasi Rumah" className={fieldClass} /></Field>
+          <Field label="Nama Sekolah"><input required autoFocus value={bookName} onChange={(e) => setBookName(e.target.value)} placeholder="Nama sekolah" className={fieldClass} /></Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Nama Kepala Sekolah"><input required value={schoolHead} onChange={(e) => setSchoolHead(e.target.value)} placeholder="Nama kepala sekolah" className={fieldClass} /></Field>
+            <Field label="Nama Perencana"><input required value={planner} onChange={(e) => setPlanner(e.target.value)} placeholder="Nama perencana" className={fieldClass} /></Field>
+            <Field label="Nama Pengawas"><input required value={supervisor} onChange={(e) => setSupervisor(e.target.value)} placeholder="Nama pengawas" className={fieldClass} /></Field>
+            <Field label="Nama P2SP"><input required value={p2sp} onChange={(e) => setP2sp(e.target.value)} placeholder="Nama P2SP" className={fieldClass} /></Field>
+          </div>
           <Field label="Tanggal mulai pembukuan"><input type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} className={fieldClass} /></Field>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Saldo awal tunai (Rp)"><input inputMode="numeric" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} className={fieldClass} /></Field>
@@ -556,12 +739,30 @@ export default function BkuPage() {
             <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Jenis transaksi"><select value={draft.transaction_type} onChange={(e) => updateDraft(index, { transaction_type: e.target.value as TxType, category: e.target.value === "IN" ? "modal" : e.target.value === "TRANSFER" ? "transfer" : "material" })} className={fieldClass}><option value="OUT">Kas keluar</option><option value="IN">Kas masuk</option><option value="TRANSFER">Transfer tunai ↔ bank</option></select></Field>
               <Field label="Kategori"><select value={draft.category} onChange={(e) => updateDraft(index, { category: e.target.value })} className={fieldClass}>{(draft.transaction_type === "IN" ? incomeCategories : draft.transaction_type === "OUT" ? expenseCategories : [["transfer", "Pemindahan saldo"]]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
-              <Field label="Nominal (Rp)"><input required inputMode="numeric" value={draft.amount} onChange={(e) => updateDraft(index, { amount: e.target.value })} placeholder="0" className={fieldClass} />{amountValue(draft.amount) > 2000000 && <span className="mt-1 block text-[11px] font-semibold text-amber-700">Periksa nominal dan nota sebenarnya (di atas Rp2 juta).</span>}</Field>
+              {draft.transaction_type !== "OUT" ? <Field label="Nominal (Rp)"><input required inputMode="numeric" value={draft.amount} onChange={(e) => updateDraft(index, { amount: e.target.value })} placeholder="0" className={fieldClass} />{amountValue(draft.amount) > 2000000 && <span className="mt-1 block text-[11px] font-semibold text-amber-700">Pengingat: periksa nota dan nominal sebenarnya (di atas Rp2 juta).</span>}</Field> : <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-emerald-800">Jumlah nota otomatis</p><p className="mt-1 text-lg font-black text-emerald-900">{money(draftDetailsTotal(draft))}</p>{draftDetailsTotal(draft) > 2000000 && <p className="mt-1 text-[11px] font-semibold text-amber-800">Pengingat: jumlah nota melebihi Rp2 juta. Pencatatan tetap dapat dilanjutkan sesuai nominal sebenarnya.</p>}</div>}
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Field label="Uraian transaksi"><input required value={draft.description} onChange={(e) => updateDraft(index, { description: e.target.value })} placeholder="Contoh: Pembelian semen 20 sak" className={fieldClass} /></Field>
+              <Field label={draft.transaction_type === "OUT" ? "Nama toko / uraian nota (opsional)" : "Uraian transaksi"}><input required={draft.transaction_type !== "OUT"} value={draft.description} onChange={(e) => updateDraft(index, { description: e.target.value })} placeholder={draft.transaction_type === "OUT" ? "Nama toko / pemasok" : "Contoh: Dana bantuan masuk"} className={fieldClass} /></Field>
               <Field label="Nomor nota / referensi"><input value={draft.receipt_number} onChange={(e) => updateDraft(index, { receipt_number: e.target.value })} placeholder="Opsional" className={fieldClass} /></Field>
             </div>
+            {draft.transaction_type === "OUT" && <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-black text-slate-800">Rincian nota pengeluaran</p><p className="text-[11px] text-slate-500">Masukkan setiap material / barang sebagai baris tersendiri.</p></div>
+                <button type="button" onClick={() => updateDraft(index, { details: [...draft.details, { name: "", unit_price: "", volume: "", unit: "pcs" }] })} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50"><Plus size={14} className="mr-1 inline" />Tambah material</button>
+              </div>
+              <div className="space-y-3">
+                {draft.details.map((line, lineIndex) => <div key={lineIndex} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <div className="mb-2 flex items-center justify-between"><span className="text-[11px] font-bold text-slate-500">Material {lineIndex + 1}</span>{draft.details.length > 1 && <button type="button" onClick={() => updateDraft(index, { details: draft.details.filter((_, i) => i !== lineIndex) })} className="text-[11px] font-semibold text-rose-600">Hapus</button>}</div>
+                  <div className="grid gap-2 sm:grid-cols-[minmax(150px,1.6fr)_1fr_.7fr_.7fr_1fr]">
+                    <Field label="Nama material"><input value={line.name} onChange={(e) => updateDraft(index, { details: draft.details.map((item, i) => i === lineIndex ? { ...item, name: e.target.value } : item) })} placeholder="Semen, pasir, besi..." className={fieldClass} /></Field>
+                    <Field label="Harga satuan (Rp)"><input inputMode="numeric" value={line.unit_price} onChange={(e) => updateDraft(index, { details: draft.details.map((item, i) => i === lineIndex ? { ...item, unit_price: e.target.value } : item) })} placeholder="0" className={fieldClass} /></Field>
+                    <Field label="Volume"><input inputMode="decimal" value={line.volume} onChange={(e) => updateDraft(index, { details: draft.details.map((item, i) => i === lineIndex ? { ...item, volume: e.target.value } : item) })} placeholder="0" className={fieldClass} /></Field>
+                    <Field label="Satuan"><input value={line.unit} onChange={(e) => updateDraft(index, { details: draft.details.map((item, i) => i === lineIndex ? { ...item, unit: e.target.value } : item) })} placeholder="sak/m³" className={fieldClass} /></Field>
+                    <div className="self-end pb-1"><p className="text-[10px] font-bold text-slate-400">TOTAL</p><p className="mt-1 text-sm font-black text-slate-800">{money(detailLineTotal(line))}</p></div>
+                  </div>
+                </div>)}
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3"><span className="text-xs font-bold text-slate-600">Jumlah seluruh rincian nota</span><strong className="text-base font-black text-emerald-800">{money(draftDetailsTotal(draft))}</strong></div>
+            </div>}
             {draft.transaction_type === "TRANSFER" ? <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <Field label="Dari rekening"><select value={draft.from_account} onChange={(e) => updateDraft(index, { from_account: e.target.value as Account })} className={fieldClass}><option value="CASH">Tunai</option><option value="BANK">Bank</option></select></Field>
               <Field label="Ke rekening"><select value={draft.to_account} onChange={(e) => updateDraft(index, { to_account: e.target.value as Account })} className={fieldClass}><option value="BANK">Bank</option><option value="CASH">Tunai</option></select></Field>
@@ -606,7 +807,7 @@ function TransactionCard({ tx, balance, onEvidence }: { tx: Transaction; balance
     <div className="flex items-start justify-between gap-3">
       <div className="flex min-w-0 items-start gap-2.5">
         <span className={"mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg " + (transfer ? "bg-blue-50 text-blue-700" : incoming ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700")}>{transfer ? <ArrowLeftRight size={16} /> : incoming ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}</span>
-        <div className="min-w-0"><p className="break-words text-sm font-bold text-slate-800">{tx.description}</p><p className="mt-0.5 text-[11px] text-slate-400">{categoryLabel(tx.category)} · {transfer ? tx.from_account + " → " + tx.to_account : tx.account === "BANK" ? "Bank / non-tunai" : "Tunai"}</p>{tx.receipt_number && <p className="mt-1 text-[11px] text-slate-500">Nota: {tx.receipt_number}</p>}</div>
+        <div className="min-w-0"><p className="break-words text-sm font-bold text-slate-800">{tx.description}</p><p className="mt-0.5 text-[11px] text-slate-400">{categoryLabel(tx.category)} · {transfer ? tx.from_account + " → " + tx.to_account : tx.account === "BANK" ? "Bank / non-tunai" : "Tunai"}</p>{tx.receipt_number && <p className="mt-1 text-[11px] text-slate-500">Nota: {tx.receipt_number}</p>}{tx.details?.length ? <p className="mt-1 text-[10px] text-slate-500">{tx.details.length} rincian: {tx.details.slice(0, 3).map((line) => line.name).join(", ")}{tx.details.length > 3 ? "…" : ""}</p> : null}</div>
       </div>
       <div className="shrink-0 text-right"><p className={"text-sm font-black " + (transfer ? "text-blue-700" : incoming ? "text-emerald-700" : "text-rose-700")}>{incoming ? "+" : transfer ? "↔" : "-"}{money(Number(tx.amount))}</p>{balance && <p className="mt-1 text-[10px] text-slate-400">Saldo {money(balance.total)}</p>}</div>
     </div>
