@@ -1056,7 +1056,7 @@ export default function BkuPage() {
             </div>}
             {draft.transaction_type === "OUT" && <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-black text-slate-800">Rincian nota pengeluaran</p><p className="text-[11px] text-slate-500">Masukkan setiap material / barang sebagai baris tersendiri.</p></div>
-                <button type="button" onClick={() => updateDraft(index, { details: [...draft.details, { name: "", unit_price: "", volume: "", unit: "pcs" }] })} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50"><Plus size={14} className="mr-1 inline" />Tambah material</button>
+                <button type="button" onClick={() => updateDraft(index, { details: [...draft.details, { name: "", unit_price: "", volume: "", unit: "pcs", material_id: "" }] })} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50"><Plus size={14} className="mr-1 inline" />Tambah material</button>
               </div>
               <div className="space-y-3">
                 {draft.details.map((line, lineIndex) => <div key={lineIndex} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
