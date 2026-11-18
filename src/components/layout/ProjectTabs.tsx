@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { ComponentType } from 'react';
 import { useParams, usePathname } from 'next/navigation';
+import { useAuth } from '@/components/auth/AuthProvider';
 import {
   Calculator,
   ClipboardList,
@@ -31,12 +32,17 @@ const executionLinks: ProjectSectionLink[] = [
   { label: 'Pusat Pelaksanaan', suffix: '/pelaksanaan-pekerjaan', icon: ClipboardCheck },
 ];
 
-const planningSuffixes = planningLinks.map((item) => item.suffix).filter(Boolean);
 const executionSuffixes = executionLinks.map((item) => item.suffix);
 
 export default function ProjectTabs() {
   const params = useParams<{ id: string }>();
   const pathname = usePathname();
+  const { access } = useAuth();
+  const isPortfolioAccount = access?.profile?.is_demo_user === true;
+  const visiblePlanningLinks = isPortfolioAccount
+    ? planningLinks.filter((item) => item.suffix !== '/kelola')
+    : planningLinks;
+  const planningSuffixes = visiblePlanningLinks.map((item) => item.suffix).filter(Boolean);
   const projectId = String(params?.id ?? '');
 
   if (!projectId) return null;
@@ -98,7 +104,7 @@ export default function ProjectTabs() {
             Pelaksanaan
           </Link>
 
-          <Link
+          {!isPortfolioAccount && <Link
             href={`/proyek/${projectId}/pelaksanaan-pekerjaan/laporan`}
             aria-current={
               pathname === `${projectBase}/pelaksanaan-pekerjaan/laporan`
@@ -113,12 +119,12 @@ export default function ProjectTabs() {
           >
             <BarChart3 className="h-4 w-4" />
             Laporan
-          </Link>
+          </Link>}
         </nav>
 
         {isPlanning ? (
           <nav aria-label="Menu Perencanaan" className="mt-3 flex items-center gap-1 overflow-x-auto border-t border-slate-100 pt-2">
-            {planningLinks.map((item) => {
+            {visiblePlanningLinks.map((item) => {
               const href = `${projectBase}${item.suffix}`;
               const isActive = item.suffix
                 ? pathname === href || pathname.startsWith(`${href}/`)
