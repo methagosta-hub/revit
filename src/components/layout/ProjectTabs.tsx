@@ -94,7 +94,7 @@ export default function ProjectTabs() {
           <Link
             href={`${projectBase}/pelaksanaan-pekerjaan`}
             aria-current={isExecution ? 'page' : undefined}
-            className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition sm:gap-2 sm:px-3.5 sm:py-2 sm:text-sm ${
               isExecution
                 ? 'bg-emerald-700 text-white shadow-sm'
                 : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
