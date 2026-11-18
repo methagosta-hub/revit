@@ -859,7 +859,7 @@ export default function BkuPage() {
             {books.length > 0 && <select value={book?.id || ""} onChange={(e) => setBook(books.find((item) => item.id === e.target.value) || null)} className="h-11 max-w-[240px] rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"><option value="">Pilih buku kas</option>{books.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}
             <button onClick={() => setShowNewBook(true)} className="flex h-11 items-center gap-2 rounded-xl border border-emerald-700 px-4 text-sm font-bold text-emerald-800 hover:bg-emerald-50"><Plus size={17} />Buku kas baru</button>
             {book && <button onClick={() => setShowExport(true)} className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><Download size={17} />Export PDF</button>}
-            {book && <button onClick={() => { setDrafts([blankDraft()]); setShowEntry(true); }} className="flex h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white shadow-sm hover:bg-emerald-800"><Plus size={17} />Catat transaksi</button>}
+            {book && <button onClick={() => { setEditingTransactionId(null); setDrafts([blankDraft()]); setShowEntry(true); }} className="flex h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white shadow-sm hover:bg-emerald-800"><Plus size={17} />Catat transaksi</button>}
           </div>
         </div>
 
@@ -1022,7 +1022,14 @@ export default function BkuPage() {
         </form>
       </Modal>}
 
-      {showEntry && book && <Modal title="Catat transaksi harian" subtitle={new Intl.DateTimeFormat("id-ID", { dateStyle: "full" }).format(new Date(selectedDate + "T00:00:00"))} onClose={() => setShowEntry(false)} wide>
+      {copySource && <Modal title="Salin nota ke tanggal lain" subtitle={`Salinan nota ${copySource.receipt_number || copySource.description}`} onClose={() => setCopySource(null)}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">Rincian nota akan disalin sebagai nota baru. Nota asli tetap utuh, dan Anda dapat mengubah sedikit perbedaannya sebelum menyimpan.</p>
+          <Field label="Tanggal tujuan"><input type="date" value={copyTargetDate} onChange={(e) => setCopyTargetDate(e.target.value)} className={fieldClass}/></Field>
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setCopySource(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600">Batal</button><button type="button" onClick={() => void confirmCopyTransaction()} className="rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white">Salin dan edit nota</button></div>
+        </div>
+      </Modal>}
+      {showEntry && book && <Modal title={editingTransactionId ? "Ubah nota / transaksi" : "Catat transaksi harian"} subtitle={new Intl.DateTimeFormat("id-ID", { dateStyle: "full" }).format(new Date(selectedDate + "T00:00:00"))} onClose={() => setShowEntry(false)} wide>
         <form onSubmit={saveEntries} className="space-y-4">
           {drafts.map((draft, index) => <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
             <div className="mb-3 flex items-center justify-between"><p className="text-sm font-black text-slate-800">Nota / transaksi {index + 1}</p>{drafts.length > 1 && <button type="button" onClick={() => setDrafts((current) => current.filter((_, i) => i !== index))} className="text-xs font-semibold text-rose-600">Hapus baris</button>}</div>
@@ -1035,6 +1042,10 @@ export default function BkuPage() {
               <Field label={draft.transaction_type === "OUT" ? "Nama toko / uraian nota (opsional)" : "Uraian transaksi"}><input required={draft.transaction_type !== "OUT"} value={draft.description} onChange={(e) => updateDraft(index, { description: e.target.value })} placeholder={draft.transaction_type === "OUT" ? "Nama toko / pemasok" : "Contoh: Dana bantuan masuk"} className={fieldClass} /></Field>
               <Field label="Nomor nota / referensi"><input value={draft.receipt_number} onChange={(e) => updateDraft(index, { receipt_number: e.target.value })} placeholder="Opsional" className={fieldClass} /></Field>
             </div>
+            {draft.transaction_type === "OUT" && <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Field label="Pilih toko yang pernah digunakan"><select value={draft.store_id} onChange={(e) => { const store = stores.find((item) => item.id === e.target.value); updateDraft(index, { store_id: e.target.value, store_name: store?.name || "" }); }} className={fieldClass}><option value="">Tambah / tulis nama toko baru</option>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</select></Field>
+              <Field label="Nama toko (otomatis tersimpan per sekolah)"><input value={draft.store_name} onChange={(e) => updateDraft(index, { store_name: e.target.value, store_id: "" })} placeholder="Nama toko / supplier" className={fieldClass}/></Field>
+            </div>}
             {draft.transaction_type === "OUT" && <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-black text-slate-800">Rincian nota pengeluaran</p><p className="text-[11px] text-slate-500">Masukkan setiap material / barang sebagai baris tersendiri.</p></div>
                 <button type="button" onClick={() => updateDraft(index, { details: [...draft.details, { name: "", unit_price: "", volume: "", unit: "pcs" }] })} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50"><Plus size={14} className="mr-1 inline" />Tambah material</button>
@@ -1042,8 +1053,9 @@ export default function BkuPage() {
               <div className="space-y-3">
                 {draft.details.map((line, lineIndex) => <div key={lineIndex} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
                   <div className="mb-2 flex items-center justify-between"><span className="text-[11px] font-bold text-slate-500">Material {lineIndex + 1}</span>{draft.details.length > 1 && <button type="button" onClick={() => updateDraft(index, { details: draft.details.filter((_, i) => i !== lineIndex) })} className="text-[11px] font-semibold text-rose-600">Hapus</button>}</div>
-                  <div className="grid gap-2 sm:grid-cols-[minmax(150px,1.6fr)_1fr_.7fr_.7fr_1fr]">
-                    <Field label="Nama material"><input value={line.name} onChange={(e) => updateDraft(index, { details: draft.details.map((item, i) => i === lineIndex ? { ...item, name: e.target.value } : item) })} placeholder="Semen, pasir, besi..." className={fieldClass} /></Field>
+                  <div className="grid gap-2 sm:grid-cols-[minmax(170px,1.7fr)_1fr_.7fr_.7fr_1fr]">
+                    <Field label="Pilih material dari katalog"><select value={line.material_id || ""} onChange={(e) => void updateDraftMaterial(index, lineIndex, e.target.value)} className={fieldClass}><option value="">Material baru / ketik manual</option>{Array.from(new Set(materials.map((item) => item.category))).map((category) => <optgroup key={category} label={category}>{materials.filter((item) => item.category === category).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.unit} · {money(Number(item.unit_price))}</option>)}</optgroup>)}</select></Field>
+                    <Field label="Nama material"><input value={line.name} onChange={(e) => updateDraft(index, { details: draft.details.map((item, i) => i === lineIndex ? { ...item, name: e.target.value, material_id: "" } : item) })} placeholder="Cari / ketik nama material baru" className={fieldClass} /></Field>
                     <Field label="Harga satuan (Rp)"><input inputMode="numeric" value={line.unit_price} onChange={(e) => updateDraft(index, { details: draft.details.map((item, i) => i === lineIndex ? { ...item, unit_price: e.target.value } : item) })} placeholder="0" className={fieldClass} /></Field>
                     <Field label="Volume"><input inputMode="decimal" value={line.volume} onChange={(e) => updateDraft(index, { details: draft.details.map((item, i) => i === lineIndex ? { ...item, volume: e.target.value } : item) })} placeholder="0" className={fieldClass} /></Field>
                     <Field label="Satuan"><input value={line.unit} onChange={(e) => updateDraft(index, { details: draft.details.map((item, i) => i === lineIndex ? { ...item, unit: e.target.value } : item) })} placeholder="sak/m³" className={fieldClass} /></Field>
@@ -1064,7 +1076,7 @@ export default function BkuPage() {
           </div>)}
           <button type="button" onClick={() => setDrafts((current) => [...current, blankDraft()])} className="flex items-center gap-2 rounded-xl border border-dashed border-emerald-400 px-4 py-3 text-sm font-bold text-emerald-800 hover:bg-emerald-50"><Plus size={17} />Tambah nota / transaksi lain</button>
           <div className="rounded-xl bg-emerald-50 p-3 text-xs leading-5 text-emerald-900">Semua baris disimpan sebagai transaksi terpisah pada tanggal yang sama. Saldo berjalan dihitung otomatis mengikuti urutan tanggal dan waktu pencatatan.</div>
-          <ModalActions busy={saving} onCancel={() => setShowEntry(false)} submitLabel="Simpan semua transaksi" />
+          <ModalActions busy={saving} onCancel={() => { setShowEntry(false); setEditingTransactionId(null); }} submitLabel={editingTransactionId ? "Simpan perubahan nota" : "Simpan semua transaksi"} />
         </form>
       </Modal>}
       {loading && <div className="fixed bottom-4 right-4 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xl"><RefreshCw className="animate-spin" size={14} />Memuat pembukuan…</div>}
