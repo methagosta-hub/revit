@@ -334,7 +334,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 declare
   v_row jsonb := case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;
   v_project_id uuid;
@@ -400,7 +400,7 @@ begin
   if tg_op = 'DELETE' then return old; end if;
   return new;
 end;
-$;
+$$;
 
 do $install_transaction_guards$
 declare
@@ -454,7 +454,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 declare
   v_row jsonb := case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;
   v_old jsonb := case when tg_op = 'UPDATE' then to_jsonb(old) else '{}'::jsonb end;
@@ -489,7 +489,7 @@ begin
 
   raise exception 'RAB terkunci pada status %. Kembalikan status ke REVIEW untuk mengubah isi RAB.', v_project.status using errcode = '23514';
 end;
-$;
+$$;
 
 drop trigger if exists rab_items_editable_guard on public.rab_items;
 create trigger rab_items_editable_guard
