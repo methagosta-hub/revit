@@ -200,6 +200,25 @@ function getComponentsAtPath(
   return getComponentsAtPath([], target.subitems ?? [], rest);
 }
 
+function getSubitemAtPath(items: RabSubitemSnapshot[], path: number[]): RabSubitemSnapshot | null {
+  if (path.length === 0) return null;
+  const [index, ...rest] = path;
+  const target = items[index];
+  if (!target) return null;
+  return rest.length === 0 ? target : getSubitemAtPath(target.subitems ?? [], rest);
+}
+
+function legacySummaryComponent(unitPrice: number, unit: string): RabComponentSnapshot {
+  return {
+    name: 'Nilai analisa lama (belum dirinci)',
+    unit: unit || 'ls',
+    coefficient: 1,
+    unit_price: unitPrice,
+    type: 'material',
+    isLegacySummary: true,
+  };
+}
+
 type MasterComponentRow = {
   id: string;
   code: string;
@@ -257,17 +276,16 @@ function ComponentLines({
                   <tr key={(component.material_id ?? component.upah_id ?? component.alat_id ?? component.name) + '-' + index}>
                     <td className="px-3 py-2">
                       <span className={'inline-flex rounded px-1.5 py-1 text-[10px] font-semibold ' + (
-                        component.type === 'material'
-                          ? 'bg-sky-50 text-sky-700'
-                          : component.type === 'labor'
-                            ? 'bg-amber-50 text-amber-700'
-                            : 'bg-violet-50 text-violet-700'
+                        component.isLegacySummary
+                          ? 'bg-slate-100 text-slate-600'
+                          : component.type === 'material'
+                            ? 'bg-sky-50 text-sky-700'
+                            : component.type === 'labor'
+                              ? 'bg-amber-50 text-amber-700'
+                              : 'bg-violet-50 text-violet-700'
                       )}>
-                        {typeLabel(component.type)}
+                        {component.isLegacySummary ? 'Ringkasan lama' : typeLabel(component.type)}
                       </span>
-                      {component.isLegacySummary && (
-                        <span className="mt-1 block text-[9px] text-slate-400">Ringkasan data lama</span>
-                      )}
                     </td>
                     <td className="px-3 py-2 font-medium text-slate-700">
                       {editing ? (
@@ -599,7 +617,19 @@ function CompositionEditor({
     if (!selected.length) return;
 
     const current = getComponentsAtPath(components, subitems, pickerTargetPath);
-    updateComponents(pickerTargetPath, [...current, ...selected]);
+    let existing = current;
+    if (existing.length === 0) {
+      if (pickerTargetPath.length === 0 && subitems.length === 0 && Number(item.unit_price || 0) > 0) {
+        // Pertahankan harga snapshot lama yang belum memiliki rincian sebelum menambahkan komponen baru.
+        existing = [legacySummaryComponent(Number(item.unit_price), item.unit)];
+      } else if (pickerTargetPath.length > 0) {
+        const target = getSubitemAtPath(subitems, pickerTargetPath);
+        if (target && (target.subitems?.length ?? 0) === 0 && Number(target.unit_price || 0) > 0) {
+          existing = [legacySummaryComponent(Number(target.unit_price), target.unit)];
+        }
+      }
+    }
+    updateComponents(pickerTargetPath, [...existing, ...selected]);
     setPickerTargetPath(null);
     setSelectedMasterKeys([]);
   };
