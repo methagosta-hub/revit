@@ -138,6 +138,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleAddAhsp = async (batch: SelectedAhspBatchPayload) => {
+    if (!canEditRab) throw new Error('Penambahan AHSP hanya tersedia pada status DRAFT atau REVIEW dengan izin rab.manage.');
     if (!activeDivisionId || submitting) {
       throw new Error('Divisi tujuan belum dipilih.');
     }
@@ -245,6 +246,7 @@ export default function ProjectWorkspacePage() {
         .insert(insertRows);
 
       if (error) throw error;
+      if (projectId) await recalculateProjectTotal(projectId);
 
       await loadData(true);
 
@@ -321,6 +323,7 @@ export default function ProjectWorkspacePage() {
         .eq('id', item.id);
 
       if (error) throw error;
+      if (projectId) await recalculateProjectTotal(projectId);
 
       await loadData(true);
       setSuccessMessage(`Item "${item.code}" berhasil dihapus dari RAB proyek.`);
@@ -554,14 +557,16 @@ export default function ProjectWorkspacePage() {
                     <span className="text-sm font-bold tabular-nums text-slate-900">
                       {formatRupiah(divisionTotal)}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => openAhspPicker(division.id, division.name)}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Tambah dari Master AHSP
-                    </button>
+                    {canEditRab && (
+                      <button
+                        type="button"
+                        onClick={() => openAhspPicker(division.id, division.name)}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Tambah dari Master AHSP
+                      </button>
+                    )}
                   </div>
                 </div>
 
