@@ -174,6 +174,39 @@ grant execute on function public.dahlia_project_category_value_access(text) to a
 revoke all on function public.dahlia_project_category_access(uuid) from public, anon;
 grant execute on function public.dahlia_project_category_access(uuid) to authenticated;
 
+-- PORTOFOLIO accounts are deliberately read-only. Company administrators
+-- retain the ability to prepare and maintain sample projects.
+create or replace function public.dahlia_project_write_access()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $
+  select exists (
+    select 1 from public.user_profiles up
+    where up.id = auth.uid()
+      and up.is_active = true
+      and (not up.is_demo_user or coalesce(public.is_company_admin(), false))
+  );
+$;
+
+create or replace function public.dahlia_project_category_write_value_access(p_project_category text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $
+  select public.dahlia_project_write_access()
+     and public.dahlia_project_category_value_access(p_project_category);
+$;
+
+revoke all on function public.dahlia_project_write_access() from public, anon;
+grant execute on function public.dahlia_project_write_access() to authenticated;
+revoke all on function public.dahlia_project_category_write_value_access(text) from public, anon;
+grant execute on function public.dahlia_project_category_write_value_access(text) to authenticated;
+
 -- Row-level category scope for every project-linked table. Company-wide rows
 -- with no project remain visible only to REGULER accounts, never to demo users.
 create or replace function public.dahlia_project_row_category_access(p_row jsonb)
@@ -293,6 +326,20 @@ $$;
 revoke all on function public.dahlia_project_row_category_access(jsonb) from public, anon;
 grant execute on function public.dahlia_project_row_category_access(jsonb) to authenticated;
 
+create or replace function public.dahlia_project_row_category_write_access(p_row jsonb)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $
+  select public.dahlia_project_write_access()
+     and public.dahlia_project_row_category_access(p_row);
+$;
+
+revoke all on function public.dahlia_project_row_category_write_access(jsonb) from public, anon;
+grant execute on function public.dahlia_project_row_category_write_access(jsonb) to authenticated;
+
 -- Add a restrictive category policy to project-linked tables which already use
 -- RLS. Existing permission policies still decide what each role can do.
 do $install_category_policies$
@@ -356,7 +403,7 @@ begin
        ) then
       execute format('drop policy if exists %I on public.%I', v_table || '_category_scope_restrictive', v_table);
       execute format(
-        'create policy %I on public.%I as restrictive for all to authenticated using (public.dahlia_project_row_category_access(to_jsonb(%I))) with check (public.dahlia_project_row_category_access(to_jsonb(%I)))',
+        'create policy %I on public.%I as restrictive for all to authenticated using (public.dahlia_project_row_category_access(to_jsonb(%I))) with check (public.dahlia_project_row_category_write_access(to_jsonb(%I)))',
         v_table || '_category_scope_restrictive',
         v_table,
         v_table,
@@ -374,7 +421,7 @@ create policy projects_category_scope_restrictive
   on public.projects as restrictive
   for all to authenticated
   using (public.dahlia_project_category_access(id))
-  with check (public.dahlia_project_category_value_access(project_category));
+  with check (public.dahlia_project_category_write_value_access(project_category));
 
 -- Preserve the existing effective role-assignment logic while enforcing the
 -- REGULER/PORTOFOLIO account boundary across project-scoped RLS checks.
@@ -497,6 +544,9 @@ begin
   if v_project.id is null then
     raise exception 'Proyek tidak ditemukan.' using errcode = 'P0002';
   end if;
+  if not public.dahlia_project_write_access() then
+    raise exception 'Akun PORTOFOLIO hanya memiliki akses baca. Hubungi administrator perusahaan untuk mengubah data proyek.' using errcode = '42501';
+  end if;
   if not public.dahlia_has_project_execution_permission(p_project_id, 'project.manage') then
     raise exception 'Tidak memiliki izin mengubah status proyek.' using errcode = '42501';
   end if;
@@ -565,6 +615,9 @@ begin
 
   if v_project_id is null then
     raise exception 'Lokasi RAB tidak ditemukan.' using errcode = 'P0002';
+  end if;
+  if not public.dahlia_project_write_access() then
+    raise exception 'Akun PORTOFOLIO hanya memiliki akses baca. Administrator perusahaan dapat mengatur RAB sampel.' using errcode = '42501';
   end if;
   if not public.dahlia_has_project_execution_permission(v_project_id, 'rab.manage')
      and not public.dahlia_has_project_execution_permission(v_project_id, 'project.manage') then
@@ -715,6 +768,9 @@ begin
   if not public.dahlia_project_category_access(v_project_id) then
     raise exception 'Akun ini tidak dapat menulis transaksi pada kategori proyek tersebut.' using errcode = '42501';
   end if;
+  if not public.dahlia_project_write_access() then
+    raise exception 'Akun PORTOFOLIO hanya memiliki akses baca. Transaksi sampel dikelola oleh administrator perusahaan.' using errcode = '42501';
+  end if;
   if v_project.status <> 'DIKERJAKAN' then
     raise exception 'Perubahan transaksi proyek hanya diperbolehkan saat status DIKERJAKAN. Status sekarang: %.', v_project.status using errcode = '23514';
   end if;
@@ -818,6 +874,9 @@ begin
   end if;
   if not public.dahlia_project_category_access(v_project_id) then
     raise exception 'Akun ini tidak dapat mengubah RAB pada kategori proyek tersebut.' using errcode = '42501';
+  end if;
+  if not public.dahlia_project_write_access() then
+    raise exception 'Akun PORTOFOLIO hanya memiliki akses baca terhadap dokumen sampel.' using errcode = '42501';
   end if;
   select * into v_project from public.projects where id = v_project_id;
 
