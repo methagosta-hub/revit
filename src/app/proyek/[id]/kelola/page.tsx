@@ -207,6 +207,17 @@ export default function DetailEditProyekPage() {
     void loadData();
   }, [loadData]);
 
+  const allowedNextStatuses = useMemo<ProjectStatus[]>(() => {
+    switch (form.status) {
+      case 'DRAFT': return ['DRAFT', 'REVIEW'];
+      case 'REVIEW': return ['REVIEW', 'DRAFT', 'FINAL RAB'];
+      case 'FINAL RAB': return ['FINAL RAB', 'REVIEW', 'DIKERJAKAN'];
+      case 'DIKERJAKAN': return ['DIKERJAKAN', 'SELESAI'];
+      case 'SELESAI': return ['SELESAI'];
+      default: return ['DRAFT'];
+    }
+  }, [form.status]);
+
   const divisionTotal = useMemo(
     () => divisions.reduce((sum, division) => sum + division.total_value, 0),
     [divisions],
@@ -402,11 +413,7 @@ export default function DetailEditProyekPage() {
             <label className="block">
               <span className={labelClass}>Status berikutnya</span>
               <select className={inputClass} value={nextStatus} onChange={(event) => setNextStatus(event.target.value as ProjectStatus)}>
-                <option value="DRAFT">DRAFT</option>
-                <option value="REVIEW">REVIEW</option>
-                <option value="FINAL RAB">FINAL RAB</option>
-                <option value="DIKERJAKAN">DIKERJAKAN</option>
-                <option value="SELESAI">SELESAI</option>
+                {allowedNextStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
               </select>
             </label>
             <label className="block">
