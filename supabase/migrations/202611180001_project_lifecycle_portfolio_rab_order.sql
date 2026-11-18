@@ -260,6 +260,102 @@ $$;
 revoke all on function public.transition_project_status(uuid, text, text) from public, anon;
 grant execute on function public.transition_project_status(uuid, text, text) to authenticated;
 
+-- Prevent any direct status change through the general project save RPC or a
+-- client UPDATE. The audited transition RPC sets a transaction-local flag.
+create or replace function public.dahlia_guard_project_status_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+begin
+  if tg_op = 'INSERT' then
+    if upper(coalesce(new.status, '')) <> 'DRAFT' then
+      raise exception 'Proyek baru harus dimulai dengan status DRAFT.' using errcode = '23514';
+    end if;
+    return new;
+  end if;
+
+  if new.status is distinct from old.status
+     and coalesce(current_setting('dahlia.project_status_transition', true), '') <> 'on' then
+    raise exception 'Status proyek hanya boleh diubah melalui alur transisi resmi.' using errcode = '42501';
+  end if;
+
+  if new.project_category is distinct from old.project_category then
+    raise exception 'Kategori proyek REGULER/PORTOFOLIO tidak dapat diubah setelah proyek dibuat.' using errcode = '23514';
+  end if;
+  return new;
+end;
+$;
+
+create or replace function public.transition_project_status(
+  p_project_id uuid,
+  p_new_status text,
+  p_reason text default null
+)
+returns public.projects
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+declare
+  v_project public.projects;
+  v_new_status text := upper(trim(coalesce(p_new_status, '')));
+  v_old_status text;
+  v_allowed boolean := false;
+begin
+  select * into v_project
+  from public.projects
+  where id = p_project_id
+  for update;
+
+  if v_project.id is null then
+    raise exception 'Proyek tidak ditemukan.' using errcode = 'P0002';
+  end if;
+  if not public.dahlia_has_project_execution_permission(p_project_id, 'project.manage') then
+    raise exception 'Tidak memiliki izin mengubah status proyek.' using errcode = '42501';
+  end if;
+  if v_new_status not in ('DRAFT', 'REVIEW', 'FINAL RAB', 'DIKERJAKAN', 'SELESAI') then
+    raise exception 'Status proyek tidak valid.' using errcode = '22023';
+  end if;
+
+  v_allowed := case v_project.status
+    when 'DRAFT' then v_new_status in ('DRAFT', 'REVIEW')
+    when 'REVIEW' then v_new_status in ('REVIEW', 'DRAFT', 'FINAL RAB')
+    when 'FINAL RAB' then v_new_status in ('FINAL RAB', 'REVIEW', 'DIKERJAKAN')
+    when 'DIKERJAKAN' then v_new_status in ('DIKERJAKAN', 'SELESAI')
+    when 'SELESAI' then v_new_status = 'SELESAI'
+    else false
+  end;
+
+  if not v_allowed then
+    raise exception 'Perpindahan status dari % ke % tidak diizinkan.', v_project.status, v_new_status using errcode = '23514';
+  end if;
+  if v_project.status = v_new_status then
+    return v_project;
+  end if;
+
+  v_old_status := v_project.status;
+  perform set_config('dahlia.project_status_transition', 'on', true);
+
+  update public.projects
+     set status = v_new_status,
+         updated_at = now()
+   where id = p_project_id
+   returning * into v_project;
+
+  insert into public.project_status_history(project_id, old_status, new_status, reason, changed_by)
+  values (p_project_id, v_old_status, v_new_status, nullif(trim(coalesce(p_reason, '')), ''), auth.uid());
+
+  return v_project;
+end;
+$;
+
+drop trigger if exists projects_status_transition_guard on public.projects;
+create trigger projects_status_transition_guard
+before insert or update of status, project_category on public.projects
+for each row execute function public.dahlia_guard_project_status_change();
+
 -- Atomic category ordering: every item ID passed must belong to this division.
 -- Other grouped work items retain their relative precedence; the reordered
 -- AHSP category items are assigned consecutive sort_order values after them.
@@ -414,6 +510,8 @@ declare
     'attendance_records',
     'project_daily_reports',
     'project_material_usages',
+    'project_material_issues',
+    'project_material_receipts',
     'material_issues',
     'goods_receipts',
     'payment_obligations',
@@ -426,7 +524,13 @@ declare
     'execution_contract_register',
     'execution_contract_documents',
     'subcontract_payment_terms',
-    'subcontract_payment_requests'
+    'subcontract_payment_requests',
+    'project_daily_report_work_items',
+    'project_daily_report_labor',
+    'project_daily_report_materials',
+    'project_daily_report_equipment',
+    'project_material_issue_items',
+    'project_material_receipt_items'
   ];
 begin
   foreach v_table in array v_tables loop
