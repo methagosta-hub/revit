@@ -1,3 +1,6 @@
+export type ProjectStatus = 'DRAFT' | 'REVIEW' | 'FINAL RAB' | 'DIKERJAKAN' | 'SELESAI';
+export type ProjectCategory = 'REGULER' | 'PORTOFOLIO';
+
 export type CalcMode = 'standard' | 'trapezoid' | 'rebar' | 'custom_formula';
 
 export interface VolumeDetail {
@@ -49,7 +52,8 @@ export interface Project {
   client: string;
   location: string;
   updatedAt: string;
-  status: 'Draft' | 'Review' | 'Final';
+  status: ProjectStatus;
+  project_category: ProjectCategory;
   totalValue: number;
   taxRate: number;
   profitMargin: number;
