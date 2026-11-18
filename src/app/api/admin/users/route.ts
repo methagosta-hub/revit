@@ -116,7 +116,6 @@ async function validateAssignments(
   if (isDemoUser && requested.some((item) => !item.project_id)) {
     return { rows: [], error: 'Akun PORTOFOLIO wajib menggunakan role proyek, bukan role global perusahaan.' };
   }
-  }
 
   const today = jakartaToday();
   const normalized: NormalizedAssignment[] = [];
