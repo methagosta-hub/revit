@@ -383,7 +383,8 @@ begin
   end if;
 
   if v_project_id is null then
-    return case when tg_op = 'DELETE' then old else new end;
+    if tg_op = 'DELETE' then return old; end if;
+    return new;
   end if;
 
   select * into v_project from public.projects where id = v_project_id;
@@ -476,7 +477,8 @@ begin
   select * into v_project from public.projects where id = v_project_id;
 
   if v_project.status in ('DRAFT', 'REVIEW') then
-    return case when tg_op = 'DELETE' then old else new end;
+    if tg_op = 'DELETE' then return old; end if;
+    return new;
   end if;
 
   if v_project.status = 'FINAL RAB' and tg_op = 'UPDATE'
