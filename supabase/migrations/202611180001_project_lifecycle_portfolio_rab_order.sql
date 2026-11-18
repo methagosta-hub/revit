@@ -182,14 +182,14 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $
+as $dahlia_project_write$
   select exists (
     select 1 from public.user_profiles up
     where up.id = auth.uid()
       and up.is_active = true
       and (not up.is_demo_user or coalesce(public.is_company_admin(), false))
   );
-$;
+$dahlia_project_write$;
 
 create or replace function public.dahlia_project_category_write_value_access(p_project_category text)
 returns boolean
@@ -197,10 +197,10 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $
+as $dahlia_category_write$
   select public.dahlia_project_write_access()
      and public.dahlia_project_category_value_access(p_project_category);
-$;
+$dahlia_category_write$;
 
 revoke all on function public.dahlia_project_write_access() from public, anon;
 grant execute on function public.dahlia_project_write_access() to authenticated;
@@ -332,10 +332,10 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $
+as $dahlia_row_write$
   select public.dahlia_project_write_access()
      and public.dahlia_project_row_category_access(p_row);
-$;
+$dahlia_row_write$;
 
 revoke all on function public.dahlia_project_row_category_write_access(jsonb) from public, anon;
 grant execute on function public.dahlia_project_row_category_write_access(jsonb) to authenticated;
