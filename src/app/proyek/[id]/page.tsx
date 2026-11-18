@@ -903,13 +903,13 @@ export default function ProjectWorkspacePage() {
       const currentDivision = divisions.find((division) => division.id === activeDivisionId);
       if (!currentDivision) throw new Error('Lokasi pekerjaan tidak ditemukan. Segarkan proyek lalu coba kembali.');
 
-      // Untuk satu AHSP, uraian pekerjaan mengikuti nama resmi Master AHSP.
-      // Kelompok hanya dibuat bila minimal dua AHSP dipilih bersama.
-      const groupName = batch.items.length === 1
-        ? String(masterById.get(batch.items[0].masterAhspId)?.name ?? batch.items[0].name).trim()
-        : batch.groupName.trim();
-      if (!groupName) {
-        throw new Error('Nama item pekerjaan wajib diisi untuk kelompok yang berisi beberapa AHSP.');
+      // Mode terpisah menjadikan tiap AHSP satu item RAB mandiri.
+      // Mode kelompok mempertahankan alur lama: beberapa AHSP berada di bawah
+      // satu kelompok pekerjaan dengan work_group_id yang sama.
+      const groupedAsSubwork = batch.mode === 'group' && batch.items.length > 1;
+      const groupName = groupedAsSubwork ? batch.groupName.trim() : '';
+      if (groupedAsSubwork && !groupName) {
+        throw new Error('Nama item pekerjaan induk wajib diisi untuk kelompok subpekerjaan.');
       }
       if (groupName.length > 255) {
         throw new Error('Nama item pekerjaan maksimal 255 karakter.');
@@ -919,7 +919,7 @@ export default function ProjectWorkspacePage() {
         (max, item) => Math.max(max, Number(item.sort_order ?? 0)),
         0,
       );
-      const workGroupId = batch.items.length > 1 ? crypto.randomUUID() : null;
+      const workGroupId = groupedAsSubwork ? crypto.randomUUID() : null;
 
       const insertRows = batch.items.map((payload, index) => {
         const sourceAhsp = masterById.get(payload.masterAhspId);
@@ -966,8 +966,10 @@ export default function ProjectWorkspacePage() {
       await loadData(true);
       setSuccessMessage(
         batch.items.length === 1
-          ? `AHSP "${groupName}" berhasil ditambahkan ke lokasi ${activeDivisionName}.`
-          : `${batch.items.length} AHSP berhasil disimpan sebagai satu item pekerjaan "${groupName}" pada lokasi ${activeDivisionName}.`,
+          ? `AHSP "${batch.items[0].name}" berhasil ditambahkan ke lokasi ${activeDivisionName}.`
+          : groupedAsSubwork
+            ? `${batch.items.length} AHSP berhasil dimasukkan sebagai subpekerjaan dalam kelompok "${groupName}" pada lokasi ${activeDivisionName}.`
+            : `${batch.items.length} AHSP berhasil ditambahkan sebagai ${batch.items.length} item pekerjaan terpisah pada lokasi ${activeDivisionName}.`,
       );
     } catch (error) {
       console.error('Gagal menambahkan paket AHSP ke RAB:', error);
