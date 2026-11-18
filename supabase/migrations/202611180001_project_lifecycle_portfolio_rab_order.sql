@@ -825,9 +825,21 @@ begin
     return new;
   end if;
 
-  if v_project.status = 'FINAL RAB' and tg_op = 'UPDATE'
-     and (v_row - 'sort_order') = (v_old - 'sort_order') then
-    return new;
+  if tg_op = 'UPDATE' then
+    -- Some project-management RPCs touch updated_at even when the RAB values
+    -- are unchanged. Permit those no-op writes without reopening the baseline.
+    if tg_table_name = 'rab_items' and v_project.status = 'FINAL RAB'
+       and (v_row - 'sort_order' - 'updated_at') = (v_old - 'sort_order' - 'updated_at') then
+      return new;
+    end if;
+    if tg_table_name <> 'rab_items'
+       and (v_row - 'updated_at') = (v_old - 'updated_at') then
+      return new;
+    end if;
+    if tg_table_name = 'rab_items' and v_project.status in ('DIKERJAKAN', 'SELESAI')
+       and (v_row - 'updated_at') = (v_old - 'updated_at') then
+      return new;
+    end if;
   end if;
 
   raise exception 'RAB terkunci pada status %. Kembalikan status ke REVIEW untuk mengubah isi RAB.', v_project.status using errcode = '23514';
