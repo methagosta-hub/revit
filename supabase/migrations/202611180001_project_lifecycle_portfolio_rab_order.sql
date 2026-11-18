@@ -128,6 +128,150 @@ grant execute on function public.dahlia_project_category_value_access(text) to a
 revoke all on function public.dahlia_project_category_access(uuid) from public, anon;
 grant execute on function public.dahlia_project_category_access(uuid) to authenticated;
 
+-- Row-level category scope for every project-linked table. Company-wide rows
+-- with no project remain visible only to REGULER accounts, never to demo users.
+create or replace function public.dahlia_project_row_category_access(p_row jsonb)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $
+declare
+  v_project_id uuid;
+  v_is_demo boolean;
+  v_package_id uuid;
+  v_segment_id uuid;
+  v_segment_item_id uuid;
+  v_contract_id uuid;
+  v_purchase_order_id uuid;
+  v_report_id uuid;
+  v_issue_id uuid;
+  v_receipt_id uuid;
+  v_division_id uuid;
+begin
+  select coalesce(is_demo_user, false)
+    into v_is_demo
+    from public.user_profiles
+   where id = auth.uid() and is_active = true;
+  if not found then return false; end if;
+
+  v_project_id := coalesce(
+    nullif(p_row->>'project_id', '')::uuid,
+    nullif(p_row->>'record_origin_project_id', '')::uuid
+  );
+  v_package_id := nullif(p_row->>'package_id', '')::uuid;
+  v_segment_id := nullif(p_row->>'segment_id', '')::uuid;
+  v_segment_item_id := nullif(p_row->>'segment_item_id', '')::uuid;
+  v_contract_id := nullif(p_row->>'contract_id', '')::uuid;
+  v_purchase_order_id := nullif(p_row->>'purchase_order_id', '')::uuid;
+  v_report_id := nullif(p_row->>'report_id', '')::uuid;
+  v_issue_id := nullif(p_row->>'issue_id', '')::uuid;
+  v_receipt_id := nullif(p_row->>'receipt_id', '')::uuid;
+  v_division_id := nullif(p_row->>'division_id', '')::uuid;
+
+  if v_project_id is null and v_package_id is not null then
+    select project_id into v_project_id from public.project_work_packages where id = v_package_id;
+  end if;
+  if v_project_id is null and v_segment_id is not null then
+    select p.project_id into v_project_id
+      from public.execution_segments es
+      join public.project_work_packages p on p.id = es.package_id
+     where es.id = v_segment_id;
+  end if;
+  if v_project_id is null and v_segment_item_id is not null then
+    select p.project_id into v_project_id
+      from public.execution_segment_items esi
+      join public.execution_segments es on es.id = esi.segment_id
+      join public.project_work_packages p on p.id = es.package_id
+     where esi.id = v_segment_item_id;
+  end if;
+  if v_project_id is null and v_contract_id is not null then
+    select project_id into v_project_id from public.execution_contract_register where id = v_contract_id;
+  end if;
+  if v_project_id is null and v_purchase_order_id is not null then
+    select project_id into v_project_id from public.project_purchase_orders where id = v_purchase_order_id;
+  end if;
+  if v_project_id is null and v_report_id is not null then
+    select project_id into v_project_id from public.project_daily_reports where id = v_report_id;
+  end if;
+  if v_project_id is null and v_issue_id is not null then
+    select project_id into v_project_id from public.project_material_issues where id = v_issue_id;
+  end if;
+  if v_project_id is null and v_receipt_id is not null then
+    select project_id into v_project_id from public.project_material_receipts where id = v_receipt_id;
+  end if;
+  if v_project_id is null and v_division_id is not null then
+    select project_id into v_project_id from public.rab_divisions where id = v_division_id;
+  end if;
+
+  if v_project_id is null then
+    return not v_is_demo;
+  end if;
+  return public.dahlia_project_category_access(v_project_id);
+end;
+$;
+
+revoke all on function public.dahlia_project_row_category_access(jsonb) from public, anon;
+grant execute on function public.dahlia_project_row_category_access(jsonb) to authenticated;
+
+-- Add a restrictive category policy to project-linked tables which already use
+-- RLS. Existing permission policies still decide what each role can do.
+do $install_category_policies$
+declare
+  v_table text;
+  v_tables text[] := array[
+    'project_purchase_orders',
+    'project_purchase_order_items',
+    'project_supplier_payments',
+    'company_cash_transactions',
+    'employee_daily_assignments',
+    'project_work_assignments',
+    'attendance_records',
+    'project_daily_reports',
+    'project_daily_report_work_items',
+    'project_daily_report_labor',
+    'project_daily_report_materials',
+    'project_daily_report_equipment',
+    'project_material_issues',
+    'project_material_issue_items',
+    'project_material_receipts',
+    'project_material_receipt_items',
+    'project_material_usages',
+    'project_work_packages',
+    'project_work_package_items',
+    'execution_segments',
+    'execution_segment_items',
+    'execution_progress_entries',
+    'execution_change_orders',
+    'execution_contract_register',
+    'execution_contract_documents',
+    'subcontract_payment_terms',
+    'subcontract_payment_requests',
+    'payment_obligations',
+    'payroll_cost_allocations'
+  ];
+begin
+  foreach v_table in array v_tables loop
+    if to_regclass(format('public.%I', v_table)) is not null
+       and exists (
+         select 1 from pg_class c
+         join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = 'public' and c.relname = v_table and c.relrowsecurity
+       ) then
+      execute format('drop policy if exists %I on public.%I', v_table || '_category_scope_restrictive', v_table);
+      execute format(
+        'create policy %I on public.%I as restrictive for all to authenticated using (public.dahlia_project_row_category_access(to_jsonb(%I))) with check (public.dahlia_project_row_category_access(to_jsonb(%I)))',
+        v_table || '_category_scope_restrictive',
+        v_table,
+        v_table,
+        v_table
+      );
+    end if;
+  end loop;
+end;
+$install_category_policies$;
+
 -- Restrictive policy adds a category boundary even when an older permissive
 -- projects policy grants broad company-level project visibility.
 drop policy if exists projects_category_scope_restrictive on public.projects;
@@ -450,14 +594,20 @@ declare
   v_segment_item_id uuid;
   v_contract_id uuid;
   v_purchase_order_id uuid;
+  v_report_id uuid;
+  v_issue_id uuid;
+  v_receipt_id uuid;
   v_project public.projects;
 begin
-  v_project_id := nullif(v_row->>'project_id', '')::uuid;
+  v_project_id := coalesce(nullif(v_row->>'project_id', '')::uuid, nullif(v_row->>'record_origin_project_id', '')::uuid);
   v_package_id := nullif(v_row->>'package_id', '')::uuid;
   v_segment_id := nullif(v_row->>'segment_id', '')::uuid;
   v_segment_item_id := nullif(v_row->>'segment_item_id', '')::uuid;
   v_contract_id := nullif(v_row->>'contract_id', '')::uuid;
   v_purchase_order_id := nullif(v_row->>'purchase_order_id', '')::uuid;
+  v_report_id := nullif(v_row->>'report_id', '')::uuid;
+  v_issue_id := nullif(v_row->>'issue_id', '')::uuid;
+  v_receipt_id := nullif(v_row->>'receipt_id', '')::uuid;
 
   if v_project_id is null and v_package_id is not null and to_regclass('public.project_work_packages') is not null then
     select project_id into v_project_id from public.project_work_packages where id = v_package_id;
@@ -487,6 +637,18 @@ begin
   if v_project_id is null and v_purchase_order_id is not null
      and to_regclass('public.project_purchase_orders') is not null then
     select project_id into v_project_id from public.project_purchase_orders where id = v_purchase_order_id;
+  end if;
+  if v_project_id is null and v_report_id is not null
+     and to_regclass('public.project_daily_reports') is not null then
+    select project_id into v_project_id from public.project_daily_reports where id = v_report_id;
+  end if;
+  if v_project_id is null and v_issue_id is not null
+     and to_regclass('public.project_material_issues') is not null then
+    select project_id into v_project_id from public.project_material_issues where id = v_issue_id;
+  end if;
+  if v_project_id is null and v_receipt_id is not null
+     and to_regclass('public.project_material_receipts') is not null then
+    select project_id into v_project_id from public.project_material_receipts where id = v_receipt_id;
   end if;
 
   if v_project_id is null then
