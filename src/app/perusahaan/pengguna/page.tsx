@@ -412,6 +412,7 @@ function UserManagementContent() {
                 <div className={cx('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-bold', user.is_active ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400')}>{user.full_name.trim().slice(0, 1).toLocaleUpperCase('id')}</div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-bold text-slate-900">{user.full_name}</p><span className={cx('rounded-full px-2 py-1 text-[9px] font-bold', user.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500')}>{user.is_active ? 'AKTIF' : 'NONAKTIF'}</span></div>
+                  <span className={cx('mt-1 inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold', user.is_demo_user ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500')}>{user.is_demo_user ? 'PORTOFOLIO / DUMMY' : 'REGULER'}</span>
                   <p className="mt-1 truncate text-xs text-slate-500">{user.email || 'Email tidak tersedia'}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5"><span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">{activeCount} akses aktif</span><span className="text-[10px] text-slate-400">{user.assignments.length} riwayat penugasan</span></div>
                 </div>
