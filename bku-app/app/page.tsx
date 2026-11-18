@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNo
 import {
   ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, CalendarDays,
   ChevronLeft, ChevronRight, Copy, Download, FileUp, LockKeyhole, LogOut, Plus,
-  RefreshCw, Settings, ShieldCheck, Store as StoreIcon, Trash2, Wallet, X,
+  RefreshCw, Settings, ShieldCheck, Trash2, Wallet, X,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { getBkuSupabase } from "@/lib/supabase";
@@ -517,7 +517,7 @@ export default function BkuPage() {
       await loadTransactions(book.id);
       setMonth(new Date(targetDate + "T00:00:00"));
       setSelectedDate(targetDate);
-      setPageError(`Tanggal mulai dan ${Number(data ?? affected)} nota berhasil digeser.`);
+      window.alert(`Tanggal mulai dan ${Number(data ?? affected)} nota berhasil digeser.`);
     } catch (error) {
       setPageError(error instanceof Error ? error.message : "Jadwal proyek gagal digeser. Pastikan SQL migrasi terbaru sudah dijalankan.");
     } finally {
@@ -900,7 +900,7 @@ export default function BkuPage() {
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Kalender pembukuan</p><h3 className="mt-1 text-xl font-black capitalize">{new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(month)}</h3><p className="mt-1 text-[11px] text-slate-500">Tanggal mulai: {new Intl.DateTimeFormat("id-ID",{day:"numeric",month:"long",year:"numeric"}).format(new Date(book.start_date+"T00:00:00"))}</p></div>
-                    <div draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", "bku-project-start")} className="cursor-grab rounded-xl border border-dashed border-emerald-500 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 active:cursor-grabbing" title="Seret penanda ini ke tanggal target pada kalender">↕ Seret tanggal mulai proyek</div>
+                    <div draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", "bku-project-start")} className="cursor-grab rounded-xl border border-dashed border-emerald-500 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 active:cursor-grabbing" title="Seret penanda ini ke tanggal target pada kalender">{shiftingSchedule ? "Memindahkan jadwal..." : "↕ Seret tanggal mulai proyek"}</div>
                     <div className="flex gap-1">
                       <button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50" aria-label="Bulan sebelumnya"><ChevronLeft size={18} /></button>
                       <button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50" aria-label="Bulan berikutnya"><ChevronRight size={18} /></button>
