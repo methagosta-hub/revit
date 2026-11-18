@@ -480,7 +480,7 @@ export default function BkuPage() {
                       const totals = dayTotals[key];
                       const active = key === selectedDate;
                       return (
-                        <button key={key} onClick={() => setSelectedDate(key)} className={"min-h-[88px] rounded-xl border p-1.5 text-left transition sm:min-h-[110px] sm:p-2 " + (active ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100" : "border-slate-100 bg-white hover:border-emerald-200 hover:bg-slate-50")}>
+                        <button key={key} onClick={() => { setSelectedDate(key); setDrafts([blankDraft()]); setShowEntry(true); }} className={"min-h-[88px] rounded-xl border p-1.5 text-left transition sm:min-h-[110px] sm:p-2 " + (active ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100" : "border-slate-100 bg-white hover:border-emerald-200 hover:bg-slate-50")}>
                           <span className={"flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold " + (active ? "bg-emerald-700 text-white" : "text-slate-700")}>{day}</span>
                           {totals ? <div className="mt-2 space-y-1">
                             {totals.incoming > 0 && <p className="truncate rounded-md bg-emerald-50 px-1 py-0.5 text-[9px] font-bold text-emerald-800 sm:text-[10px]">+{shortMoney(totals.incoming)}</p>}
