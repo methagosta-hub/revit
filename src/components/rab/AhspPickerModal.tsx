@@ -57,6 +57,7 @@ export type SelectedAhspPayload = {
 
 export type SelectedAhspBatchPayload = {
   groupName: string;
+  mode?: 'separate' | 'group';
   items: SelectedAhspPayload[];
 };
 
@@ -206,8 +207,10 @@ export default function AhspPickerModal({
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('ALL');
   const [selectedId, setSelectedId] = useState('');
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<string[]>([]);
   const [volume, setVolume] = useState('1');
   const [groupName, setGroupName] = useState('');
+  const [insertionMode, setInsertionMode] = useState<'separate' | 'group'>('separate');
   const [queuedItems, setQueuedItems] = useState<SelectedAhspPayload[]>([]);
   const [adding, setAdding] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -220,8 +223,10 @@ export default function AhspPickerModal({
     setSearch('');
     setCategory('ALL');
     setSelectedId('');
+    setBulkSelectedIds([]);
     setVolume('1');
     setGroupName('');
+    setInsertionMode('separate');
     setQueuedItems([]);
     setActionError('');
 
@@ -500,18 +505,57 @@ export default function AhspPickerModal({
     setActionError('');
   };
 
+  const handleAddSelectedToQueue = () => {
+    if (bulkSelectedIds.length === 0) {
+      setActionError('Centang minimal satu AHSP pada daftar.');
+      return;
+    }
+
+    const selectedRecords = records.filter((record) => bulkSelectedIds.includes(record.id));
+    const invalidRecords = selectedRecords.filter((record) => !String(record.unit ?? '').trim());
+    if (invalidRecords.length > 0) {
+      setActionError(`AHSP tanpa satuan tidak dapat dijadikan item RAB: ${invalidRecords.map((item) => item.code).join(', ')}.`);
+      return;
+    }
+
+    const payloads = selectedRecords.map((record): SelectedAhspPayload => {
+      const existing = queuedItems.find((item) => item.masterAhspId === record.id);
+      const components = record.components ?? componentsFor(record);
+      const price = itemUnitPrice(record);
+      const itemVolume = existing?.volume ?? 1;
+      return {
+        masterAhspId: record.id,
+        code: record.code,
+        name: record.name,
+        unit: String(record.unit ?? '').trim(),
+        volume: itemVolume,
+        unitPrice: price,
+        totalPrice: Number((itemVolume * price).toFixed(2)),
+        componentsSnapshot: components,
+        subitemsSnapshot: record.subitems ?? [],
+      };
+    });
+
+    setQueuedItems((current) => {
+      const byId = new Map(current.map((item) => [item.masterAhspId, item]));
+      payloads.forEach((item) => byId.set(item.masterAhspId, item));
+      return Array.from(byId.values());
+    });
+    setActionError('');
+  };
+
   const handleSaveBatch = async () => {
     if (queuedItems.length === 0) {
       setActionError('Pilih dan masukkan minimal satu AHSP ke daftar item pekerjaan.');
       return;
     }
-    // Satu AHSP memakai uraian Master AHSP secara otomatis sehingga pengguna
-    // tidak perlu mengetik ulang nama yang sama.
-    const cleanGroupName = queuedItems.length === 1
-      ? queuedItems[0].name.trim()
-      : groupName.trim();
-    if (queuedItems.length > 1 && !cleanGroupName) {
-      setActionError('Isi nama item pekerjaan untuk menggabungkan beberapa AHSP, misalnya: Pembuatan Kolom K1 30 x 30 cm.');
+    const cleanGroupName = insertionMode === 'group' && queuedItems.length > 1
+      ? groupName.trim()
+      : queuedItems.length === 1
+        ? queuedItems[0].name.trim()
+        : '';
+    if (insertionMode === 'group' && queuedItems.length > 1 && !cleanGroupName) {
+      setActionError('Isi nama item pekerjaan untuk menggabungkan AHSP sebagai satu pekerjaan.');
       return;
     }
     if (cleanGroupName.length > 255) {
@@ -526,7 +570,7 @@ export default function AhspPickerModal({
     setAdding(true);
     setActionError('');
     try {
-      await onAdd({ groupName: cleanGroupName, items: queuedItems });
+      await onAdd({ groupName: cleanGroupName, mode: insertionMode, items: queuedItems });
       onClose();
     } catch (error) {
       console.error('Gagal menyimpan paket AHSP ke RAB:', error);
@@ -561,7 +605,7 @@ export default function AhspPickerModal({
               Susun Item Pekerjaan dari Beberapa AHSP
             </h2>
             <p className="mt-1 truncate text-xs text-slate-500">
-              Tujuan: {divisionName || 'Lokasi pekerjaan'} · pilih beberapa AHSP, atur volumenya, lalu simpan sebagai satu item
+              Tujuan: {divisionName || 'Lokasi pekerjaan'} · pilih banyak AHSP sekaligus, lalu masukkan sebagai item terpisah atau subpekerjaan
             </p>
           </div>
           <button
@@ -621,46 +665,49 @@ export default function AhspPickerModal({
                 <div className="divide-y divide-slate-100">
                   {filteredRecords.map((item) => {
                     const isSelected = selectedId === item.id;
+                    const isBulkSelected = bulkSelectedIds.includes(item.id);
 
                     return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedId(item.id);
-                          const queued = queuedItems.find((entry) => entry.masterAhspId === item.id);
-                          setVolume(queued ? String(queued.volume) : '1');
-                          setActionError('');
-                        }}
-                        className={`block w-full px-4 py-4 text-left transition ${
-                          isSelected
-                            ? 'bg-emerald-50/80 ring-1 ring-inset ring-emerald-200'
-                            : 'hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="font-mono text-xs font-bold text-emerald-700">
-                              {item.code}
-                            </p>
-                            <p className="mt-1 text-sm font-semibold leading-5 text-slate-900">
-                              {item.name}
-                            </p>
-                            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                              <span className={`rounded px-2 py-0.5 ${item.unit?.trim() ? 'bg-slate-100' : 'bg-amber-50 text-amber-700'}`}>{item.unit?.trim() || 'Kelompok'}</span>
-                              <span>{item.category || 'Umum'}</span>
+                      <div key={item.id} className={`flex items-stretch gap-2 px-3 py-2 transition ${isSelected ? 'bg-emerald-50/70' : 'hover:bg-slate-50'}`}>
+                        <label className="flex shrink-0 cursor-pointer items-center px-1" title="Pilih AHSP untuk input massal">
+                          <input
+                            type="checkbox"
+                            checked={isBulkSelected}
+                            onChange={(event) => setBulkSelectedIds((current) => event.target.checked
+                              ? [...current, item.id]
+                              : current.filter((id) => id !== item.id))}
+                            disabled={!item.unit?.trim()}
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-30"
+                            aria-label={`Pilih ${item.code} sebagai item RAB terpisah`}
+                          />
+                        </label>
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedId(item.id);
+                            const queued = queuedItems.find((entry) => entry.masterAhspId === item.id);
+                            setVolume(queued ? String(queued.volume) : '1');
+                            setActionError('');
+                          }}
+                          className={`min-w-0 flex-1 rounded-lg px-2 py-2 text-left transition ${isSelected ? 'ring-1 ring-inset ring-emerald-200' : ''}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-mono text-xs font-bold text-emerald-700">{item.code}</p>
+                              <p className="mt-1 text-sm font-semibold leading-5 text-slate-900">{item.name}</p>
+                              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                                <span className={`rounded px-2 py-0.5 ${item.unit?.trim() ? 'bg-slate-100' : 'bg-amber-50 text-amber-700'}`}>{item.unit?.trim() || 'Kelompok'}</span>
+                                <span>{item.category || 'Umum'}</span>
+                              </div>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <p className="text-xs font-bold tabular-nums text-slate-900">{formatRupiah(itemUnitPrice(item))}</p>
+                              {isSelected && <CheckCircle2 className="ml-auto mt-2 h-4 w-4 text-emerald-600" />}
                             </div>
                           </div>
-                          <div className="shrink-0 text-right">
-                            <p className="text-xs font-bold tabular-nums text-slate-900">
-                              {formatRupiah(itemUnitPrice(item))}
-                            </p>
-                            {isSelected && (
-                              <CheckCircle2 className="ml-auto mt-2 h-4 w-4 text-emerald-600" />
-                            )}
-                          </div>
-                        </div>
-                      </button>
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -681,19 +728,22 @@ export default function AhspPickerModal({
           </div>
 
           <aside className="min-h-0 overflow-y-auto p-4 sm:p-5">
-            {queuedItems.length === 1 ? (
-              <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
-                <p className="text-xs font-bold text-emerald-950">Nama item otomatis mengikuti AHSP</p>
-                <p className="mt-1 text-sm font-semibold text-emerald-900">{queuedItems[0].name}</p>
-                <p className="mt-1 text-[10px] leading-4 text-emerald-800">
-                  Karena hanya satu AHSP dipilih, nama dari Master AHSP langsung digunakan.
-                </p>
-              </div>
-            ) : queuedItems.length > 1 ? (
-              <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3">
-                <label htmlFor="ahsp-work-group-name" className="mb-1.5 block text-xs font-bold text-indigo-950">
-                  Nama item pekerjaan untuk beberapa AHSP
+            <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="mb-2 text-xs font-bold text-slate-800">Cara memasukkan AHSP</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label className={`flex cursor-pointer items-start gap-2 rounded-lg border p-2.5 ${insertionMode === 'separate' ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+                  <input type="radio" name="ahsp-insertion-mode" checked={insertionMode === 'separate'} onChange={() => setInsertionMode('separate')} className="mt-0.5 text-emerald-600" />
+                  <span><strong className="block text-xs text-slate-900">Item pekerjaan terpisah</strong><span className="mt-0.5 block text-[10px] leading-4 text-slate-500">Setiap AHSP menjadi satu baris/item RAB sendiri. Ini pilihan utama untuk input massal.</span></span>
                 </label>
+                <label className={`flex cursor-pointer items-start gap-2 rounded-lg border p-2.5 ${insertionMode === 'group' ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 bg-white'}`}>
+                  <input type="radio" name="ahsp-insertion-mode" checked={insertionMode === 'group'} onChange={() => setInsertionMode('group')} className="mt-0.5 text-indigo-600" />
+                  <span><strong className="block text-xs text-slate-900">Gabungkan sebagai subpekerjaan</strong><span className="mt-0.5 block text-[10px] leading-4 text-slate-500">Beberapa AHSP ditempatkan dalam satu kelompok pekerjaan seperti cara sebelumnya.</span></span>
+                </label>
+              </div>
+            </div>
+            {insertionMode === 'group' && queuedItems.length > 1 ? (
+              <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3">
+                <label htmlFor="ahsp-work-group-name" className="mb-1.5 block text-xs font-bold text-indigo-950">Nama item pekerjaan induk</label>
                 <input
                   id="ahsp-work-group-name"
                   type="text"
@@ -703,14 +753,16 @@ export default function AhspPickerModal({
                   placeholder="Contoh: Pembuatan Kolom K1 30 x 30 cm"
                   className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                 />
-                <p className="mt-1.5 text-[10px] leading-4 text-indigo-800">
-                  Satu nama akan menaungi seluruh AHSP yang dipilih, misalnya pembesian, beton, dan bekisting.
-                </p>
+                <p className="mt-1.5 text-[10px] leading-4 text-indigo-800">Nama induk ini akan menaungi semua AHSP pilihan sebagai satu kelompok pekerjaan.</p>
+              </div>
+            ) : insertionMode === 'separate' ? (
+              <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
+                <p className="text-xs font-bold text-emerald-950">Setiap AHSP akan menjadi item RAB mandiri</p>
+                <p className="mt-1 text-[10px] leading-4 text-emerald-800">Kode, uraian, satuan, analisa, dan harga mengikuti masing-masing Master AHSP. Volume dapat diubah per item dari daftar pilihan.</p>
               </div>
             ) : (
               <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-semibold text-slate-700">Nama item pekerjaan otomatis dari AHSP jika hanya satu dipilih.</p>
-                <p className="mt-1 text-[10px] leading-4 text-slate-500">Pilih AHSP dan masukkan ke daftar. Nama kelompok baru diminta saat memilih lebih dari satu AHSP.</p>
+                <p className="text-xs font-semibold text-slate-700">Pilih sedikitnya dua AHSP untuk membuat satu kelompok subpekerjaan.</p>
               </div>
             )}
             {selectedItem ? (
@@ -872,13 +924,23 @@ export default function AhspPickerModal({
             <section className="mt-4 rounded-xl border border-slate-200 bg-white">
               <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2.5">
                 <div>
-                  <h4 className="text-xs font-bold text-slate-800">AHSP dalam item pekerjaan</h4>
+                  <h4 className="text-xs font-bold text-slate-800">Daftar AHSP untuk RAB</h4>
                   <p className="text-[10px] text-slate-500">{queuedItems.length} AHSP dipilih</p>
                 </div>
                 <span className="rounded-full bg-indigo-100 px-2 py-1 text-[10px] font-bold text-indigo-800">
                   {formatRupiah(queuedItems.reduce((sum, item) => sum + (Number.isFinite(item.totalPrice) ? item.totalPrice : 0), 0))}
                 </span>
               </div>
+              {bulkSelectedIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleAddSelectedToQueue}
+                  disabled={adding}
+                  className="m-3 inline-flex w-[calc(100%-1.5rem)] items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4" /> Tambahkan {bulkSelectedIds.length} AHSP tercentang ke daftar
+                </button>
+              )}
               {queuedItems.length > 0 ? (
                 <div className="divide-y divide-slate-100">
                   {queuedItems.map((item) => (
@@ -926,11 +988,11 @@ export default function AhspPickerModal({
             <button
               type="button"
               onClick={() => void handleSaveBatch()}
-              disabled={adding || queuedItems.length === 0 || (queuedItems.length > 1 && !groupName.trim())}
+              disabled={adding || queuedItems.length === 0 || (insertionMode === 'group' && queuedItems.length > 1 && !groupName.trim())}
               className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-              {adding ? 'Menyimpan seluruh AHSP...' : `Simpan ${queuedItems.length} AHSP ke RAB`}
+              {adding ? 'Menyimpan seluruh AHSP...' : insertionMode === 'group' && queuedItems.length > 1 ? `Simpan ${queuedItems.length} AHSP sebagai satu kelompok` : `Simpan ${queuedItems.length} AHSP sebagai item terpisah`}
             </button>
           </aside>
         </div>
