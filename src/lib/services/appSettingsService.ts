@@ -14,7 +14,6 @@ export type AppSettings = {
   company_responsible_title: string;
   default_tax_rate: number;
   default_profit_margin: number;
-  default_project_status: 'Draft' | 'Review' | 'Final';
   currency_code: string;
   currency_locale: string;
   price_decimal_places: number;
@@ -44,7 +43,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   company_responsible_title: 'Penanggung Jawab',
   default_tax_rate: 11,
   default_profit_margin: 10,
-  default_project_status: 'Draft',
   currency_code: 'IDR',
   currency_locale: 'id-ID',
   price_decimal_places: 2,
@@ -74,13 +72,13 @@ export async function fetchAppSettings(): Promise<AppSettings> {
 export async function fetchNewProjectDefaults(): Promise<{
   tax_rate: number;
   profit_margin: number;
-  status: 'Draft' | 'Review' | 'Final';
+  status: 'DRAFT';
 }> {
   const settings = await fetchAppSettings();
   return {
     tax_rate: Number(settings.default_tax_rate ?? DEFAULT_APP_SETTINGS.default_tax_rate),
     profit_margin: Number(settings.default_profit_margin ?? DEFAULT_APP_SETTINGS.default_profit_margin),
-    status: settings.default_project_status ?? DEFAULT_APP_SETTINGS.default_project_status,
+    status: 'DRAFT',
   };
 }
 
