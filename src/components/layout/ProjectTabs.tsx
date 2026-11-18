@@ -81,7 +81,7 @@ export default function ProjectTabs() {
           <Link
             href={projectBase}
             aria-current={isPlanning ? 'page' : undefined}
-            className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition sm:gap-2 sm:px-3.5 sm:py-2 sm:text-sm ${
               isPlanning
                 ? 'bg-blue-700 text-white shadow-sm'
                 : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
@@ -150,7 +150,7 @@ export default function ProjectTabs() {
         ) : null}
 
         {isExecution ? (
-          <nav aria-label="Menu Pelaksanaan" className="mt-3 flex items-center gap-1 overflow-x-auto border-t border-slate-100 pt-2">
+          <nav aria-label="Menu Pelaksanaan" className="dahlia-horizontal-tabs mt-2 flex items-center gap-1 border-t border-slate-100 pt-2 sm:mt-3 sm:gap-1.5">
             {executionLinks.map((item) => {
               const href = `${projectBase}${item.suffix}`;
               const Icon = item.icon;
