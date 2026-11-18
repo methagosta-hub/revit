@@ -628,6 +628,9 @@ export default function RekapRABPage() {
       </section>
 
       <div id="rekap-print-report" style={{ fontFamily: PDF_FONTS[pdfFont].css, fontWeight: 400, color: '#1e293b' }}>
+        {project.project_category === 'PORTOFOLIO' && (
+          <div className="portfolio-print-watermark" aria-hidden="true">LAPORAN DUMMY/SAMPEL</div>
+        )}
         <header className="report-running-header" style={{ borderBottom: `2px solid ${activeTheme.accent}`, color: activeTheme.text }}>
           <span>{formatDate(new Date())}</span><strong>{project.title}</strong>
         </header>
@@ -644,7 +647,7 @@ export default function RekapRABPage() {
             <div><span>Lokasi</span><strong>{textValue(project.location)}</strong></div>
             <div><span>Kabupaten / Kota</span><strong>{textValue(project.kabupaten_kota)}</strong></div>
             <div><span>NPSN</span><strong>{textValue(project.school_npsn)}</strong></div>
-            <div><span>Status dokumen</span><strong>{textValue(project.status, 'Draft')}</strong></div>
+            <div><span>Status dokumen</span><strong>{textValue(project.status, 'DRAFT')}</strong></div>
             <div><span>Tanggal dokumen</span><strong>{formatDate(new Date())}</strong></div>
           </div>
           <div className="cover-total" style={{ background: activeTheme.soft, borderColor: activeTheme.border }}>
@@ -759,6 +762,7 @@ export default function RekapRABPage() {
       </div>
 
       <style jsx global>{`
+        .portfolio-print-watermark { display:none; }
         #rekap-print-report { background:#fff; color:#1e293b; font-family:${PDF_FONTS[pdfFont].css}; font-size:9pt; line-height:1.35; }
         #rekap-print-report * { box-sizing:border-box; }
         .report-page { margin:0 0 18px; padding:0; }
@@ -817,6 +821,7 @@ export default function RekapRABPage() {
           html,body { margin:0!important; padding:0!important; background:#fff!important; }
           body * { visibility:hidden; }
           #rekap-print-report,#rekap-print-report * { visibility:visible!important; }
+          .portfolio-print-watermark { display:block!important; position:fixed!important; z-index:9999!important; top:44%!important; left:0!important; width:100%!important; transform:rotate(-32deg)!important; color:#9f1239!important; opacity:.14!important; font-size:28pt!important; font-weight:900!important; letter-spacing:4px!important; text-align:center!important; white-space:nowrap!important; pointer-events:none!important; }
           #rekap-print-report { position:absolute!important; left:0!important; top:0!important; width:100%!important; padding:0!important; margin:0!important; border:0!important; box-shadow:none!important; font-size:8pt!important; }
           .no-print { display:none!important; }
           .cover-page { min-height:270mm; break-after:page!important; page-break-after:always!important; }
