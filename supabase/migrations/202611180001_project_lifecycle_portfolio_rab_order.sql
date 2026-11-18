@@ -397,7 +397,8 @@ begin
   if v_project.status <> 'DIKERJAKAN' then
     raise exception 'Perubahan transaksi proyek hanya diperbolehkan saat status DIKERJAKAN. Status sekarang: %.', v_project.status using errcode = '23514';
   end if;
-  return case when tg_op = 'DELETE' then old else new end;
+  if tg_op = 'DELETE' then return old; end if;
+  return new;
 end;
 $;
 
