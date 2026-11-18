@@ -1124,6 +1124,7 @@ export default function ProjectWorkspacePage() {
           .from('projects')
           .select('id, title, client')
           .neq('id', projectId ?? '')
+          .in('status', ['DRAFT', 'REVIEW'])
           .order('updated_at', { ascending: false });
         if (error) throw error;
         const choices = (data ?? []) as ProjectChoice[];
