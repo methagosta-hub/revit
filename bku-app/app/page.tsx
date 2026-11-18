@@ -23,6 +23,7 @@ type Transaction = {
   book_id: string;
   transaction_date: string;
   created_at: string;
+  entry_no: number;
   transaction_type: TxType;
   category: string;
   description: string;
@@ -154,10 +155,10 @@ export default function BkuPage() {
     if (!supabase) return;
     const { data, error } = await supabase
       .from("bku_transactions")
-      .select("id,book_id,transaction_date,created_at,transaction_type,category,description,amount,account,from_account,to_account,receipt_number,evidence_path")
+      .select("id,book_id,transaction_date,created_at,entry_no,transaction_type,category,description,amount,account,from_account,to_account,receipt_number,evidence_path")
       .eq("book_id", bookId)
       .order("transaction_date", { ascending: true })
-      .order("created_at", { ascending: true });
+      .order("entry_no", { ascending: true });
     if (error) setPageError(error.message);
     setTransactions((data || []) as Transaction[]);
   }, [supabase]);
@@ -170,7 +171,7 @@ export default function BkuPage() {
 
   const ordered = useMemo(() => [...transactions].sort((a, b) =>
     a.transaction_date.localeCompare(b.transaction_date) ||
-    a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)
+    a.entry_no - b.entry_no || a.created_at.localeCompare(b.created_at)
   ), [transactions]);
 
   const balances = useMemo(() => {
@@ -310,6 +311,7 @@ export default function BkuPage() {
         records.push({
           book_id: book.id,
           transaction_date: selectedDate,
+          entry_no: firstEntryNo + index,
           transaction_type: draft.transaction_type,
           category: draft.category,
           description: draft.description.trim(),
