@@ -291,7 +291,7 @@ values
 ('Bata & Dinding','Roster beton 20 x 40 cm','bh',15000,'Acuan estimasi Indonesia 2026 · konfirmasi harga toko lokal',true),
 ('Bata & Dinding','Roster keramik 20 x 20 cm','bh',49000,'Acuan estimasi Indonesia 2026 · konfirmasi harga toko lokal',true),
 ('Bata & Dinding','Hebel lem perekat 40 kg','sak',105000,'Acuan estimasi Indonesia 2026 · konfirmasi harga toko lokal',true),
-('Bata & Dinding','GRC board 4 mm 1,2 x 2,4 m','lbr',72000,'Acuan estimasi Indonesia 2026 · konfirmasi harga toko lokal',true),
+('Bata & Dinding','GRC board 4 mm partisi 1,2 x 2,4 m','lbr',72000,'Acuan estimasi Indonesia 2026 · konfirmasi harga toko lokal',true),
 ('Rangka Atap Baja Ringan','Rangka atap baja ringan C75 tebal 0,75 mm','m2',175000,'Acuan estimasi Indonesia 2026 · konfirmasi harga toko lokal',true),
 ('Rangka Atap Baja Ringan','Rangka atap baja ringan C75 tebal 1,00 mm','m2',205000,'Acuan estimasi Indonesia 2026 · konfirmasi harga toko lokal',true),
 ('Rangka Atap Baja Ringan','Profil C baja ringan 0,75 mm x 6 m','btg',115000,'Acuan estimasi Indonesia 2026 · konfirmasi harga toko lokal',true),
