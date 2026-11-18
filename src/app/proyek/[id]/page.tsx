@@ -857,6 +857,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleAddAhsp = async (batch: SelectedAhspBatchPayload) => {
+    if (!canEditRab) throw new Error('RAB terkunci pada status proyek saat ini.');
     if (!activeDivisionId || submitting) {
       throw new Error('Lokasi pekerjaan tujuan belum dipilih.');
     }
@@ -1104,7 +1105,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const openDivisionDialog = async (mode: 'edit' | 'copy' | 'export', division: RABDivision) => {
-    if (!canEditRab) { setErrorMessage('Data lokasi RAB terkunci pada status proyek saat ini.'); return; }
+    if (mode !== 'export' && !canEditRab) { setErrorMessage('Data lokasi RAB terkunci pada status proyek saat ini.'); return; }
     setErrorMessage('');
     setSuccessMessage('');
     setDivisionNameDraft(
@@ -1563,7 +1564,7 @@ export default function ProjectWorkspacePage() {
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:items-end">
-            <button
+            {canEditRab && <button
               type="button"
               onClick={() => {
                 setNewLocationName('');
@@ -1822,6 +1823,7 @@ export default function ProjectWorkspacePage() {
                             onUpdateComponents={handleUpdateComponents}
                             onDelete={handleDeleteItem}
                             onVolumeUpdated={() => loadData(true)}
+                            readOnly={!canEditRab}
                           />
                         </section>
                       );
