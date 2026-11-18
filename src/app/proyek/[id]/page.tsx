@@ -18,6 +18,9 @@ import {
   Plus,
   Database,
   Copy,
+  GripVertical,
+  ChevronUp,
+  ChevronDown,
   Pencil,
   Download,
   Save,
@@ -387,9 +390,13 @@ function buildAhspItemGroups(items: RabTableItem[]): AhspItemGroup[] {
     }
   }
 
-  return Array.from(groups.values()).sort((left, right) =>
-    compareAhspCodes(left.prefix, right.prefix),
-  );
+  // Urutan kategori mengikuti sort_order proyek, bukan urutan kode Master AHSP.
+  // Jika belum pernah dikustomisasi, urutan kode tetap menjadi fallback awal.
+  return Array.from(groups.values()).sort((left, right) => {
+    const leftOrder = Math.min(...left.items.map((item) => Number(item.sort_order ?? Number.MAX_SAFE_INTEGER)));
+    const rightOrder = Math.min(...right.items.map((item) => Number(item.sort_order ?? Number.MAX_SAFE_INTEGER)));
+    return leftOrder - rightOrder || compareAhspCodes(left.prefix, right.prefix);
+  });
 }
 
 function getErrorMessage(error: unknown): string {
@@ -512,6 +519,8 @@ export default function ProjectWorkspacePage() {
 
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [draggingAhspCategory, setDraggingAhspCategory] = useState<string | null>(null);
+  const [dragOverAhspCategory, setDragOverAhspCategory] = useState<string | null>(null);
 
   const loadData = useCallback(async (showRefreshState = false) => {
     if (!projectId) {
@@ -1009,6 +1018,67 @@ export default function ProjectWorkspacePage() {
       setErrorMessage(`Gagal menghapus item RAB: ${getErrorMessage(error)}`);
       throw error;
     }
+  };
+
+  const handleReorderAhspCategories = async (
+    divisionId: string,
+    groups: AhspItemGroup[],
+    sourceKey: string,
+    targetKey: string,
+  ) => {
+    if (!canManageRab || sourceKey === targetKey) return;
+    const fromIndex = groups.findIndex((group) => group.key === sourceKey);
+    const toIndex = groups.findIndex((group) => group.key === targetKey);
+    if (fromIndex < 0 || toIndex < 0) return;
+
+    const reordered = [...groups];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+
+    // Kirim semua item kategori dalam urutan baru. Database menyimpan urutan
+    // secara atomik sehingga PDF, layar RAB, dan Kurva S membaca urutan sama.
+    const orderedItemIds = reordered.flatMap((group) =>
+      [...group.items]
+        .sort((left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0))
+        .map((item) => item.id),
+    );
+    if (orderedItemIds.length === 0) return;
+    if (new Set(orderedItemIds).size !== orderedItemIds.length) {
+      setErrorMessage('Urutan kategori tidak valid karena ada item RAB ganda.');
+      return;
+    }
+
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      const { error } = await supabase.rpc('reorder_project_rab_categories', {
+        p_division_id: divisionId,
+        p_item_ids: orderedItemIds,
+      });
+      if (error) throw error;
+      await loadData(true);
+      setSuccessMessage('Urutan kategori pekerjaan berhasil disimpan dan akan digunakan pada ekspor RAB.');
+    } catch (error) {
+      console.error('Gagal menyimpan urutan kategori RAB:', error);
+      setErrorMessage(
+        `Gagal menyimpan urutan kategori: ${getErrorMessage(error)}. Pastikan migrasi pengurutan RAB sudah dijalankan.`,
+      );
+    } finally {
+      setDraggingAhspCategory(null);
+      setDragOverAhspCategory(null);
+    }
+  };
+
+  const moveAhspCategory = async (
+    divisionId: string,
+    groups: AhspItemGroup[],
+    groupKey: string,
+    direction: -1 | 1,
+  ) => {
+    const index = groups.findIndex((group) => group.key === groupKey);
+    const target = groups[index + direction];
+    if (!target) return;
+    await handleReorderAhspCategories(divisionId, groups, groupKey, target.key);
   };
 
   const openDivisionDialog = async (mode: 'edit' | 'copy' | 'export', division: RABDivision) => {
@@ -1602,11 +1672,18 @@ export default function ProjectWorkspacePage() {
                       );
                     })}
 
-                    {ahspGroups.map((group) => {
+                    {ahspGroups.length > 0 && canManageRab && (
+                      <p className="px-1 text-xs text-slate-500">
+                        <GripVertical className="mr-1 inline h-3.5 w-3.5" />
+                        Seret kategori untuk mengubah urutan pekerjaan. Urutan ini ikut digunakan dalam PDF RAB.
+                      </p>
+                    )}
+                    {ahspGroups.map((group, groupIndex) => {
                       const groupTotal = group.items.reduce(
                         (sum, item) => sum + Number(item.total_price || 0),
                         0,
                       );
+                      const dragKey = `${division.id}:${group.key}`;
                       const sortedGroupItems = [...group.items]
                         .sort((left, right) =>
                           compareAhspCodes(String(left.code || ''), String(right.code || '')),
@@ -1619,7 +1696,36 @@ export default function ProjectWorkspacePage() {
                       return (
                         <section
                           key={group.key}
-                          className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+                          draggable={canManageRab}
+                          onDragStart={(event) => {
+                            if (!canManageRab) return;
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', dragKey);
+                            setDraggingAhspCategory(dragKey);
+                          }}
+                          onDragOver={(event) => {
+                            if (!canManageRab || !draggingAhspCategory || draggingAhspCategory === dragKey) return;
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = 'move';
+                            setDragOverAhspCategory(dragKey);
+                          }}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            const source = event.dataTransfer.getData('text/plain') || draggingAhspCategory;
+                            const sourceKey = source?.startsWith(`${division.id}:`)
+                              ? source.slice(division.id.length + 1)
+                              : null;
+                            if (sourceKey && sourceKey !== group.key) {
+                              void handleReorderAhspCategories(division.id, ahspGroups, sourceKey, group.key);
+                            }
+                            setDraggingAhspCategory(null);
+                            setDragOverAhspCategory(null);
+                          }}
+                          onDragEnd={() => {
+                            setDraggingAhspCategory(null);
+                            setDragOverAhspCategory(null);
+                          }}
+                          className={`overflow-hidden rounded-xl border bg-white transition ${dragOverAhspCategory === dragKey ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-slate-200'} ${draggingAhspCategory === dragKey ? 'opacity-50' : ''} ${canManageRab ? 'cursor-grab active:cursor-grabbing' : ''}`}
                         >
                           <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
                             <div className="min-w-0">
@@ -1646,6 +1752,32 @@ export default function ProjectWorkspacePage() {
                               </div>
                             </div>
                             <div className="flex items-center justify-between gap-3 sm:justify-end">
+                              {canManageRab && (
+                                <div className="flex items-center gap-1">
+                                  <span className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Urutan</span>
+                                  <button
+                                    type="button"
+                                    aria-label="Naikkan kategori"
+                                    title="Naikkan kategori"
+                                    disabled={groupIndex === 0}
+                                    onClick={() => void moveAhspCategory(division.id, ahspGroups, group.key, -1)}
+                                    className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                                  >
+                                    <ChevronUp className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    aria-label="Turunkan kategori"
+                                    title="Turunkan kategori"
+                                    disabled={groupIndex === ahspGroups.length - 1}
+                                    onClick={() => void moveAhspCategory(division.id, ahspGroups, group.key, 1)}
+                                    className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                                  >
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                  </button>
+                                  <GripVertical className="ml-1 h-4 w-4 text-slate-400" />
+                                </div>
+                              )}
                               <span className="text-xs text-slate-500">{group.items.length} AHSP</span>
                               <span className="text-sm font-bold tabular-nums text-slate-800">{formatRupiah(groupTotal)}</span>
                             </div>
