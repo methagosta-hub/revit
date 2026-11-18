@@ -512,7 +512,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 begin
   if not public.dahlia_project_write_access() then
     raise exception 'Akun PORTOFOLIO hanya memiliki akses baca. Perubahan proyek sampel dikelola administrator perusahaan.' using errcode = '42501';
@@ -539,7 +539,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 create or replace function public.transition_project_status(
   p_project_id uuid,
