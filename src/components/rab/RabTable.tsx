@@ -831,7 +831,7 @@ function collectSubitemComponents(items: RabSubitemSnapshot[]): RabComponentSnap
 export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete, onVolumeUpdated, onReorder, canReorder = false, readOnly = false }: Props) {
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<EditForm>({ code: '', name: '', volume: '', unitPrice: '' });
+  const [form, setForm] = useState<EditForm>({ code: '', name: '', volume: '' });
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
