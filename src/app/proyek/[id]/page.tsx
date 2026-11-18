@@ -38,7 +38,7 @@ import { fetchProjectDetail, recalculateProjectTotal } from '@/lib/services/proj
 import { generateRABExcel } from '@/lib/excel-generator';
 import { formatRupiah } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import type { Project } from '@/types/rab';
+import type { Project, ProjectCategory } from '@/types/rab';
 
 type RABDivision = {
   id: string;
@@ -54,6 +54,7 @@ type WorkspaceProject = Omit<Project, 'divisions'> & {
   client?: string;
   location?: string;
   status?: string;
+  project_category?: ProjectCategory;
   school_npsn?: string | null;
   principal_name?: string | null;
   p2sp_chair_name?: string | null;
@@ -632,9 +633,19 @@ export default function ProjectWorkspacePage() {
     // Hilangkan blok tanda tangan/footer laporan dari hasil PDF.
     reportClone.querySelector('.pdf-report-footer')?.remove();
     const reportMarkup = reportClone.outerHTML;
+    const isPortfolio = project.project_category === 'PORTOFOLIO';
+    const demoWatermark = isPortfolio
+      ? '<div class="pdf-demo-watermark" aria-hidden="true">LAPORAN DUMMY/SAMPEL</div>'
+      : '';
 
     const printStyles = `
       @page { size: A4 portrait; margin: 12mm 14mm 13mm; }
+      .pdf-demo-watermark {
+        position: fixed; z-index: 9999; top: 42%; left: 0; width: 100%;
+        transform: rotate(-32deg); text-align: center; pointer-events: none;
+        color: #9f1239; opacity: .15; font-size: 28pt; line-height: 1.2;
+        font-weight: 900; letter-spacing: 4px; white-space: nowrap;
+      }
       * { box-sizing: border-box; }
       html, body { margin: 0; padding: 0; width: 100%; min-height: 0; background: #fff; }
       body { font-family: ${PDF_FONTS[pdfFont].css}; font-weight: 400; color: #1e293b; font-size: 9pt; line-height: 1.35; }
@@ -677,7 +688,7 @@ export default function ProjectWorkspacePage() {
             <link rel="stylesheet" href="${PDF_GOOGLE_FONTS_URL}" />
             <style>${printStyles}</style>
           </head>
-          <body>${reportMarkup}</body>
+          <body>${demoWatermark}${reportMarkup}</body>
         </html>`;
       const printBlob = new Blob([printDocument], { type: 'text/html;charset=utf-8' });
       printUrl = URL.createObjectURL(printBlob);
