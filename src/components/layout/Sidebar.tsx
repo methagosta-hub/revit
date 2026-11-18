@@ -18,6 +18,7 @@ import {
   Home,
   LogIn,
   LogOut,
+  Menu,
   Package,
   PlusCircle,
   Settings,
@@ -29,6 +30,7 @@ import {
   Wallet,
   Warehouse,
   Wrench,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -125,13 +127,31 @@ export default function Sidebar() {
       }))
     : navGroups;
   const [signingOut, setSigningOut] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [masterOpen, setMasterOpen] = useState(() => pathname.startsWith('/master/'));
 
   // Jika pengguna masuk ke salah satu halaman master melalui navigasi lain,
   // buka otomatis grup Master Data agar posisi halaman tetap terlihat.
   useEffect(() => {
     if (pathname.startsWith('/master/')) setMasterOpen(true);
+    setMobileMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [mobileMenuOpen]);
 
   async function handleSignOut() {
     if (signingOut) return;
@@ -150,7 +170,42 @@ export default function Sidebar() {
   const masterIsActive = pathname.startsWith('/master/');
 
   return (
-    <aside className="relative sticky top-0 z-30 flex h-screen w-[288px] shrink-0 select-none flex-col overflow-hidden border-r border-white/[0.08] bg-[#071321] text-slate-100 shadow-[12px_0_40px_rgba(2,8,23,0.16)]">
+    <>
+      <div className="sticky top-0 z-40 flex h-14 w-full shrink-0 items-center justify-between border-b border-white/10 bg-[#071321] px-4 text-white shadow-sm xl:hidden">
+        <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="flex min-w-0 items-center gap-2.5" aria-label="Buka Dashboard DAHLIA">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-300 via-teal-500 to-cyan-700">
+            <HardHat className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-black tracking-[0.14em]">DAHLIA</span>
+            <span className="block truncate text-[9px] font-semibold uppercase tracking-[0.16em] text-emerald-300">Construction System</span>
+          </span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen((open) => !open)}
+          aria-label={mobileMenuOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi'}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="dahlia-primary-sidebar"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-slate-100 transition hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+        >
+          {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+      </div>
+
+      {mobileMenuOpen && (
+        <button
+          type="button"
+          aria-label="Tutup menu navigasi"
+          onClick={() => setMobileMenuOpen(false)}
+          className="fixed inset-x-0 bottom-0 top-14 z-40 bg-slate-950/55 backdrop-blur-[1px] xl:hidden"
+        />
+      )}
+
+      <aside
+        id="dahlia-primary-sidebar"
+        aria-label="Menu utama DAHLIA"
+        className={`fixed bottom-0 left-0 top-14 z-50 flex h-auto w-[min(86vw,300px)] shrink-0 select-none flex-col overflow-hidden border-r border-white/[0.08] bg-[#071321] text-slate-100 shadow-[12px_0_40px_rgba(2,8,23,0.16)] transition-transform duration-300 xl:sticky xl:bottom-auto xl:top-0 xl:h-screen xl:w-[clamp(216px,17vw,280px)] xl:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Ambient glow dekoratif, tidak mengganggu interaksi menu. */}
       <div
         aria-hidden="true"
@@ -164,6 +219,7 @@ export default function Sidebar() {
       {/* Brand / logo perusahaan */}
       <Link
         href="/dashboard"
+        onClick={() => setMobileMenuOpen(false)}
         className="relative z-10 flex min-h-[112px] items-center gap-4 border-b border-white/[0.08] px-5 py-5 transition-colors hover:bg-white/[0.035]"
         aria-label="Buka Dashboard Perusahaan DAHLIA"
       >
@@ -218,6 +274,7 @@ export default function Sidebar() {
                     <Link
                       key={item.href}
                       href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
                       aria-current={isActive ? 'page' : undefined}
                       className={`group relative flex min-h-[46px] items-center gap-3 rounded-[13px] px-2.5 py-2 text-[12.5px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071321] ${
                         isActive
@@ -312,6 +369,7 @@ export default function Sidebar() {
                         <Link
                           key={item.href}
                           href={item.href}
+                          onClick={() => setMobileMenuOpen(false)}
                           aria-current={isActive ? 'page' : undefined}
                           className={`group flex min-h-[39px] items-center gap-2.5 rounded-[10px] px-2.5 text-[11.5px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/70 ${
                             isActive
@@ -388,6 +446,7 @@ export default function Sidebar() {
 
         <Link
           href="/"
+          onClick={() => setMobileMenuOpen(false)}
           className="mb-3 flex items-center justify-between rounded-[10px] px-2.5 py-2 text-[10.5px] font-semibold text-slate-500 transition-colors hover:bg-white/[0.045] hover:text-slate-200"
         >
           <span>Kembali ke halaman awal</span>
@@ -409,6 +468,7 @@ export default function Sidebar() {
           </p>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
