@@ -98,7 +98,7 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $
+as $$
   select exists (
     select 1
     from public.user_profiles up
@@ -106,7 +106,7 @@ as $
       and up.is_active = true
       and p_project_category = case when up.is_demo_user then 'PORTOFOLIO' else 'REGULER' end
   );
-$;
+$$;
 
 create or replace function public.dahlia_project_category_access(p_project_id uuid)
 returns boolean
@@ -114,14 +114,14 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $
+as $$
   select exists (
     select 1
     from public.projects p
     where p.id = p_project_id
       and public.dahlia_project_category_value_access(p.project_category)
   );
-$;
+$$;
 
 revoke all on function public.dahlia_project_category_value_access(text) from public, anon;
 grant execute on function public.dahlia_project_category_value_access(text) to authenticated;
@@ -136,7 +136,7 @@ language plpgsql
 stable
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 declare
   v_project_id uuid;
   v_is_demo boolean;
@@ -210,7 +210,7 @@ begin
   end if;
   return public.dahlia_project_category_access(v_project_id);
 end;
-$;
+$$;
 
 revoke all on function public.dahlia_project_row_category_access(jsonb) from public, anon;
 grant execute on function public.dahlia_project_row_category_access(jsonb) to authenticated;
@@ -331,13 +331,14 @@ begin
     from public.user_profiles
    where id = new.user_id;
 
-  if v_is_demo then
-    if new.project_id is null then
-      raise exception 'Akun dummy harus menggunakan penugasan khusus proyek PORTOFOLIO.' using errcode = '42501';
-    end if;
+  if v_is_demo and new.project_id is null then
+    raise exception 'Akun dummy harus menggunakan penugasan khusus proyek PORTOFOLIO.' using errcode = '42501';
+  end if;
+
+  if new.project_id is not null then
     select project_category into v_category from public.projects where id = new.project_id;
-    if v_category <> 'PORTOFOLIO' then
-      raise exception 'Akun dummy hanya boleh ditugaskan ke proyek PORTOFOLIO.' using errcode = '42501';
+    if v_category is distinct from case when v_is_demo then 'PORTOFOLIO' else 'REGULER' end then
+      raise exception 'Penugasan akun hanya boleh menggunakan kategori proyek yang sesuai dengan jenis akunnya.' using errcode = '42501';
     end if;
   end if;
   return new;
@@ -349,72 +350,6 @@ create trigger user_role_assignments_demo_scope
 before insert or update of user_id, project_id on public.user_role_assignments
 for each row execute function public.dahlia_guard_demo_role_assignment();
 
--- Change project status only through this audited transition function.
-create or replace function public.transition_project_status(
-  p_project_id uuid,
-  p_new_status text,
-  p_reason text default null
-)
-returns public.projects
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_project public.projects;
-  v_new_status text := upper(trim(coalesce(p_new_status, '')));
-  v_old_status text;
-  v_allowed boolean := false;
-begin
-  select * into v_project
-  from public.projects
-  where id = p_project_id
-  for update;
-
-  if v_project.id is null then
-    raise exception 'Proyek tidak ditemukan.' using errcode = 'P0002';
-  end if;
-  if not public.dahlia_has_project_execution_permission(p_project_id, 'project.manage') then
-    raise exception 'Tidak memiliki izin mengubah status proyek.' using errcode = '42501';
-  end if;
-  if v_new_status not in ('DRAFT', 'REVIEW', 'FINAL RAB', 'DIKERJAKAN', 'SELESAI') then
-    raise exception 'Status proyek tidak valid.' using errcode = '22023';
-  end if;
-
-  v_allowed := case v_project.status
-    when 'DRAFT' then v_new_status in ('DRAFT', 'REVIEW')
-    when 'REVIEW' then v_new_status in ('REVIEW', 'DRAFT', 'FINAL RAB')
-    when 'FINAL RAB' then v_new_status in ('FINAL RAB', 'REVIEW', 'DIKERJAKAN')
-    when 'DIKERJAKAN' then v_new_status in ('DIKERJAKAN', 'SELESAI')
-    when 'SELESAI' then v_new_status = 'SELESAI'
-    else false
-  end;
-
-  if not v_allowed then
-    raise exception 'Perpindahan status dari % ke % tidak diizinkan.', v_project.status, v_new_status using errcode = '23514';
-  end if;
-
-  if v_project.status = v_new_status then
-    return v_project;
-  end if;
-  v_old_status := v_project.status;
-
-  update public.projects
-     set status = v_new_status,
-         updated_at = now()
-   where id = p_project_id
-   returning * into v_project;
-
-  insert into public.project_status_history(project_id, old_status, new_status, reason, changed_by)
-  values (p_project_id, v_old_status, v_new_status, nullif(trim(coalesce(p_reason, '')), ''), auth.uid());
-
-  return v_project;
-end;
-$$;
-
-revoke all on function public.transition_project_status(uuid, text, text) from public, anon;
-grant execute on function public.transition_project_status(uuid, text, text) to authenticated;
-
 -- Prevent any direct status change through the general project save RPC or a
 -- client UPDATE. The audited transition RPC sets a transaction-local flag.
 create or replace function public.dahlia_guard_project_status_change()
@@ -422,7 +357,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 begin
   if tg_op = 'INSERT' then
     if upper(coalesce(new.status, '')) <> 'DRAFT' then
@@ -441,7 +376,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 create or replace function public.transition_project_status(
   p_project_id uuid,
@@ -452,7 +387,7 @@ returns public.projects
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 declare
   v_project public.projects;
   v_new_status text := upper(trim(coalesce(p_new_status, '')));
@@ -504,7 +439,7 @@ begin
 
   return v_project;
 end;
-$;
+$$;
 
 drop trigger if exists projects_status_transition_guard on public.projects;
 create trigger projects_status_transition_guard
