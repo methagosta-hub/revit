@@ -93,7 +93,8 @@ export async function fetchSupplierPayments(limit = 200): Promise<SupplierPaymen
 export async function fetchPayablePurchaseOrders(): Promise<PayablePurchaseOrder[]> {
   const { data, error } = await supabase
     .from('project_purchase_orders')
-    .select('id, project_id, po_number, status, order_date, subtotal, project:projects(title), supplier:suppliers(name)')
+    .select('id, project_id, po_number, status, order_date, subtotal, project:projects!inner(title,status,project_category), supplier:suppliers(name)')
+    .eq('project.status', 'DIKERJAKAN')
     .in('status', ['approved', 'ordered', 'partially_received', 'received'])
     .order('order_date', { ascending: false });
   if (error) fail(error, 'Gagal memuat PO untuk pembayaran');
