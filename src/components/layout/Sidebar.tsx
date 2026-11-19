@@ -7,6 +7,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import {
   Activity,
   ArrowUpRight,
+  BookOpen,
   Building2,
   Calculator,
   ChevronDown,
@@ -65,6 +66,7 @@ const navGroups: NavigationGroup[] = [
       { name: 'Personalia', href: '/personalia', icon: Users },
       { name: 'Gudang & Persediaan', href: '/gudang', icon: Warehouse },
       { name: 'Keuangan', href: '/keuangan', icon: Wallet },
+      { name: 'BKU Proyek Eksternal · Login Terpisah', href: 'https://dahlia-bku.vercel.app', icon: BookOpen },
       {
         name: 'Pelaporan Eksternal',
         href: '/laporan-eksternal',
