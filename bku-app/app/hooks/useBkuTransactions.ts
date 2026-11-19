@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
-import type { Book, Draft, Material, SchoolStore, StoredDetail, Transaction, SaveEntriesInput } from "@/app/lib/bku/types";
+import type { Book, Draft, Material, SchoolStore, StoreInput, StoredDetail, Transaction, SaveEntriesInput } from "@/app/lib/bku/types";
 import { amountValue, detailLineTotal, parseDecimal, parseUnitPrice } from "@/app/lib/bku/formatters";
 import { getValidDrafts, validateDrafts } from "@/app/lib/bku/validation";
 import { moveTransactionsToDate } from "@/app/lib/bku/transaction-movement";
@@ -56,13 +56,31 @@ export function useBkuTransactions(supabase: BkuClient | null, session: Session 
     const [materialResult, storeResult] = await Promise.all([
       supabase.from("bku_materials").select(MATERIAL_SELECT)
         .eq("is_active", true).or(`book_id.is.null,book_id.eq.${bookId}`).order("category").order("name"),
-      supabase.from("bku_stores").select("id,book_id,name,address,phone").eq("book_id", bookId).order("name"),
+      supabase.from("bku_stores").select("id,book_id,name,address,phone,notes,is_active").eq("book_id", bookId).order("name"),
     ]);
     if (materialResult.error) throw materialResult.error;
     if (storeResult.error) throw storeResult.error;
     setMaterials((materialResult.data || []) as Material[]);
     setStores((storeResult.data || []) as SchoolStore[]);
   }, [supabase]);
+
+  const saveStore = useCallback(async (input: StoreInput) => {
+    if (!supabase || !book || !session?.user) throw new Error("Sesi akun atau buku kas tidak tersedia.");
+    const name = input.name.trim();
+    if (!name) throw new Error("Nama toko wajib diisi.");
+    const { data, error: saveError } = await supabase.rpc("bku_save_store", {
+      p_book_id: book.id,
+      p_name: name,
+      p_store_id: input.id || null,
+      p_address: input.address.trim(),
+      p_phone: input.phone.trim(),
+      p_notes: input.notes.trim(),
+      p_is_active: input.is_active,
+    });
+    if (saveError) throw saveError;
+    await Promise.all([loadSchoolResources(book.id), loadTransactions(book.id)]);
+    return data as unknown as SchoolStore;
+  }, [supabase, book?.id, session?.user?.id, loadSchoolResources, loadTransactions]);
 
   const refresh = useCallback(async () => {
     if (!book?.id) {
@@ -120,7 +138,8 @@ export function useBkuTransactions(supabase: BkuClient | null, session: Session 
       firstEntryNo = Number(latestEntry?.entry_no || 0) + 1;
     }
 
-    const resolvedStores = new Map<string, SchoolStore>(stores.map((item) => [item.name.toLowerCase(), item] as [string, SchoolStore]));
+    const resolvedStores = new Map<string, SchoolStore>(stores.filter((item) => item.is_active !== false).map((item) => [item.name.toLowerCase(), item] as [string, SchoolStore]));
+    const inactiveStores = new Set(stores.filter((item) => item.is_active === false).map((item) => item.name.toLowerCase()));
     const resolvedMaterials = new Map<string, Material>(materials.map((item) => [item.name.toLowerCase() + "|" + item.unit, item] as [string, Material]));
     const records: Record<string, unknown>[] = [];
     const splitGroupTotals = new Map<string, number>();
@@ -144,16 +163,19 @@ export function useBkuTransactions(supabase: BkuClient | null, session: Session 
       if (storeId) {
         storeName = stores.find((item) => item.id === storeId)?.name || storeName;
       } else if (storeName) {
-        const existingStore = resolvedStores.get(storeName.toLowerCase());
+        const normalizedStoreName = storeName.toLowerCase();
+        const existingStore = resolvedStores.get(normalizedStoreName);
         if (existingStore) {
           storeId = existingStore.id;
           storeName = existingStore.name;
+        } else if (inactiveStores.has(normalizedStoreName)) {
+          throw new Error("Toko ini berstatus nonaktif. Aktifkan kembali melalui Master Data atau pilih toko lain.");
         } else {
           const { data: newStore, error: storeError } = await supabase.from("bku_stores").insert({
             book_id: book.id,
             name: storeName,
             created_by: activeSession.user.id,
-          }).select("id,book_id,name,address,phone").single();
+          }).select("id,book_id,name,address,phone,notes,is_active").single();
           if (storeError) throw storeError;
           const createdStore = newStore as SchoolStore;
           resolvedStores.set(createdStore.name.toLowerCase(), createdStore);
@@ -328,6 +350,7 @@ export function useBkuTransactions(supabase: BkuClient | null, session: Session 
     refresh,
     loadTransactions,
     saveEntries,
+    saveStore,
     deleteTransaction,
     moveTransactions,
     shiftProjectSchedule,
