@@ -22,6 +22,7 @@ import { MoveTransactionsDialog } from "@/app/components/calendar/MoveTransactio
 import { TransactionFormModal } from "@/app/components/transactions/TransactionFormModal";
 import { TransactionLedger } from "@/app/components/transactions/TransactionLedger";
 import { WorkerPayrollView } from "@/app/components/workers/WorkerPayrollView";
+import { StoreMasterView } from "@/app/components/stores/StoreMasterView";
 import { ExportPdfModal } from "@/app/components/reports/ExportPdfModal";
 import { openBkuPdfReport } from "@/app/components/reports/pdfReport";
 
@@ -509,9 +510,9 @@ export default function BkuPage() {
             <BalanceSummary summary={balances}/>
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
               <div className="inline-flex flex-wrap rounded-xl bg-slate-200/70 p-1">
-                {(["calendar", "ledger", "payroll", "profile"] as AppView[]).map((item) => <button key={item} type="button" onClick={() => setView(item)} className={`rounded-lg px-3.5 py-2 text-xs font-bold transition sm:px-4 ${view === item ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>{item === "calendar" ? "Kalender" : item === "ledger" ? "Buku transaksi" : item === "payroll" ? "Absensi & gaji" : "Profil lembaga"}</button>)}
+                {(["calendar", "ledger", "payroll", "stores", "profile"] as AppView[]).map((item) => <button key={item} type="button" onClick={() => setView(item)} className={`rounded-lg px-3.5 py-2 text-xs font-bold transition sm:px-4 ${view === item ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>{item === "calendar" ? "Kalender" : item === "ledger" ? "Buku transaksi" : item === "payroll" ? "Absensi & gaji" : item === "stores" ? "Master Data" : "Profil lembaga"}</button>)}
               </div>
-              <p className="text-[10px] text-slate-400">{view === "calendar" ? "Klik tanggal untuk membuka nota · Seret tanggal untuk menata jadwal" : view === "ledger" ? "Daftar seluruh transaksi dalam buku kas" : view === "payroll" ? "Kelola roster pekerja, absensi HOK, dan penggajian mingguan" : "Kelola identitas lembaga untuk laporan PDF"}</p>
+              <p className="text-[10px] text-slate-400">{view === "calendar" ? "Klik tanggal untuk membuka nota · Seret tanggal untuk menata jadwal" : view === "ledger" ? "Daftar seluruh transaksi dalam buku kas" : view === "payroll" ? "Kelola roster pekerja, absensi HOK, dan penggajian mingguan" : view === "stores" ? "Master data toko, pemasok, dan riwayat transaksi terkait" : "Kelola identitas lembaga untuk laporan PDF"}</p>
             </div>
 
             {view === "calendar" && <section className="mt-4 space-y-3">
@@ -549,6 +550,8 @@ export default function BkuPage() {
               onSavePayroll={handleSaveWeeklyPayroll}
               onClearError={() => payrollApi.setError("")}
             />}
+
+            {view === "stores" && <StoreMasterView stores={transactionsApi.stores} loading={transactionsApi.loading} onSave={transactionsApi.saveStore} />}
 
             {view === "profile" && <section className="mt-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <div className="mb-5"><p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Pengaturan lembaga</p><h3 className="mt-1 text-xl font-black text-slate-900">Profil sekolah / lembaga</h3><p className="mt-1 text-xs text-slate-500">Identitas ini digunakan pada header laporan dan dokumen PDF BKU.</p></div>
