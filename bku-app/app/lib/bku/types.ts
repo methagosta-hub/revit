@@ -1,6 +1,6 @@
 export type Account = "CASH" | "BANK";
 export type TxType = "IN" | "OUT" | "TRANSFER";
-export type AppView = "calendar" | "ledger" | "payroll" | "profile";
+export type AppView = "calendar" | "ledger" | "payroll" | "stores" | "profile";
 
 export type Book = {
   id: string;
@@ -75,6 +75,17 @@ export type SchoolStore = {
   name: string;
   address: string;
   phone: string;
+  notes: string;
+  is_active: boolean;
+};
+
+export type StoreInput = {
+  id?: string;
+  name: string;
+  address: string;
+  phone: string;
+  notes: string;
+  is_active: boolean;
 };
 
 export type Draft = {
