@@ -27,7 +27,7 @@ export function TransactionLedger({
           <tbody className="divide-y divide-slate-100">
             {transactions.map((tx) => <tr key={tx.id} className="align-top transition hover:bg-slate-50/70">
               <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">{dateLabel(tx.transaction_date, { day: "2-digit", month: "short", year: "numeric" })}</td>
-              <td className="max-w-[320px] px-4 py-3"><p className="break-words font-semibold text-slate-800">{tx.description}</p><p className="mt-1 text-[10px] text-slate-400">{tx.receipt_number ? `Nota ${tx.receipt_number}` : `Nomor urut #${tx.entry_no}`}</p>{tx.details?.length ? <p className="mt-1 text-[10px] text-slate-400">{tx.details.map((line) => line.name).join(" · ")}</p> : null}</td>
+              <td className="max-w-[320px] px-4 py-3"><p className="break-words font-semibold text-slate-800">{tx.description}</p><p className="mt-1 text-[10px] text-slate-400">{tx.receipt_number ? `Nota ${tx.receipt_number}` : `Nomor urut #${tx.entry_no}`}</p>{tx.store_name ? <p className="mt-1 text-[10px] font-semibold text-slate-500">Toko: {tx.store_name}</p> : null}{tx.details?.length ? <p className="mt-1 text-[10px] text-slate-400">{tx.details.map((line) => line.name).join(" · ")}</p> : null}</td>
               <td className="px-4 py-3 text-xs text-slate-500">{categoryLabel(tx.category)}</td>
               <td className="px-4 py-3 text-xs text-slate-500">{tx.transaction_type === "TRANSFER" ? `${tx.from_account} → ${tx.to_account}` : tx.account === "BANK" ? "Bank" : "Tunai"}</td>
               <td className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold text-emerald-700">{tx.transaction_type === "IN" ? money(Number(tx.amount)) : "—"}</td>
