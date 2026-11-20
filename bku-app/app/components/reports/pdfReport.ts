@@ -1,6 +1,6 @@
-import type { Book, SignatoryRole, Transaction, ExportTheme, Worker, WorkerAttendance } from "@/app/lib/bku/types";
+import type { Book, ReportCategory, SignatoryRole, Transaction, ExportTheme, Worker, WorkerAttendance } from "@/app/lib/bku/types";
 import { calculateBalances, sortTransactions } from "@/app/lib/bku/balances";
-import { escapeHtml, exportThemes, money, dateLabel, dateKey } from "@/app/lib/bku/formatters";
+import { categoryLabel, escapeHtml, exportThemes, money, dateLabel, dateKey } from "@/app/lib/bku/formatters";
 
 export type PdfReportOptions = {
   book: Book;
@@ -11,6 +11,7 @@ export type PdfReportOptions = {
   font: string;
   financialSignatoryRoles: SignatoryRole[];
   attendanceSignatoryRoles: SignatoryRole[];
+  reportCategories?: ReportCategory[];
   workers?: Worker[];
   attendance?: WorkerAttendance[];
 };
@@ -55,13 +56,14 @@ export function buildBkuPdfHtml(options: PdfReportOptions) {
       <div class="detail-line"><span>${escapeHtml(line.name)}</span><span>${Number(line.volume).toLocaleString("id-ID")} ${escapeHtml(line.unit || "")} × ${money(Number(line.unit_price))}</span><strong>${money(Number(line.line_total ?? Number(line.unit_price) * Number(line.volume)))}</strong></div>
     `).join("");
     const typeLabel = tx.transaction_type === "IN" ? "Kas masuk" : tx.transaction_type === "OUT" ? "Kas keluar" : "Transfer";
+    const categoryText = categoryLabel(tx.category, options.reportCategories || [], tx.transaction_type);
     const method = tx.transaction_type === "TRANSFER"
       ? `${tx.from_account === "BANK" ? "Bank" : "Tunai"} → ${tx.to_account === "BANK" ? "Bank" : "Tunai"}`
       : tx.account === "BANK" ? "Bank / non-tunai" : "Tunai";
     const movement = periodBalances.rows[tx.id];
     return `<tr>
       <td class="nowrap">${dateLabel(tx.transaction_date, { day: "2-digit", month: "short", year: "numeric" })}</td>
-      <td><strong>${escapeHtml(tx.receipt_number || `#${tx.entry_no}`)}</strong><div class="muted">${typeLabel} · ${method}${tx.store_name ? ` · ${escapeHtml(tx.store_name)}` : ""}</div>${tx.split_group_id ? `<div class="muted">Kelompok: ${escapeHtml(tx.split_group_label || "Nota terpisah")} · Total kelompok ${money(Number(tx.split_group_total || 0))}</div>` : ""}</td>
+      <td><strong>${escapeHtml(tx.receipt_number || `#${tx.entry_no}`)}</strong><div class="muted">${typeLabel} · ${escapeHtml(categoryText)} · ${method}${tx.store_name ? ` · ${escapeHtml(tx.store_name)}` : ""}</div>${tx.split_group_id ? `<div class="muted">Kelompok: ${escapeHtml(tx.split_group_label || "Nota terpisah")} · Total kelompok ${money(Number(tx.split_group_total || 0))}</div>` : ""}</td>
       <td><strong class="description">${escapeHtml(tx.description || "—")}</strong>${details ? `<div class="details">${details}</div>` : ""}</td>
       <td class="number incoming">${tx.transaction_type === "IN" ? money(Number(tx.amount)) : "—"}</td>
       <td class="number outgoing">${tx.transaction_type === "OUT" ? money(Number(tx.amount)) : "—"}</td>
