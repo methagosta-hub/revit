@@ -10,12 +10,14 @@ export function TransactionLedger({
   balances,
   onEdit,
   onCopy,
+  onExport,
   onDelete,
 }: {
   transactions: Transaction[];
   balances: Record<string, BalanceAtTransaction>;
   onEdit: (transaction: Transaction) => void;
   onCopy: (transaction: Transaction) => void;
+  onExport: (transaction: Transaction) => void;
   onDelete: (transaction: Transaction) => void;
 }) {
   return (
@@ -33,7 +35,7 @@ export function TransactionLedger({
               <td className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold text-emerald-700">{tx.transaction_type === "IN" ? money(Number(tx.amount)) : "—"}</td>
               <td className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold text-rose-700">{tx.transaction_type === "OUT" ? money(Number(tx.amount)) : "—"}</td>
               <td className="whitespace-nowrap px-4 py-3 text-right text-xs font-black text-slate-800">{money(balances[tx.id]?.total || 0)}</td>
-              <td className="whitespace-nowrap px-4 py-3"><div className="flex gap-1"><button type="button" onClick={() => onEdit(tx)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-[10px] font-semibold">Ubah</button><button type="button" onClick={() => onCopy(tx)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-[10px] font-semibold">Salin</button><button type="button" onClick={() => onDelete(tx)} className="rounded-lg border border-rose-100 px-2 py-1.5 text-[10px] font-semibold text-rose-700">Hapus</button></div></td>
+              <td className="whitespace-nowrap px-4 py-3"><div className="flex gap-1"><button type="button" onClick={() => onEdit(tx)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-[10px] font-semibold">Ubah</button><button type="button" onClick={() => onCopy(tx)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-[10px] font-semibold">Salin</button><button type="button" onClick={() => onExport(tx)} className="rounded-lg border border-emerald-100 px-2 py-1.5 text-[10px] font-semibold text-emerald-700">Ekspor</button><button type="button" onClick={() => onDelete(tx)} className="rounded-lg border border-rose-100 px-2 py-1.5 text-[10px] font-semibold text-rose-700">Hapus</button></div></td>
             </tr>)}
           </tbody>
         </table>
