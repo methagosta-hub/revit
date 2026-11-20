@@ -158,7 +158,7 @@ export function TransactionDetailEditor({
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <p className="text-xs font-black text-emerald-950">{editingIndex === null ? "Input material" : "Ubah material"}</p>
-                <p className="mt-0.5 text-[10px] text-emerald-800">{editingIndex === null ? "Isi satu material, lalu tambahkan ke daftar." : \`Sedang mengubah material nomor \${editingIndex + 1}.\`}</p>
+                <p className="mt-0.5 text-[10px] text-emerald-800">{editingIndex === null ? "Isi satu material, lalu tambahkan ke daftar." : `Sedang mengubah material nomor ${editingIndex + 1}.`}</p>
               </div>
               {editingIndex !== null && <button type="button" onClick={clearEntry} className="rounded-lg p-1.5 text-slate-500 hover:bg-white" aria-label="Batal mengubah material"><X size={16} /></button>}
             </div>
@@ -231,9 +231,9 @@ export function TransactionDetailEditor({
           </div>}
 
           <div className="max-h-[54vh] min-h-[220px] space-y-2 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-slate-50/60 p-2 pr-1 sm:p-3">
-            {visibleLines.length === 0 ? <div className="flex min-h-[190px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white px-5 text-center"><ReceiptText size={24} className="text-slate-300" /><p className="mt-2 text-xs font-bold text-slate-600">Belum ada material</p><p className="mt-1 max-w-xs text-[10px] leading-5 text-slate-400">Isi panel Input Material di samping, lalu tekan Tambahkan material ke daftar.</p></div> : visibleLines.map(({ line, index }) => <article key={index} className={\`rounded-xl border bg-white p-3 transition \${selectedValidIndexes.includes(index) ? "border-emerald-300 ring-1 ring-emerald-100" : "border-slate-200"}\`}>
+            {visibleLines.length === 0 ? <div className="flex min-h-[190px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white px-5 text-center"><ReceiptText size={24} className="text-slate-300" /><p className="mt-2 text-xs font-bold text-slate-600">Belum ada material</p><p className="mt-1 max-w-xs text-[10px] leading-5 text-slate-400">Isi panel Input Material di samping, lalu tekan Tambahkan material ke daftar.</p></div> : visibleLines.map(({ line, index }) => <article key={index} className={`rounded-xl border bg-white p-3 transition ${selectedValidIndexes.includes(index) ? "border-emerald-300 ring-1 ring-emerald-100" : "border-slate-200"}`}>
               <div className="flex items-start gap-2.5">
-                {canSelect && <input type="checkbox" aria-label={\`Pilih material \${line.name}\`} checked={selectedValidIndexes.includes(index)} onChange={(event) => toggleSelected(index, event.target.checked)} className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 accent-emerald-700" />}
+                {canSelect && <input type="checkbox" aria-label={`Pilih material ${line.name}`} checked={selectedValidIndexes.includes(index)} onChange={(event) => toggleSelected(index, event.target.checked)} className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 accent-emerald-700" />}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
