@@ -41,17 +41,11 @@ Jalankan ulang `database/setup.sql` pada proyek Supabase BKU. Selain migrasi pro
 Harga katalog adalah estimasi acuan nasional per November 2026, bukan quotation toko. Harga perlu dicek ulang sesuai kota, spesifikasi, merek, volume, ongkos kirim, serta perlakuan pajak sebelum dipakai untuk RAB atau pembelian.
 
 ## Master Kategori Rekap
-Setelah menerapkan perubahan kategori pada aplikasi, jalankan `database/migrations/20261120_bku_report_categories.sql` melalui **Supabase Dashboard → proyek Supabase BKU → SQL Editor → New query**. Migrasi ini membuat master kategori rekap untuk kas masuk dan kas keluar, termasuk Gaji Harian Tukang, APE, Meubeler, SMKK, dan Lain-lain.
+Untuk instalasi database BKU yang belum memiliki master kategori, jalankan file migrasi berikut satu kali melalui **Supabase Dashboard → proyek Supabase BKU → SQL Editor → New query**, sesuai urutan:
 
-Kategori bersifat global untuk seluruh akun pada database BKU yang sama. Penambahan kategori selanjutnya dilakukan dari SQL Editor dengan pola:
+1. `database/migrations/20261120_bku_report_categories.sql` — membuat tabel dan mengisi kategori awal kas masuk serta kas keluar.
+2. `database/migrations/20261120_bku_report_category_management.sql` — menambahkan fungsi database yang dipanggil aplikasi untuk menambah, mengubah, serta mengaktifkan atau menonaktifkan kategori.
 
-```sql
-insert into public.bku_report_categories (transaction_type, code, label, sort_order)
-values ('OUT', 'kode_baru', 'Nama Kategori Baru', 100)
-on conflict (transaction_type, code) do update
-set label = excluded.label,
-    sort_order = excluded.sort_order,
-    is_active = true;
-```
+Setelah kedua migrasi selesai, pengelolaan kategori dilakukan langsung melalui **Master Data → Master Rekap Data**. Pengguna tidak perlu menulis SQL lagi untuk kegiatan sehari-hari. Formulir aplikasi membuat kode internal otomatis; saat mengubah kategori, kode internal dipertahankan agar transaksi lama tetap terhubung. Kategori yang dinonaktifkan disembunyikan dari pilihan transaksi baru tetapi tetap dipertahankan untuk membaca riwayat.
 
-Gunakan `OUT` untuk kas keluar dan `IN` untuk kas masuk. Kode `upah` sengaja dipertahankan untuk menjaga kompatibilitas transaksi penggajian mingguan yang sudah tersimpan.
+Kategori bersifat global untuk seluruh akun pada database BKU yang sama. Kode `upah` dipertahankan dan tidak dapat dinonaktifkan karena dipakai otomatis oleh modul Absensi & Gaji.
