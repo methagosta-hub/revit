@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Copy, Eye, Pencil, Trash2 } from "lucide-react";
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Copy, Eye, FolderOutput, Pencil, Trash2 } from "lucide-react";
 import type { BalanceAtTransaction, Transaction } from "@/app/lib/bku/types";
 import { categoryLabel, money, numberFormat } from "@/app/lib/bku/formatters";
 
@@ -10,6 +10,7 @@ export function TransactionCard({
   onEvidence,
   onEdit,
   onCopy,
+  onExport,
   onDelete,
 }: {
   tx: Transaction;
@@ -17,6 +18,7 @@ export function TransactionCard({
   onEvidence: (path: string) => void;
   onEdit: (transaction: Transaction) => void;
   onCopy: (transaction: Transaction) => void;
+  onExport: (transaction: Transaction) => void;
   onDelete: (transaction: Transaction) => void;
 }) {
   const incoming = tx.transaction_type === "IN";
@@ -48,6 +50,7 @@ export function TransactionCard({
         {tx.evidence_path && <button type="button" onClick={() => onEvidence(tx.evidence_path as string)} className="flex items-center gap-1 rounded-lg border border-emerald-100 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50"><Eye size={13} />Bukti</button>}
         <button type="button" onClick={() => onEdit(tx)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"><Pencil size={13} />Ubah</button>
         <button type="button" onClick={() => onCopy(tx)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"><Copy size={13} />Salin</button>
+        <button type="button" onClick={() => onExport(tx)} className="flex items-center gap-1 rounded-lg border border-emerald-100 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50"><FolderOutput size={13} />Ekspor</button>
         <button type="button" onClick={() => onDelete(tx)} className="flex items-center gap-1 rounded-lg border border-rose-100 px-2.5 py-1.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-50"><Trash2 size={13} />Hapus</button>
       </div>
     </article>
