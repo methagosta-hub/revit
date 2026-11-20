@@ -11,7 +11,7 @@ import { useBkuBooks } from "@/app/hooks/useBkuBooks";
 import { useBkuTransactions } from "@/app/hooks/useBkuTransactions";
 import { useBkuMaterialSummary } from "@/app/hooks/useBkuMaterialSummary";
 import { useBkuReportCategories } from "@/app/hooks/useBkuReportCategories";
-import { getMondayDate, useBkuPayroll } from "@/app/hooks/useBkuPayroll";
+import { getSundayDate, useBkuPayroll } from "@/app/hooks/useBkuPayroll";
 import { AppHeader } from "@/app/components/layout/AppHeader";
 import { AppModal } from "@/app/components/layout/AppModal";
 import { BalanceSummary } from "@/app/components/layout/BalanceSummary";
@@ -67,7 +67,7 @@ export default function BkuPage() {
   const transactionsApi = useBkuTransactions(supabase, booksApi.session, booksApi.book);
   const materialsApi = useBkuMaterialSummary(supabase, booksApi.session, booksApi.books);
   const reportCategoriesApi = useBkuReportCategories(supabase, booksApi.session);
-  const [payrollWeekStart, setPayrollWeekStart] = useState(() => getMondayDate(dateKey(new Date())));
+  const [payrollWeekStart, setPayrollWeekStart] = useState(() => getSundayDate(dateKey(new Date())));
   const payrollApi = useBkuPayroll(supabase, booksApi.session, booksApi.book, payrollWeekStart);
 
   const [view, setView] = useState<AppView>("calendar");
@@ -128,7 +128,7 @@ export default function BkuPage() {
 
   useEffect(() => {
     if (!booksApi.book) return;
-    setPayrollWeekStart(getMondayDate(booksApi.book.start_date || dateKey(new Date())));
+    setPayrollWeekStart(getSundayDate(booksApi.book.start_date || dateKey(new Date())));
     setProfileAddress(booksApi.book.address || "");
     setProfilePhone(booksApi.book.phone || "");
     setProfileNpsn(booksApi.book.npsn || "");
@@ -576,7 +576,7 @@ export default function BkuPage() {
         userEmail={booksApi.session.user.email || ""}
         books={booksApi.books}
         selectedBookId={book?.id || ""}
-        onSelectBook={(id) => { const selected = booksApi.books.find((item) => item.id === id) || null; booksApi.setBook(selected); if (selected) setPayrollWeekStart(getMondayDate(selected.start_date)); setView("calendar"); setDayDialogDate(null); }}
+        onSelectBook={(id) => { const selected = booksApi.books.find((item) => item.id === id) || null; booksApi.setBook(selected); if (selected) setPayrollWeekStart(getSundayDate(selected.start_date)); setView("calendar"); setDayDialogDate(null); }}
         onNewBook={() => setShowNewBook(true)}
         onExport={() => setShowExport(true)}
         onNewTransaction={() => openNewEntry(selectedDate)}
@@ -631,7 +631,7 @@ export default function BkuPage() {
               loading={payrollApi.loading}
               saving={payrollApi.saving}
               error={payrollApi.error}
-              onWeekStartChange={(value) => { if (isValidDateKey(value)) setPayrollWeekStart(getMondayDate(value)); }}
+              onWeekStartChange={(value) => { if (isValidDateKey(value)) setPayrollWeekStart(getSundayDate(value)); }}
               onSaveWorker={payrollApi.saveWorker}
               onSetWorkerActive={payrollApi.setWorkerActive}
               onCopyWeek={payrollApi.copyWeekAttendance}
