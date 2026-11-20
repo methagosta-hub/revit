@@ -54,8 +54,8 @@ export function TransactionDetailEditor({
   const total = draftDetailsTotal(draft);
 
   useEffect(() => {
-    if (initialLine) composerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+    if (focusLineIndex !== undefined) composerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focusLineIndex]);
 
   function updateEntry(patch: Partial<DetailLine>) {
     setEntryLine((current) => ({ ...current, ...patch }));
