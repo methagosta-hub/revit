@@ -95,7 +95,7 @@ export function MaterialSummaryView({
 
   const { grouped, unmapped, totalAmount, unmappedAmount } = useMemo(() => {
     const groupMaps = new Map<string, Map<string, { name: string; amount: number; units: Map<string, UnitTotal>; records: MaterialPurchaseRecord[] }>>();
-    const ungroupedMap = new Map<string, { name: string; amount: number; units: Map<string, UnitTotal>; records: MaterialPurchaseRecord[] }>>();
+    const ungroupedMap = new Map<string, { name: string; amount: number; units: Map<string, UnitTotal>; records: MaterialPurchaseRecord[] }>();
     let allAmount = 0;
     let pendingAmount = 0;
 
