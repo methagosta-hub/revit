@@ -98,7 +98,10 @@ export function ReportCategoryMasterView({
       setFormError("Urutan harus berupa angka bulat antara 0 sampai 9999.");
       return;
     }
-    if (!form.code && categories.some((item) => item.transaction_type === form.transaction_type && item.code === code)) {
+    if (!form.code && categories.some((item) =>
+      item.transaction_type === form.transaction_type &&
+      (item.code === code || item.label.trim().toLocaleLowerCase("id-ID") === label.toLocaleLowerCase("id-ID"))
+    )) {
       setFormError("Kategori dengan nama serupa sudah ada. Gunakan nama yang berbeda atau ubah kategori yang tersedia.");
       return;
     }
