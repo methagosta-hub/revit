@@ -8,6 +8,7 @@ export function TransactionList({
   balances,
   onEdit,
   onCopy,
+  onExport,
   onDelete,
   onEvidence,
 }: {
@@ -15,9 +16,10 @@ export function TransactionList({
   balances: Record<string, BalanceAtTransaction>;
   onEdit: (transaction: Transaction) => void;
   onCopy: (transaction: Transaction) => void;
+  onExport: (transaction: Transaction) => void;
   onDelete: (transaction: Transaction) => void;
   onEvidence: (path: string) => void;
 }) {
   if (!transactions.length) return <EmptyState icon={<ReceiptText size={22} />} title="Belum ada transaksi" description="Nota yang dicatat pada tanggal ini akan muncul di sini." />;
-  return <div className="space-y-3">{transactions.map((tx) => <TransactionCard key={tx.id} tx={tx} balance={balances[tx.id]} onEdit={onEdit} onCopy={onCopy} onDelete={onDelete} onEvidence={onEvidence} />)}</div>;
+  return <div className="space-y-3">{transactions.map((tx) => <TransactionCard key={tx.id} tx={tx} balance={balances[tx.id]} onEdit={onEdit} onCopy={onCopy} onExport={onExport} onDelete={onDelete} onEvidence={onEvidence} />)}</div>;
 }
