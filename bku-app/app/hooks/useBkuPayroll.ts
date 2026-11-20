@@ -21,10 +21,10 @@ function safeLocalDate(value: string): Date {
   return new Date();
 }
 
-export function getMondayDate(value: string) {
+export function getSundayDate(value: string) {
   const date = safeLocalDate(value);
   const day = date.getDay();
-  date.setDate(date.getDate() - ((day + 6) % 7));
+  date.setDate(date.getDate() - day);
   return dateKey(date);
 }
 
@@ -65,16 +65,16 @@ export function useBkuPayroll(
       setWeeklyPayroll(null);
       return;
     }
-    const monday = getMondayDate(targetWeekStart);
-    const saturday = addCalendarDays(monday, 5);
+    const sunday = getSundayDate(targetWeekStart);
+    const saturday = addCalendarDays(sunday, 6);
     setAttendance([]);
     setWeeklyPayroll(null);
     const [attendanceResult, payrollResult] = await Promise.all([
       supabase.from("bku_worker_attendance").select(ATTENDANCE_SELECT)
-        .eq("book_id", book.id).gte("work_date", monday).lte("work_date", saturday)
+        .eq("book_id", book.id).gte("work_date", sunday).lte("work_date", saturday)
         .order("work_date"),
       supabase.from("bku_payroll_weeks").select(PAYROLL_SELECT)
-        .eq("book_id", book.id).eq("week_start", monday).maybeSingle(),
+        .eq("book_id", book.id).eq("week_start", sunday).maybeSingle(),
     ]);
     if (attendanceResult.error) throw attendanceResult.error;
     if (payrollResult.error) throw payrollResult.error;
@@ -134,17 +134,17 @@ export function useBkuPayroll(
   const copyWeekAttendance = useCallback(async (sourceWeekStart: string, targetWeekStart = weekStart) => {
     if (!supabase || !book) throw new Error("Pilih buku kas terlebih dahulu.");
     if (!isValidDateKey(sourceWeekStart) || !isValidDateKey(targetWeekStart)) throw new Error("Tanggal minggu sumber dan tujuan harus valid.");
-    const sourceMonday = getMondayDate(sourceWeekStart);
-    const sourceSaturday = addCalendarDays(sourceMonday, 5);
+    const sourceSunday = getSundayDate(sourceWeekStart);
+    const sourceSaturday = addCalendarDays(sourceSunday, 6);
     const { data, error: queryError } = await supabase.from("bku_worker_attendance")
       .select(ATTENDANCE_SELECT).eq("book_id", book.id)
-      .gte("work_date", sourceMonday).lte("work_date", sourceSaturday);
+      .gte("work_date", sourceSunday).lte("work_date", sourceSaturday);
     if (queryError) throw queryError;
     const mapped: Record<string, number[]> = {};
     for (const row of (data || []) as WorkerAttendance[]) {
-      const offset = Math.round((new Date(`${row.work_date}T00:00:00`).getTime() - new Date(`${sourceMonday}T00:00:00`).getTime()) / 86400000);
-      if (offset < 0 || offset > 5) continue;
-      mapped[row.worker_id] ||= [0, 0, 0, 0, 0, 0];
+      const offset = Math.round((new Date(`${row.work_date}T00:00:00`).getTime() - new Date(`${sourceSunday}T00:00:00`).getTime()) / 86400000);
+      if (offset < 0 || offset > 6) continue;
+      mapped[row.worker_id] ||= [0, 0, 0, 0, 0, 0, 0];
       mapped[row.worker_id][offset] = Number(row.hok || 0);
     }
     return mapped;
@@ -158,15 +158,15 @@ export function useBkuPayroll(
   ) => {
     if (!supabase || !book) throw new Error("Pilih buku kas terlebih dahulu.");
     if (!isValidDateKey(targetWeekStart) || !isValidDateKey(payDate)) throw new Error("Tanggal minggu dan tanggal pembayaran harus valid.");
-    const normalizedMonday = getMondayDate(targetWeekStart);
-    const normalizedSaturday = addCalendarDays(normalizedMonday, 5);
-    if (payDate < normalizedMonday || payDate > normalizedSaturday) throw new Error("Tanggal pembayaran harus berada dalam minggu yang dipilih (Senin–Sabtu).");
+    const normalizedSunday = getSundayDate(targetWeekStart);
+    const normalizedSaturday = addCalendarDays(normalizedSunday, 6);
+    if (payDate !== normalizedSaturday) throw new Error("Pembayaran gaji mingguan wajib dicatat pada hari Sabtu.");
     setSaving(true);
     setError("");
     try {
       const { data, error: rpcError } = await supabase.rpc("bku_save_weekly_payroll", {
         p_book_id: book.id,
-        p_week_start: normalizedMonday,
+        p_week_start: normalizedSunday,
         p_pay_date: payDate,
         p_account: account,
         p_attendance: rows,

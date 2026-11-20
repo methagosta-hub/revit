@@ -49,3 +49,13 @@ Untuk instalasi database BKU yang belum memiliki master kategori, jalankan file 
 Setelah kedua migrasi selesai, pengelolaan kategori dilakukan langsung melalui **Master Data → Master Rekap Data**. Pengguna tidak perlu menulis SQL lagi untuk kegiatan sehari-hari. Formulir aplikasi membuat kode internal otomatis; saat mengubah kategori, kode internal dipertahankan agar transaksi lama tetap terhubung. Kategori yang dinonaktifkan disembunyikan dari pilihan transaksi baru tetapi tetap dipertahankan untuk membaca riwayat.
 
 Kategori bersifat global untuk seluruh akun pada database BKU yang sama. Kode `upah` dipertahankan dan tidak dapat dinonaktifkan karena dipakai otomatis oleh modul Absensi & Gaji.
+
+## Jadwal Absensi dan Penggajian Mingguan
+
+Periode kerja mingguan menggunakan tujuh hari kalender penuh, **Minggu sampai Sabtu**, tanpa hari libur terjadwal. Matriks absensi menampilkan tujuh kolom hari. Pembayaran gaji mingguan selalu dibukukan pada **hari Sabtu** sebagai satu transaksi kas keluar kategori `upah`.
+
+Untuk memperbarui database BKU yang sebelumnya menggunakan periode Senin–Sabtu, jalankan satu kali:
+
+- `database/migrations/20261120_payroll_sunday_saturday.sql` — mengubah awal periode menjadi Minggu, akhir periode menjadi Sabtu, menetapkan tanggal pembayaran pada Sabtu, dan menyesuaikan kunci periode historis tanpa menghapus absensi maupun mengubah total HOK/nominal yang sudah tersimpan.
+
+Jalankan migrasi ini hanya pada proyek Supabase BKU. Jangan jalankan pada database utama Dahlia.

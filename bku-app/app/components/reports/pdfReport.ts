@@ -76,21 +76,21 @@ export function buildBkuPdfHtml(options: PdfReportOptions) {
     date.setDate(date.getDate() + days);
     return dateKey(date);
   };
-  const mondayOf = (value: string) => {
+  const sundayOf = (value: string) => {
     const date = new Date(`${value}T00:00:00`);
-    date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+    date.setDate(date.getDate() - date.getDay());
     return dateKey(date);
   };
   const workerAttendanceMap = new Map(attendance.map((item) => [`${item.worker_id}|${item.work_date}`, item]));
   const attendanceWeeks: string[] = [];
-  for (let cursor = mondayOf(startDate), last = mondayOf(endDate); cursor <= last; cursor = addDays(cursor, 7)) attendanceWeeks.push(cursor);
+  for (let cursor = sundayOf(startDate), last = sundayOf(endDate); cursor <= last; cursor = addDays(cursor, 7)) attendanceWeeks.push(cursor);
   const attendanceSection = workers.length && attendanceWeeks.length ? `
     <section class="attendance-section">
       <div class="section">Matriks absensi dan upah pekerja</div>
       <div class="range-note">Daftar nama mencakup seluruh pekerja yang sudah bergabung sampai akhir periode. Pekerja yang baru masuk pada minggu berikutnya tetap ditampilkan dengan sel kosong pada minggu sebelumnya.</div>
       ${attendanceWeeks.map((weekStart) => {
-        const weekDates = Array.from({ length: 6 }, (_, index) => addDays(weekStart, index));
-        const weekEnd = weekDates[5];
+        const weekDates = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+        const weekEnd = weekDates[6];
         const weekTotal = attendance.filter((item) => item.work_date >= weekDates[0] && item.work_date <= weekEnd && item.work_date >= startDate && item.work_date <= endDate).reduce((sum, item) => sum + Number(item.amount || 0), 0);
         const workerRows = [...workers].sort((a, b) => a.worker_type.localeCompare(b.worker_type) || a.name.localeCompare(b.name)).map((worker) => {
           const workerWeekRows = attendance.filter((item) => item.worker_id === worker.id && item.work_date >= weekDates[0] && item.work_date <= weekEnd && item.work_date >= startDate && item.work_date <= endDate);
@@ -107,7 +107,7 @@ export function buildBkuPdfHtml(options: PdfReportOptions) {
           const rateLabel = historicalRates.length > 1 ? "Bervariasi" : money(historicalRates[0] ?? Number(worker.daily_rate || 0));
           return `<tr><td>${workerWeekRows[0]?.worker_type_snapshot === "TUKANG" || (!workerWeekRows.length && worker.worker_type === "TUKANG") ? "Tukang" : "Pekerja"}</td><td class="worker-name">${escapeHtml(displayName)}</td><td class="number">${rateLabel}</td>${cells}<td class="number">${totalHok ? totalHok.toLocaleString("id-ID", { maximumFractionDigits: 2 }) : ""}</td><td class="number attendance-pay">${totalPay ? money(totalPay) : ""}</td></tr>`;
         }).join("");
-        return `<div class="attendance-week"><div class="attendance-week-title"><strong>Minggu ${dateLabel(weekStart, { day: "numeric", month: "short", year: "numeric" })} – ${dateLabel(weekEnd, { day: "numeric", month: "short", year: "numeric" })}</strong><span>Total nilai upah berdasarkan absensi: ${money(weekTotal)}</span></div><table class="attendance-table"><colgroup><col style="width:8%"><col style="width:17%"><col style="width:12%"><col style="width:7.2%"><col style="width:7.2%"><col style="width:7.2%"><col style="width:7.2%"><col style="width:7.2%"><col style="width:7.2%"><col style="width:7.8%"><col style="width:12%"></colgroup><thead><tr><th>Jenis</th><th>Nama pekerja</th><th>Upah/hari</th>${["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"].map((day) => `<th>${day}</th>`).join("")}<th>Total HOK</th><th>Jumlah upah</th></tr></thead><tbody>${workerRows || `<tr><td colspan="11">Belum ada pekerja pada periode ini.</td></tr>`}</tbody></table></div>`;
+        return `<div class="attendance-week"><div class="attendance-week-title"><strong>Minggu ${dateLabel(weekStart, { day: "numeric", month: "short", year: "numeric" })} – ${dateLabel(weekEnd, { day: "numeric", month: "short", year: "numeric" })}</strong><span>Total nilai upah berdasarkan absensi: ${money(weekTotal)}</span></div><table class="attendance-table"><colgroup><col style="width:8%"><col style="width:15%"><col style="width:11%"><col style="width:6.5%"><col style="width:6.5%"><col style="width:6.5%"><col style="width:6.5%"><col style="width:6.5%"><col style="width:6.5%"><col style="width:6.5%"><col style="width:8%"><col style="width:12.5%"></colgroup><thead><tr><th>Jenis</th><th>Nama pekerja</th><th>Upah/hari</th>${["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"].map((day) => `<th>${day}</th>`).join("")}<th>Total HOK</th><th>Jumlah upah</th></tr></thead><tbody>${workerRows || `<tr><td colspan="12">Belum ada pekerja pada periode ini.</td></tr>`}</tbody></table></div>`;
       }).join("")}
       ${attendanceSignatures}
     </section>` : `<section class="attendance-section"><div class="section">Matriks absensi dan upah pekerja</div><p class="range-note">Belum ada data daftar pekerja atau absensi pada rentang laporan ini.</p>${attendanceSignatures}</section>`;
