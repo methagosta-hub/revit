@@ -112,7 +112,7 @@ begin
   loop
     insert into public.bku_material_groups(created_by, name)
     values (v_user_id, v_group.name)
-    on conflict (created_by, lower(name)) do nothing;
+    on conflict do nothing;
   end loop;
 
   for v_alias in
