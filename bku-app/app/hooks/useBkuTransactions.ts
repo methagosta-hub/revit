@@ -300,6 +300,27 @@ export function useBkuTransactions(supabase: BkuClient | null, session: Session 
     await loadTransactions(book.id);
   }, [supabase, book, session?.user?.id, transactions, stores, materials, loadTransactions]);
 
+  const exportTransactionToBook = useCallback(async (transaction: Transaction, targetBookId: string, targetDate: string) => {
+    if (!supabase || !book || !session?.user) throw new Error("Sesi akun atau buku kas tidak tersedia.");
+    if (transaction.book_id !== book.id) throw new Error("Nota sumber tidak sesuai dengan proyek yang sedang dibuka.");
+    if (!targetBookId || targetBookId === book.id) throw new Error("Pilih proyek tujuan yang berbeda dari proyek asal.");
+    if (!targetDate) throw new Error("Tanggal pencatatan di proyek tujuan wajib dipilih.");
+
+    const { data, error: exportError } = await supabase.rpc("bku_export_transaction_to_book", {
+      p_transaction_id: transaction.id,
+      p_target_book_id: targetBookId,
+      p_target_date: targetDate,
+    });
+    if (exportError) throw exportError;
+    const result = Array.isArray(data) ? data[0] : data;
+    if (!result?.new_transaction_id) throw new Error("Ekspor tidak menghasilkan nomor transaksi. Periksa migrasi database lalu coba kembali.");
+    return {
+      transactionId: String(result.new_transaction_id),
+      entryNo: Number(result.new_entry_no),
+      targetBookName: String(result.target_book_name || ""),
+    };
+  }, [supabase, book?.id, session?.user?.id]);
+
   const deleteTransaction = useCallback(async (transaction: Transaction) => {
     if (!supabase || !book) throw new Error("Pilih buku kas terlebih dahulu.");
     const { error: deleteError } = await supabase.from("bku_transactions").delete()
@@ -352,6 +373,7 @@ export function useBkuTransactions(supabase: BkuClient | null, session: Session 
     saveEntries,
     saveStore,
     deleteTransaction,
+    exportTransactionToBook,
     moveTransactions,
     shiftProjectSchedule,
     createEvidenceUrl,
