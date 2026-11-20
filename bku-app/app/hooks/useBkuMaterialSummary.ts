@@ -22,6 +22,8 @@ export function useBkuMaterialSummary(
   const [error, setError] = useState("");
 
   const bookIdsKey = books.map((book) => book.id).sort().join(",");
+  const bookNamesKey = books.map((book) => `${book.id}:${book.name}`).sort().join("|");
+  const bookNameById = new Map(books.map((book) => [book.id, book.name]));
 
   const refresh = useCallback(async () => {
     if (!supabase || !session?.user || !bookIdsKey) {
@@ -58,7 +60,7 @@ export function useBkuMaterialSummary(
         while (true) {
           const { data, error: transactionError } = await supabase
             .from("bku_transactions")
-            .select("book_id,transaction_date,transaction_type,details")
+            .select("id,book_id,transaction_date,entry_no,receipt_number,description,store_name,transaction_type,details")
             .eq("book_id", bookId)
             .eq("transaction_type", "OUT")
             .order("transaction_date", { ascending: true })
@@ -74,19 +76,27 @@ export function useBkuMaterialSummary(
               unit_price?: unknown;
               line_total?: unknown;
             }> : [];
-            for (const detail of details) {
+            for (const [detailIndex, detail] of details.entries()) {
               const name = String(detail.name || "").trim();
               if (!name) continue;
               const volume = Number(detail.volume || 0);
               const unitPrice = Number(detail.unit_price || 0);
               const amount = Number(detail.line_total ?? volume * unitPrice);
               allRecords.push({
+                transaction_id: String(transaction.id),
                 book_id: String(transaction.book_id),
+                book_name: bookNameById.get(String(transaction.book_id)) || "Proyek tidak diketahui",
                 transaction_date: String(transaction.transaction_date),
+                entry_no: Number(transaction.entry_no || 0),
+                receipt_number: transaction.receipt_number ? String(transaction.receipt_number) : null,
+                description: String(transaction.description || ""),
+                store_name: String(transaction.store_name || ""),
+                detail_index: detailIndex,
                 name,
                 normalized_name: normalizeMaterialName(name),
                 unit: String(detail.unit || "satuan tidak diisi").trim() || "satuan tidak diisi",
                 volume: Number.isFinite(volume) ? volume : 0,
+                unit_price: Number.isFinite(unitPrice) ? unitPrice : 0,
                 amount: Number.isFinite(amount) ? amount : 0,
               });
             }
@@ -105,7 +115,7 @@ export function useBkuMaterialSummary(
     } finally {
       setLoading(false);
     }
-  }, [supabase, session?.user?.id, bookIdsKey]);
+  }, [supabase, session?.user?.id, bookIdsKey, bookNamesKey]);
 
   useEffect(() => {
     if (session?.user && books.length) void refresh();
