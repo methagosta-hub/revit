@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { CalendarDays, LockKeyhole, Plus, RefreshCw, ShieldCheck, Wallet } from "lucide-react";
 import { getBkuSupabase } from "@/lib/supabase";
-import type { AppView, Draft, ProfileInput, SignatoryRole, Transaction, WorkerAttendanceDraft } from "@/app/lib/bku/types";
+import type { AppView, Draft, MaterialPurchaseRecord, ProfileInput, SignatoryRole, Transaction, WorkerAttendanceDraft } from "@/app/lib/bku/types";
 import { amountValue, blankDetail, blankDraft, dateKey, dateLabel, detailLineTotal, fieldClass, isValidDateKey, money } from "@/app/lib/bku/formatters";
 import { buildDaySummaries, calculateBalances, sortTransactions } from "@/app/lib/bku/balances";
 import { calendarDateDelta } from "@/app/lib/bku/transaction-movement";
 import { useBkuBooks } from "@/app/hooks/useBkuBooks";
 import { useBkuTransactions } from "@/app/hooks/useBkuTransactions";
 import { useBkuMaterialSummary } from "@/app/hooks/useBkuMaterialSummary";
+import { useBkuReportCategories } from "@/app/hooks/useBkuReportCategories";
 import { getMondayDate, useBkuPayroll } from "@/app/hooks/useBkuPayroll";
 import { AppHeader } from "@/app/components/layout/AppHeader";
 import { AppModal } from "@/app/components/layout/AppModal";
@@ -25,6 +26,7 @@ import { TransactionLedger } from "@/app/components/transactions/TransactionLedg
 import { TransactionExportDialog } from "@/app/components/transactions/TransactionExportDialog";
 import { WorkerPayrollView } from "@/app/components/workers/WorkerPayrollView";
 import { StoreMasterView } from "@/app/components/stores/StoreMasterView";
+import { ReportCategoryMasterView } from "@/app/components/stores/ReportCategoryMasterView";
 import { MaterialSummaryView } from "@/app/components/materials/MaterialSummaryView";
 import { ExportPdfModal } from "@/app/components/reports/ExportPdfModal";
 import { openBkuPdfReport } from "@/app/components/reports/pdfReport";
@@ -64,6 +66,7 @@ export default function BkuPage() {
   const booksApi = useBkuBooks(supabase);
   const transactionsApi = useBkuTransactions(supabase, booksApi.session, booksApi.book);
   const materialsApi = useBkuMaterialSummary(supabase, booksApi.session, booksApi.books);
+  const reportCategoriesApi = useBkuReportCategories(supabase, booksApi.session);
   const [payrollWeekStart, setPayrollWeekStart] = useState(() => getMondayDate(dateKey(new Date())));
   const payrollApi = useBkuPayroll(supabase, booksApi.session, booksApi.book, payrollWeekStart);
 
@@ -93,6 +96,8 @@ export default function BkuPage() {
   const [showEntry, setShowEntry] = useState(false);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [editTargetDate, setEditTargetDate] = useState("");
+  const [materialCorrectionContext, setMaterialCorrectionContext] = useState<MaterialPurchaseRecord | null>(null);
+  const [pendingMaterialCorrection, setPendingMaterialCorrection] = useState<MaterialPurchaseRecord | null>(null);
   const [drafts, setDrafts] = useState<Draft[]>([blankDraft()]);
   const [entrySaving, setEntrySaving] = useState(false);
   const [entryError, setEntryError] = useState("");
@@ -237,6 +242,26 @@ export default function BkuPage() {
     setShowEntry(true);
   }
 
+  function requestMaterialCorrection(record: MaterialPurchaseRecord) {
+    const targetBook = booksApi.books.find((item) => item.id === record.book_id);
+    if (!targetBook) {
+      setToast({ message: "Proyek sumber nota tidak ditemukan. Muat ulang daftar buku kas.", tone: "error" });
+      return;
+    }
+    setPendingMaterialCorrection(record);
+    setView("materials");
+    if (booksApi.book?.id !== targetBook.id) booksApi.setBook(targetBook);
+  }
+
+  useEffect(() => {
+    if (!pendingMaterialCorrection || booksApi.book?.id !== pendingMaterialCorrection.book_id) return;
+    const sourceTransaction = transactionsApi.transactions.find((item) => item.id === pendingMaterialCorrection.transaction_id);
+    if (!sourceTransaction) return;
+    setMaterialCorrectionContext(pendingMaterialCorrection);
+    setPendingMaterialCorrection(null);
+    openEditTransaction(sourceTransaction);
+  }, [pendingMaterialCorrection, booksApi.book?.id, transactionsApi.transactions, openEditTransaction]);
+
   function openCopyTransaction(tx: Transaction) {
     setCopySource(tx);
     setCopyTargetDate(tx.transaction_date);
@@ -320,17 +345,26 @@ export default function BkuPage() {
         editingTransactionId,
         session: booksApi.session,
       });
+      const wasMaterialCorrection = Boolean(materialCorrectionContext);
       setShowEntry(false);
       setEditingTransactionId(null);
       setEditTargetDate("");
       setDrafts([blankDraft()]);
       setSelectedDate(targetDate);
       setMonth(new Date(`${targetDate}T00:00:00`));
-      setDayDialogDate(targetDate);
+      if (wasMaterialCorrection) {
+        setMaterialCorrectionContext(null);
+        setDayDialogDate(null);
+        await materialsApi.refresh();
+      } else {
+        setDayDialogDate(targetDate);
+      }
       setToast({
-        message: editingTransactionId
-          ? (drafts.length > 1 ? `Nota utama diperbarui dan ${drafts.length - 1} nota baru berhasil dibuat.` : "Nota berhasil diperbarui.")
-          : "Transaksi berhasil disimpan.",
+        message: wasMaterialCorrection
+          ? "Koreksi nota berhasil disimpan. Rekap material telah diperbarui dari nota sumber."
+          : editingTransactionId
+            ? (drafts.length > 1 ? `Nota utama diperbarui dan ${drafts.length - 1} nota baru berhasil dibuat.` : "Nota berhasil diperbarui.")
+            : "Transaksi berhasil disimpan.",
         tone: "success",
       });
     } catch (cause) {
@@ -499,6 +533,7 @@ export default function BkuPage() {
         attendanceSignatoryRoles,
         workers: attendanceReport.workers,
         attendance: attendanceReport.attendance,
+        reportCategories: reportCategoriesApi.categories,
       }, reportWindow);
       setShowExport(false);
     } catch (cause) {
@@ -586,7 +621,7 @@ export default function BkuPage() {
               />
             </section>}
 
-            {view === "ledger" && <TransactionLedger transactions={ordered} balances={balances.rows} onEdit={openEditTransaction} onCopy={openCopyTransaction} onExport={openExportTransaction} onDelete={(tx) => void handleDeleteTransaction(tx)}/>}
+            {view === "ledger" && <TransactionLedger transactions={ordered} balances={balances.rows} reportCategories={reportCategoriesApi.categories} onEdit={openEditTransaction} onCopy={openCopyTransaction} onExport={openExportTransaction} onDelete={(tx) => void handleDeleteTransaction(tx)}/>}
 
             {view === "payroll" && <WorkerPayrollView
               workers={payrollApi.workers}
@@ -604,7 +639,10 @@ export default function BkuPage() {
               onClearError={() => payrollApi.setError("")}
             />}
 
-            {view === "stores" && <StoreMasterView stores={transactionsApi.stores} loading={transactionsApi.loading} onSave={transactionsApi.saveStore} />}
+            {view === "stores" && <>
+              <StoreMasterView stores={transactionsApi.stores} loading={transactionsApi.loading} onSave={transactionsApi.saveStore} />
+              <ReportCategoryMasterView categories={reportCategoriesApi.categories} loading={reportCategoriesApi.loading} error={reportCategoriesApi.error} onRefresh={() => void reportCategoriesApi.refresh()} />
+            </>}
 
             {view === "materials" && <MaterialSummaryView
               books={booksApi.books}
@@ -617,6 +655,7 @@ export default function BkuPage() {
               onRefresh={() => void materialsApi.refresh()}
               onCreateGroup={materialsApi.createGroup}
               onMapMaterial={materialsApi.mapMaterial}
+              onEditRecord={requestMaterialCorrection}
             />}
 
             {view === "profile" && <section className="mt-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -652,6 +691,7 @@ export default function BkuPage() {
         onExport={openExportTransaction}
         onDelete={(tx) => void handleDeleteTransaction(tx)}
         onEvidence={(path) => void handleOpenEvidence(path)}
+        reportCategories={reportCategoriesApi.categories}
       />
 
       <TransactionExportDialog
@@ -661,6 +701,7 @@ export default function BkuPage() {
         selectedBookId={exportDestinationBookId}
         targetDate={exportDestinationDate}
         busy={exportTransactionSaving}
+        reportCategories={reportCategoriesApi.categories}
         onBookChange={changeExportDestination}
         onDateChange={setExportDestinationDate}
         onClose={() => { if (!exportTransactionSaving) setTransactionToExport(null); }}
@@ -688,7 +729,7 @@ export default function BkuPage() {
         saving={entrySaving}
         error={entryError}
         onClearError={() => setEntryError("")}
-        onClose={() => { setShowEntry(false); setEditingTransactionId(null); setEditTargetDate(""); setEntryError(""); }}
+        onClose={() => { setShowEntry(false); setEditingTransactionId(null); setEditTargetDate(""); setEntryError(""); setMaterialCorrectionContext(null); setPendingMaterialCorrection(null); }}
         onSave={handleSaveEntries}
         onDraftChange={updateDraft}
         onLineChange={updateDraftLine}
@@ -697,6 +738,8 @@ export default function BkuPage() {
         onAddDraft={() => setDrafts((current) => [...current, blankDraft()])}
         onRemoveDraft={(index) => setDrafts((current) => current.filter((_draft, currentIndex) => currentIndex !== index))}
         onSplitDetails={handleSplitDetails}
+        materialCorrection={materialCorrectionContext}
+        reportCategories={reportCategoriesApi.categories}
       />
 
       {showNewBook && <AppModal title="Buat buku kas baru" subtitle="Identitas dan saldo awal pembukuan lembaga / proyek." onClose={() => setShowNewBook(false)}>

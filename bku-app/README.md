@@ -39,3 +39,19 @@ Jika database BKU sudah menjalankan versi setup.sql sebelumnya, jalankan kembali
 Jalankan ulang `database/setup.sql` pada proyek Supabase BKU. Selain migrasi profil, file ini membuat tabel toko per sekolah, katalog material master dan custom per sekolah, menambahkan relasi toko pada transaksi, menambahkan RPC untuk menggeser jadwal, serta mengisi 210 harga referensi material. Perubahan bersifat idempotent untuk migrasi kolom, kebijakan, dan seed katalog.
 
 Harga katalog adalah estimasi acuan nasional per November 2026, bukan quotation toko. Harga perlu dicek ulang sesuai kota, spesifikasi, merek, volume, ongkos kirim, serta perlakuan pajak sebelum dipakai untuk RAB atau pembelian.
+
+## Master Kategori Rekap
+Setelah menerapkan perubahan kategori pada aplikasi, jalankan `database/migrations/20261120_bku_report_categories.sql` melalui **Supabase Dashboard → proyek Supabase BKU → SQL Editor → New query**. Migrasi ini membuat master kategori rekap untuk kas masuk dan kas keluar, termasuk Gaji Harian Tukang, APE, Meubeler, SMKK, dan Lain-lain.
+
+Kategori bersifat global untuk seluruh akun pada database BKU yang sama. Penambahan kategori selanjutnya dilakukan dari SQL Editor dengan pola:
+
+```sql
+insert into public.bku_report_categories (transaction_type, code, label, sort_order)
+values ('OUT', 'kode_baru', 'Nama Kategori Baru', 100)
+on conflict (transaction_type, code) do update
+set label = excluded.label,
+    sort_order = excluded.sort_order,
+    is_active = true;
+```
+
+Gunakan `OUT` untuk kas keluar dan `IN` untuk kas masuk. Kode `upah` sengaja dipertahankan untuk menjaga kompatibilitas transaksi penggajian mingguan yang sudah tersimpan.

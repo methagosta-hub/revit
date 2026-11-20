@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarClock, FolderOutput, ReceiptText } from "lucide-react";
-import type { Book, Transaction } from "@/app/lib/bku/types";
+import type { Book, ReportCategory, Transaction } from "@/app/lib/bku/types";
 import { categoryLabel, dateLabel, fieldClass, money } from "@/app/lib/bku/formatters";
 import { AppModal } from "@/app/components/layout/AppModal";
 import { FormField } from "@/app/components/layout/FormField";
@@ -17,8 +17,10 @@ export function TransactionExportDialog({
   onDateChange,
   onClose,
   onConfirm,
+  reportCategories,
 }: {
   transaction: Transaction | null;
+  reportCategories: ReportCategory[];
   sourceBookName: string;
   destinationBooks: Book[];
   selectedBookId: string;
@@ -64,7 +66,7 @@ export function TransactionExportDialog({
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-700 shadow-sm"><ReceiptText size={19} /></span>
             <div className="min-w-0 flex-1">
               <p className="break-words text-sm font-bold text-slate-900">{transaction.description || "Transaksi tanpa uraian"}</p>
-              <p className="mt-1 text-[10px] text-slate-500">{typeLabel} · {categoryLabel(transaction.category)} · {dateLabel(transaction.transaction_date)}</p>
+              <p className="mt-1 text-[10px] text-slate-500">{typeLabel} · {categoryLabel(transaction.category, reportCategories, transaction.transaction_type)} · {dateLabel(transaction.transaction_date)}</p>
               {transaction.receipt_number && <p className="mt-1 text-[10px] font-semibold text-slate-600">Nomor nota: {transaction.receipt_number}</p>}
               {transaction.store_name && <p className="mt-1 text-[10px] text-slate-500">Toko / pihak: {transaction.store_name}</p>}
               {transaction.details?.length ? <p className="mt-1 text-[10px] text-slate-500">{transaction.details.length} rincian material / barang</p> : null}

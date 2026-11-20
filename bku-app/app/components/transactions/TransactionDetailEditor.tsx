@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Pencil, Plus, ReceiptText, Scissors, Trash2, X } from "lucide-react";
 import type { DetailLine, Draft, Material } from "@/app/lib/bku/types";
 import {
@@ -25,6 +25,7 @@ export function TransactionDetailEditor({
   onLineChange,
   onSplitLines,
   allowSplit,
+  focusLineIndex,
 }: {
   draft: Draft;
   materials: Material[];
@@ -33,9 +34,11 @@ export function TransactionDetailEditor({
   onLineChange: (lineIndex: number, patch: Partial<DetailLine>) => void;
   onSplitLines?: (lineIndexes: number[]) => void;
   allowSplit?: boolean;
+  focusLineIndex?: number;
 }) {
-  const [entryLine, setEntryLine] = useState<DetailLine>(() => blankDetail());
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const initialLine = Number.isInteger(focusLineIndex) ? draft.details[focusLineIndex as number] : undefined;
+  const [entryLine, setEntryLine] = useState<DetailLine>(() => initialLine ? { ...initialLine } : blankDetail());
+  const [editingIndex, setEditingIndex] = useState<number | null>(() => initialLine ? focusLineIndex as number : null);
   const [entryError, setEntryError] = useState("");
   const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
   const composerRef = useRef<HTMLDivElement>(null);
@@ -49,6 +52,10 @@ export function TransactionDetailEditor({
   const selectedTotal = selectedValidIndexes.reduce((sum, index) => sum + detailLineTotal(draft.details[index]), 0);
   const canMoveSelected = canSelect && selectedCount > 0 && selectedCount < visibleLines.length;
   const total = draftDetailsTotal(draft);
+
+  useEffect(() => {
+    if (focusLineIndex !== undefined) composerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focusLineIndex]);
 
   function updateEntry(patch: Partial<DetailLine>) {
     setEntryLine((current) => ({ ...current, ...patch }));
