@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 import { FileUp, Plus, Store } from "lucide-react";
-import type { DetailLine, Draft, Material, SchoolStore, TxType } from "@/app/lib/bku/types";
+import type { DetailLine, Draft, Material, MaterialPurchaseRecord, SchoolStore, TxType } from "@/app/lib/bku/types";
 import { amountValue, draftDetailsTotal, expenseCategories, fieldClass, incomeCategories, money } from "@/app/lib/bku/formatters";
 import { AppModal } from "@/app/components/layout/AppModal";
 import { FormField } from "@/app/components/layout/FormField";
@@ -28,8 +28,10 @@ export function TransactionFormModal({
   onAddDraft,
   onRemoveDraft,
   onSplitDetails,
+  materialCorrection,
 }: {
   open: boolean;
+  materialCorrection?: MaterialPurchaseRecord | null;
   date: string;
   onDateChange: (date: string) => void;
   drafts: Draft[];
@@ -58,6 +60,11 @@ export function TransactionFormModal({
           <p className="text-[11px] leading-5 text-slate-500">{editing ? "Tanggal dapat diubah. Setelah disimpan, nota akan berpindah ke tanggal tujuan dan nomor urut disesuaikan." : "Semua nota dalam form ini akan dicatat pada tanggal yang dipilih."}</p>
         </div>
         {error && <div role="alert" className="flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-5 text-rose-800"><span>{error}</span><button type="button" onClick={onClearError} className="font-bold">Tutup</button></div>}
+        {materialCorrection && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-[11px] leading-5 text-emerald-950">
+          <p className="font-black">Koreksi dari Rekap Material · baris #{materialCorrection.detail_index + 1}</p>
+          <p className="mt-1">Material: <strong>{materialCorrection.name}</strong> · {materialCorrection.volume} {materialCorrection.unit} · harga satuan {money(materialCorrection.unit_price)}.</p>
+          <p className="mt-1">Editor rincian di bawah sudah diarahkan ke baris ini. Sesuaikan nama, satuan, atau harga berdasarkan nota/bukti asli, lalu simpan perubahan nota.</p>
+        </div>}
         {editing && <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-3 text-[11px] leading-5 text-amber-950">
           <p className="font-black">Pengaturan baris saat mengubah nota</p>
           <p className="mt-1"><strong>Potong ke nota baru:</strong> centang satu atau beberapa rincian. Semua rincian terpilih akan digabung ke dalam satu nota baru, sedangkan rincian yang tidak dipilih tetap berada di nota utama. Nota baru dibuat setelah tombol simpan ditekan.</p>
@@ -78,7 +85,7 @@ export function TransactionFormModal({
             <FormField label="Pilih toko yang pernah digunakan"><select value={draft.store_id} onChange={(event) => { const store = stores.find((item) => item.id === event.target.value); onDraftChange(index, { store_id: event.target.value, store_name: store?.name || "" }); }} className={fieldClass}><option value="">Tidak memilih toko / isi manual</option>{stores.filter((store) => store.is_active || store.id === draft.store_id).map((store) => <option key={store.id} value={store.id} disabled={!store.is_active}>{store.name}{!store.is_active ? " (Nonaktif — transaksi lama)" : ""}</option>)}</select></FormField>
             <FormField label="Nama toko / pemasok (opsional)"><div className="relative"><Store className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={draft.store_name} onChange={(event) => onDraftChange(index, { store_name: event.target.value, store_id: "" })} placeholder="Boleh dikosongkan" className={`${fieldClass} pl-9`} /></div></FormField>
           </div>}
-          {draft.transaction_type === "OUT" && <TransactionDetailEditor draft={draft} materials={materials} onAdd={(line) => onAddDetail(index, line)} onRemove={(lineIndex) => onRemoveDetail(index, lineIndex)} onLineChange={(lineIndex, patch) => onLineChange(index, lineIndex, patch)} onSplitLines={(lineIndexes) => onSplitDetails(index, lineIndexes)} allowSplit={draft.transaction_type === "OUT" && draft.details.length > 1} />}
+          {draft.transaction_type === "OUT" && <TransactionDetailEditor draft={draft} materials={materials} onAdd={(line) => onAddDetail(index, line)} onRemove={(lineIndex) => onRemoveDetail(index, lineIndex)} onLineChange={(lineIndex, patch) => onLineChange(index, lineIndex, patch)} onSplitLines={(lineIndexes) => onSplitDetails(index, lineIndexes)} allowSplit={draft.transaction_type === "OUT" && draft.details.length > 1} focusLineIndex={index === 0 ? materialCorrection?.detail_index : undefined} />}
           {draft.transaction_type === "TRANSFER" ? <div className="grid gap-3 sm:grid-cols-2"><FormField label="Dari rekening"><select value={draft.from_account} onChange={(event) => onDraftChange(index, { from_account: event.target.value as Draft["from_account"] })} className={fieldClass}><option value="CASH">Tunai</option><option value="BANK">Bank</option></select></FormField><FormField label="Ke rekening"><select value={draft.to_account} onChange={(event) => onDraftChange(index, { to_account: event.target.value as Draft["to_account"] })} className={fieldClass}><option value="BANK">Bank</option><option value="CASH">Tunai</option></select></FormField></div> : <div className="max-w-sm"><FormField label="Sumber / metode pembayaran"><select value={draft.account} onChange={(event) => onDraftChange(index, { account: event.target.value as Draft["account"] })} className={fieldClass}><option value="CASH">Tunai</option><option value="BANK">Non-tunai / rekening bank</option></select></FormField></div>}
           <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-3 text-xs font-semibold text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50/40"><FileUp size={17} className="shrink-0 text-emerald-700"/><span className="min-w-0 flex-1 truncate">{draft.file ? draft.file.name : "Lampirkan foto nota / bukti transfer (opsional)"}</span><input type="file" accept="image/*,.pdf" className="sr-only" onChange={(event) => onDraftChange(index, { file: event.target.files?.[0] || null })}/></label>
         </section>)}
