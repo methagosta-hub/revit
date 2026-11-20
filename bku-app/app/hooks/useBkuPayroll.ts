@@ -24,7 +24,7 @@ function safeLocalDate(value: string): Date {
 export function getSundayDate(value: string) {
   const date = safeLocalDate(value);
   const day = date.getDay();
-  date.setDate(date.getDate() - ((day + 6) % 7));
+  date.setDate(date.getDate() - day);
   return dateKey(date);
 }
 
@@ -159,7 +159,7 @@ export function useBkuPayroll(
     if (!supabase || !book) throw new Error("Pilih buku kas terlebih dahulu.");
     if (!isValidDateKey(targetWeekStart) || !isValidDateKey(payDate)) throw new Error("Tanggal minggu dan tanggal pembayaran harus valid.");
     const normalizedSunday = getSundayDate(targetWeekStart);
-    const normalizedSaturday = addCalendarDays(normalizedSunday, 5);
+    const normalizedSaturday = addCalendarDays(normalizedSunday, 6);
     if (payDate !== normalizedSaturday) throw new Error("Pembayaran gaji mingguan wajib dicatat pada hari Sabtu.");
     setSaving(true);
     setError("");
