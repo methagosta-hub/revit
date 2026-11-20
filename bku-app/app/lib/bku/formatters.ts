@@ -111,7 +111,11 @@ export const incomeCategories = [
 export function categoryLabel(value: string, categories: ReportCategory[] = [], transactionType?: TxType) {
   const dynamic = categories.find((item) => item.code === value && (!transactionType || item.transaction_type === transactionType));
   if (dynamic) return dynamic.label;
-  const options = [...expenseCategories, ...incomeCategories, ["transfer", "Pemindahan saldo"]] as const;
+  const options = transactionType === "IN"
+    ? incomeCategories
+    : transactionType === "OUT"
+      ? expenseCategories
+      : [...expenseCategories, ...incomeCategories, ["transfer", "Pemindahan saldo"]] as const;
   return options.find(([key]) => key === value)?.[1] || value;
 }
 
