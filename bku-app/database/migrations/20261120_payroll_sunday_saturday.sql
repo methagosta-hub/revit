@@ -32,6 +32,7 @@ $$;
 
 alter table public.bku_payroll_weeks
   drop constraint if exists bku_payroll_monday_check,
+  drop constraint if exists bku_payroll_sunday_check,
   drop constraint if exists bku_payroll_range_check,
   drop constraint if exists bku_payroll_pay_date_check;
 
