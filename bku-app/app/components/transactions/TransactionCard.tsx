@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Copy, Eye, FolderOutput, Pencil, Trash2 } from "lucide-react";
-import type { BalanceAtTransaction, Transaction } from "@/app/lib/bku/types";
+import type { BalanceAtTransaction, ReportCategory, Transaction } from "@/app/lib/bku/types";
 import { categoryLabel, money, numberFormat } from "@/app/lib/bku/formatters";
 
 export function TransactionCard({
@@ -12,8 +12,10 @@ export function TransactionCard({
   onCopy,
   onExport,
   onDelete,
+  reportCategories,
 }: {
   tx: Transaction;
+  reportCategories: ReportCategory[];
   balance?: BalanceAtTransaction;
   onEvidence: (path: string) => void;
   onEdit: (transaction: Transaction) => void;
@@ -33,7 +35,7 @@ export function TransactionCard({
           <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${transfer ? "bg-blue-50 text-blue-700" : incoming ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}><Icon size={17} /></span>
           <div className="min-w-0">
             <p className="break-words text-sm font-black text-slate-800">{tx.description || "Transaksi tanpa uraian"}</p>
-            <p className="mt-1 text-[10px] text-slate-400">{categoryLabel(tx.category)} · {transfer ? `${tx.from_account === "BANK" ? "Bank" : "Tunai"} → ${tx.to_account === "BANK" ? "Bank" : "Tunai"}` : tx.account === "BANK" ? "Bank / non-tunai" : "Tunai"}</p>
+            <p className="mt-1 text-[10px] text-slate-400">{categoryLabel(tx.category, reportCategories, tx.transaction_type)} · {transfer ? `${tx.from_account === "BANK" ? "Bank" : "Tunai"} → ${tx.to_account === "BANK" ? "Bank" : "Tunai"}` : tx.account === "BANK" ? "Bank / non-tunai" : "Tunai"}</p>
             {tx.store_name && <p className="mt-1 text-[11px] font-semibold text-slate-600">Toko / pihak: {tx.store_name}</p>}
             {tx.receipt_number && <p className="mt-1 text-[11px] text-slate-500">Nomor nota: {tx.receipt_number}</p>}
             {tx.split_group_id && <p className="mt-1 inline-flex rounded-md bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">Kelompok: {tx.split_group_label || "Nota terpisah"} · Total kelompok {money(Number(tx.split_group_total || 0))}</p>}
