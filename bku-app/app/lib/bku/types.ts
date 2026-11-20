@@ -1,6 +1,6 @@
 export type Account = "CASH" | "BANK";
 export type TxType = "IN" | "OUT" | "TRANSFER";
-export type AppView = "calendar" | "ledger" | "payroll" | "stores" | "profile";
+export type AppView = "calendar" | "ledger" | "payroll" | "stores" | "materials" | "profile";
 
 export type Book = {
   id: string;
@@ -216,4 +216,32 @@ export type SaveEntriesInput = {
   drafts: Draft[];
   targetDate: string;
   editingTransactionId: string | null;
+};
+
+
+export type MaterialGroup = {
+  id: string;
+  created_by: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+};
+
+export type MaterialAlias = {
+  id: string;
+  created_by: string;
+  group_id: string;
+  material_name: string;
+  normalized_name: string;
+  created_at: string;
+};
+
+export type MaterialPurchaseRecord = {
+  book_id: string;
+  transaction_date: string;
+  name: string;
+  normalized_name: string;
+  unit: string;
+  volume: number;
+  amount: number;
 };

@@ -9,6 +9,7 @@ import { buildDaySummaries, calculateBalances, sortTransactions } from "@/app/li
 import { calendarDateDelta } from "@/app/lib/bku/transaction-movement";
 import { useBkuBooks } from "@/app/hooks/useBkuBooks";
 import { useBkuTransactions } from "@/app/hooks/useBkuTransactions";
+import { useBkuMaterialSummary } from "@/app/hooks/useBkuMaterialSummary";
 import { getMondayDate, useBkuPayroll } from "@/app/hooks/useBkuPayroll";
 import { AppHeader } from "@/app/components/layout/AppHeader";
 import { AppModal } from "@/app/components/layout/AppModal";
@@ -24,6 +25,7 @@ import { TransactionLedger } from "@/app/components/transactions/TransactionLedg
 import { TransactionExportDialog } from "@/app/components/transactions/TransactionExportDialog";
 import { WorkerPayrollView } from "@/app/components/workers/WorkerPayrollView";
 import { StoreMasterView } from "@/app/components/stores/StoreMasterView";
+import { MaterialSummaryView } from "@/app/components/materials/MaterialSummaryView";
 import { ExportPdfModal } from "@/app/components/reports/ExportPdfModal";
 import { openBkuPdfReport } from "@/app/components/reports/pdfReport";
 
@@ -61,6 +63,7 @@ export default function BkuPage() {
   const supabase = useMemo(() => getBkuSupabase(), []);
   const booksApi = useBkuBooks(supabase);
   const transactionsApi = useBkuTransactions(supabase, booksApi.session, booksApi.book);
+  const materialsApi = useBkuMaterialSummary(supabase, booksApi.session, booksApi.books);
   const [payrollWeekStart, setPayrollWeekStart] = useState(() => getMondayDate(dateKey(new Date())));
   const payrollApi = useBkuPayroll(supabase, booksApi.session, booksApi.book, payrollWeekStart);
 
@@ -107,7 +110,9 @@ export default function BkuPage() {
   const [exportEndDate, setExportEndDate] = useState("");
   const [exportTheme, setExportTheme] = useState("emerald");
   const [exportFont, setExportFont] = useState("Inter");
-  const [signatoryRoles, setSignatoryRoles] = useState<SignatoryRole[]>(["school_head", "p2sp", "supervisor", "planner"]);
+  const defaultSignatories: SignatoryRole[] = ["school_head", "p2sp", "supervisor", "planner"];
+  const [financialSignatoryRoles, setFinancialSignatoryRoles] = useState<SignatoryRole[]>(defaultSignatories);
+  const [attendanceSignatoryRoles, setAttendanceSignatoryRoles] = useState<SignatoryRole[]>(defaultSignatories);
   const [toast, setToast] = useState<ToastState>(null);
 
   const closeToast = useCallback(() => setToast(null), []);
@@ -490,7 +495,8 @@ export default function BkuPage() {
         endDate: exportEndDate,
         themeId: exportTheme,
         font: exportFont,
-        signatoryRoles,
+        financialSignatoryRoles,
+        attendanceSignatoryRoles,
         workers: attendanceReport.workers,
         attendance: attendanceReport.attendance,
       }, reportWindow);
@@ -557,9 +563,9 @@ export default function BkuPage() {
             <BalanceSummary summary={balances}/>
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
               <div className="inline-flex flex-wrap rounded-xl bg-slate-200/70 p-1">
-                {(["calendar", "ledger", "payroll", "stores", "profile"] as AppView[]).map((item) => <button key={item} type="button" onClick={() => setView(item)} className={`rounded-lg px-3.5 py-2 text-xs font-bold transition sm:px-4 ${view === item ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>{item === "calendar" ? "Kalender" : item === "ledger" ? "Buku transaksi" : item === "payroll" ? "Absensi & gaji" : item === "stores" ? "Master Data" : "Profil lembaga"}</button>)}
+                {(["calendar", "ledger", "payroll", "stores", "materials", "profile"] as AppView[]).map((item) => <button key={item} type="button" onClick={() => setView(item)} className={`rounded-lg px-3.5 py-2 text-xs font-bold transition sm:px-4 ${view === item ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>{item === "calendar" ? "Kalender" : item === "ledger" ? "Buku transaksi" : item === "payroll" ? "Absensi & gaji" : item === "stores" ? "Master Data" : item === "materials" ? "Rekap Material" : "Profil lembaga"}</button>)}
               </div>
-              <p className="text-[10px] text-slate-400">{view === "calendar" ? "Klik tanggal untuk membuka nota · Seret tanggal untuk menata jadwal" : view === "ledger" ? "Daftar seluruh transaksi dalam buku kas" : view === "payroll" ? "Kelola roster pekerja, absensi HOK, dan penggajian mingguan" : view === "stores" ? "Master data toko, pemasok, dan riwayat transaksi terkait" : "Kelola identitas lembaga untuk laporan PDF"}</p>
+              <p className="text-[10px] text-slate-400">{view === "calendar" ? "Klik tanggal untuk membuka nota · Seret tanggal untuk menata jadwal" : view === "ledger" ? "Daftar seluruh transaksi dalam buku kas" : view === "payroll" ? "Kelola roster pekerja, absensi HOK, dan penggajian mingguan" : view === "stores" ? "Master data toko, pemasok, dan riwayat transaksi terkait" : view === "materials" ? "Rekap kebutuhan material, biaya, dan kuantitas per satuan" : "Kelola identitas lembaga untuk laporan PDF"}</p>
             </div>
 
             {view === "calendar" && <section className="mt-4 space-y-3">
@@ -599,6 +605,19 @@ export default function BkuPage() {
             />}
 
             {view === "stores" && <StoreMasterView stores={transactionsApi.stores} loading={transactionsApi.loading} onSave={transactionsApi.saveStore} />}
+
+            {view === "materials" && <MaterialSummaryView
+              books={booksApi.books}
+              selectedBookId={book.id}
+              groups={materialsApi.groups}
+              aliases={materialsApi.aliases}
+              records={materialsApi.records}
+              loading={materialsApi.loading}
+              error={materialsApi.error}
+              onRefresh={() => void materialsApi.refresh()}
+              onCreateGroup={materialsApi.createGroup}
+              onMapMaterial={materialsApi.mapMaterial}
+            />}
 
             {view === "profile" && <section className="mt-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <div className="mb-5"><p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Pengaturan lembaga</p><h3 className="mt-1 text-xl font-black text-slate-900">Profil sekolah / lembaga</h3><p className="mt-1 text-xs text-slate-500">Identitas ini digunakan pada header laporan dan dokumen PDF BKU.</p></div>
@@ -700,17 +719,19 @@ export default function BkuPage() {
         endDate={exportEndDate}
         themeId={exportTheme}
         font={exportFont}
-        signatoryRoles={signatoryRoles}
+        financialSignatoryRoles={financialSignatoryRoles}
+        attendanceSignatoryRoles={attendanceSignatoryRoles}
         onStartDateChange={setExportStartDate}
         onEndDateChange={setExportEndDate}
         onThemeChange={setExportTheme}
         onFontChange={setExportFont}
-        onSignatoryChange={setSignatoryRoles}
+        onFinancialSignatoryChange={setFinancialSignatoryRoles}
+        onAttendanceSignatoryChange={setAttendanceSignatoryRoles}
         onClose={() => setShowExport(false)}
         onExport={() => { void handleExportPdf(); }}
       />
 
-      {(booksApi.loading || transactionsApi.loading || payrollApi.loading) && <LoadingOverlay label="Memuat pembukuan…"/>}
+      {(booksApi.loading || transactionsApi.loading || materialsApi.loading || payrollApi.loading) && <LoadingOverlay label="Memuat pembukuan…"/>}
     </main>
   );
 }

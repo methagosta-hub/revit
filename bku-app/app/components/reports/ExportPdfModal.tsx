@@ -19,12 +19,14 @@ export function ExportPdfModal({
   endDate,
   themeId,
   font,
-  signatoryRoles,
+  financialSignatoryRoles,
+  attendanceSignatoryRoles,
   onStartDateChange,
   onEndDateChange,
   onThemeChange,
   onFontChange,
-  onSignatoryChange,
+  onFinancialSignatoryChange,
+  onAttendanceSignatoryChange,
   onClose,
   onExport,
 }: {
@@ -33,12 +35,14 @@ export function ExportPdfModal({
   endDate: string;
   themeId: string;
   font: string;
-  signatoryRoles: SignatoryRole[];
+  financialSignatoryRoles: SignatoryRole[];
+  attendanceSignatoryRoles: SignatoryRole[];
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onThemeChange: (value: string) => void;
   onFontChange: (value: string) => void;
-  onSignatoryChange: (roles: SignatoryRole[]) => void;
+  onFinancialSignatoryChange: (roles: SignatoryRole[]) => void;
+  onAttendanceSignatoryChange: (roles: SignatoryRole[]) => void;
   onClose: () => void;
   onExport: () => void;
 }) {
@@ -61,9 +65,14 @@ export function ExportPdfModal({
             <FormField label="Jenis font"><select value={font} onChange={(event) => onFontChange(event.target.value)} className={fieldClass}>{exportFonts.map((item) => <option key={item} value={item}>{item}</option>)}</select></FormField>
           </section>
           <section className="rounded-2xl border border-slate-200 p-4">
-            <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-black text-slate-800">Penandatangan laporan</h3><span className="text-[10px] font-semibold text-slate-400">{signatoryRoles.length} dipilih</span></div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">{roles.map((role) => <label key={role.id} className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-100 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"><input type="checkbox" checked={signatoryRoles.includes(role.id)} onChange={(event) => onSignatoryChange(event.target.checked ? [...signatoryRoles, role.id] : signatoryRoles.filter((item) => item !== role.id))} className="accent-emerald-700"/>{role.label}</label>)}</div>
-            <p className="mt-2 text-[10px] text-slate-400">Pilih pihak yang memang akan menandatangani dokumen.</p>
+            <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-black text-slate-800">Tanda tangan rekap keuangan</h3><span className="text-[10px] font-semibold text-slate-400">{financialSignatoryRoles.length} dipilih</span></div>
+            <p className="mt-1 text-[10px] leading-5 text-slate-500">Blok tanda tangan ini ditempatkan tepat di bawah saldo akhir periode pada rekap keuangan.</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">{roles.map((role) => <label key={role.id} className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-100 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"><input type="checkbox" checked={financialSignatoryRoles.includes(role.id)} onChange={(event) => onFinancialSignatoryChange(event.target.checked ? [...financialSignatoryRoles, role.id] : financialSignatoryRoles.filter((item) => item !== role.id))} className="accent-emerald-700"/>{role.label}</label>)}</div>
+          </section>
+          <section className="rounded-2xl border border-slate-200 p-4">
+            <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-black text-slate-800">Tanda tangan matriks absensi</h3><span className="text-[10px] font-semibold text-slate-400">{attendanceSignatoryRoles.length} dipilih</span></div>
+            <p className="mt-1 text-[10px] leading-5 text-slate-500">Pilihan ini terpisah dari rekap keuangan dan ditempatkan setelah seluruh matriks absensi pekerja.</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">{roles.map((role) => <label key={role.id} className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-100 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"><input type="checkbox" checked={attendanceSignatoryRoles.includes(role.id)} onChange={(event) => onAttendanceSignatoryChange(event.target.checked ? [...attendanceSignatoryRoles, role.id] : attendanceSignatoryRoles.filter((item) => item !== role.id))} className="accent-emerald-700"/>{role.label}</label>)}</div>
           </section>
         </div>
         <aside className="space-y-3">
