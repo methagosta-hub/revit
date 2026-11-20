@@ -641,7 +641,7 @@ export default function BkuPage() {
 
             {view === "stores" && <>
               <StoreMasterView stores={transactionsApi.stores} loading={transactionsApi.loading} onSave={transactionsApi.saveStore} />
-              <ReportCategoryMasterView categories={reportCategoriesApi.categories} loading={reportCategoriesApi.loading} error={reportCategoriesApi.error} onRefresh={() => void reportCategoriesApi.refresh()} />
+              <ReportCategoryMasterView categories={reportCategoriesApi.categories} loading={reportCategoriesApi.loading} error={reportCategoriesApi.error} onRefresh={() => void reportCategoriesApi.refresh()} onSave={reportCategoriesApi.save} onSetActive={reportCategoriesApi.setActive} />
             </>}
 
             {view === "materials" && <MaterialSummaryView
