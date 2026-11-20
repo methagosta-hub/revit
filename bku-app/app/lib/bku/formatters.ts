@@ -1,4 +1,4 @@
-import type { Draft, ExportTheme, Material } from "./types";
+import type { Draft, ExportTheme, Material, ReportCategory, TxType } from "./types";
 
 export const money = (value: number) => new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -91,11 +91,14 @@ export const blankDraft = (): Draft => ({
 
 export const expenseCategories = [
   ["material", "Pembelian material"],
-  ["upah", "Gaji / upah pekerja"],
+  ["upah", "Gaji Harian Tukang"],
   ["operasional", "Operasional proyek"],
   ["transportasi", "Transportasi"],
   ["konsumsi", "Konsumsi"],
-  ["lainnya", "Pengeluaran lainnya"],
+  ["ape", "APE"],
+  ["meubeler", "Meubeler"],
+  ["smkk", "SMKK"],
+  ["lainnya", "Lain-lain"],
 ] as const;
 
 export const incomeCategories = [
@@ -105,7 +108,9 @@ export const incomeCategories = [
   ["lainnya", "Pemasukan lainnya"],
 ] as const;
 
-export function categoryLabel(value: string) {
+export function categoryLabel(value: string, categories: ReportCategory[] = [], transactionType?: TxType) {
+  const dynamic = categories.find((item) => item.code === value && (!transactionType || item.transaction_type === transactionType));
+  if (dynamic) return dynamic.label;
   const options = [...expenseCategories, ...incomeCategories, ["transfer", "Pemindahan saldo"]] as const;
   return options.find(([key]) => key === value)?.[1] || value;
 }
