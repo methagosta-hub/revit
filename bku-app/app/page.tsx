@@ -257,7 +257,7 @@ export default function BkuPage() {
     setMaterialCorrectionContext(pendingMaterialCorrection);
     setPendingMaterialCorrection(null);
     openEditTransaction(sourceTransaction);
-  }, [pendingMaterialCorrection, booksApi.book?.id, transactionsApi.transactions]);
+  }, [pendingMaterialCorrection, booksApi.book?.id, transactionsApi.transactions, openEditTransaction]);
 
   function openCopyTransaction(tx: Transaction) {
     setCopySource(tx);
