@@ -613,7 +613,7 @@ export default function BkuPage() {
         onDraftChange={updateDraft}
         onLineChange={updateDraftLine}
         onMaterialSelect={updateDraftMaterial}
-        onAddDetail={(draftIndex) => updateDraft(draftIndex, { details: [...drafts[draftIndex].details, blankDetail()] })}
+        onAddDetail={(draftIndex, line) => updateDraft(draftIndex, { details: [...drafts[draftIndex].details, line] })}
         onRemoveDetail={(draftIndex, lineIndex) => updateDraft(draftIndex, { details: drafts[draftIndex].details.filter((_line, index) => index !== lineIndex) })}
         onAddDraft={() => setDrafts((current) => [...current, blankDraft()])}
         onRemoveDraft={(index) => setDrafts((current) => current.filter((_draft, currentIndex) => currentIndex !== index))}
