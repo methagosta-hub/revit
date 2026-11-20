@@ -237,11 +237,19 @@ export type MaterialAlias = {
 };
 
 export type MaterialPurchaseRecord = {
+  transaction_id: string;
   book_id: string;
+  book_name: string;
   transaction_date: string;
+  entry_no: number;
+  receipt_number: string | null;
+  description: string;
+  store_name: string;
+  detail_index: number;
   name: string;
   normalized_name: string;
   unit: string;
   volume: number;
+  unit_price: number;
   amount: number;
 };
