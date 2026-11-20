@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { ArrowDown, ArrowUp, Check, Database, Pencil, Plus, Power, RefreshCw, X } from "lucide-react";
+import { Check, Database, Pencil, Plus, Power, RefreshCw, X } from "lucide-react";
 import type { ReportCategory, ReportCategoryInput } from "@/app/lib/bku/types";
 import { fieldClass } from "@/app/lib/bku/formatters";
 import { FormField } from "@/app/components/layout/FormField";
