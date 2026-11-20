@@ -18,5 +18,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="id"><body className={plusJakartaSans.className}>{children}</body></html>;
+  return <html lang="id"><body className={`${plusJakartaSans.variable} ${plusJakartaSans.className}`}>{children}</body></html>;
 }
