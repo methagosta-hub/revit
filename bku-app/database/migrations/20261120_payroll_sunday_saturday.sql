@@ -33,7 +33,7 @@ $$;
 
 -- Jangan geser kunci minggu bila periode Minggu untuk buku kas yang sama
 -- sudah ada; kondisi ini akan membuat konflik dengan UNIQUE(book_id, week_start).
-do $
+do $collision_guard$
 begin
   if exists (
     select 1
@@ -47,7 +47,7 @@ begin
     raise exception 'Ditemukan dua rekap untuk periode kerja yang sama (periode lama Senin dan periode baru Minggu). Selesaikan duplikasi sebelum migrasi.';
   end if;
 end;
-$;
+$collision_guard$;
 
 alter table public.bku_payroll_weeks
   drop constraint if exists bku_payroll_monday_check,
