@@ -26,6 +26,7 @@ import { TransactionLedger } from "@/app/components/transactions/TransactionLedg
 import { TransactionExportDialog } from "@/app/components/transactions/TransactionExportDialog";
 import { WorkerPayrollView } from "@/app/components/workers/WorkerPayrollView";
 import { StoreMasterView } from "@/app/components/stores/StoreMasterView";
+import { ReportCategoryMasterView } from "@/app/components/stores/ReportCategoryMasterView";
 import { MaterialSummaryView } from "@/app/components/materials/MaterialSummaryView";
 import { ExportPdfModal } from "@/app/components/reports/ExportPdfModal";
 import { openBkuPdfReport } from "@/app/components/reports/pdfReport";
@@ -638,7 +639,10 @@ export default function BkuPage() {
               onClearError={() => payrollApi.setError("")}
             />}
 
-            {view === "stores" && <StoreMasterView stores={transactionsApi.stores} loading={transactionsApi.loading} onSave={transactionsApi.saveStore} />}
+            {view === "stores" && <>
+              <StoreMasterView stores={transactionsApi.stores} loading={transactionsApi.loading} onSave={transactionsApi.saveStore} />
+              <ReportCategoryMasterView categories={reportCategoriesApi.categories} loading={reportCategoriesApi.loading} error={reportCategoriesApi.error} onRefresh={() => void reportCategoriesApi.refresh()} />
+            </>}
 
             {view === "materials" && <MaterialSummaryView
               books={booksApi.books}
