@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Boxes, Check, ChevronDown, ChevronRight, Layers3, RefreshCw, Search, Sparkles } from "lucide-react";
 import type { Book, MaterialGroup, MaterialAlias, MaterialPurchaseRecord } from "@/app/lib/bku/types";
 import { money, numberFormat, fieldClass } from "@/app/lib/bku/formatters";
@@ -291,8 +291,8 @@ export function MaterialSummaryView({
                         const expandedMaterial = expandedMaterialKey === material.normalizedName;
                         const unitVariants = new Set(material.records.map((record) => record.unit.trim().toLocaleLowerCase("id-ID")));
                         const priceVariants = new Set(material.records.map((record) => `${record.unit.trim().toLocaleLowerCase("id-ID")}|${record.unit_price}`));
-                        return <>
-                          <tr key={material.normalizedName}>
+                        return <Fragment key={material.normalizedName}>
+                          <tr>
                             <td className="px-2 py-3 font-semibold text-slate-800">
                               {material.name}
                               {unitVariants.size > 1 && <span className="mt-1 block text-[10px] font-semibold text-amber-700">Periksa variasi satuan</span>}
@@ -320,7 +320,7 @@ export function MaterialSummaryView({
                             </div>
                             <p className="mt-2 text-[10px] leading-5 text-slate-500">Harga atau satuan yang berbeda hanya ditandai untuk pemeriksaan. Perubahan dilakukan pada nota asli dan harus disesuaikan dengan bukti belanja.</p>
                           </td></tr>}
-                        </>;
+                        </Fragment>;
                       })}
                     </tbody>
                     <tfoot><tr><td className="px-2 py-3 font-black text-slate-900">Total kelompok</td><td className="px-2 py-3 text-[10px] font-semibold text-slate-600">{formatUnits(Array.from(unitTotals.values()))}</td><td className="px-2 py-3 text-[10px] text-slate-500">Rekap dihitung dari nota sumber</td><td className="px-2 py-3 text-right font-black text-emerald-800">{money(item.amount)}</td></tr></tfoot>
@@ -342,17 +342,35 @@ export function MaterialSummaryView({
         </div>
 
         {visibleUnmapped.length ? <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-left text-xs">
-          <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3">Nama material dari nota</th><th className="px-3 py-3">Kuantitas tercatat</th><th className="px-3 py-3 text-right">Biaya</th><th className="px-3 py-3">Kelompok</th><th className="px-3 py-3">Aksi</th></tr></thead>
+          <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3">Nama material dari nota</th><th className="px-3 py-3">Kuantitas tercatat</th><th className="px-3 py-3 text-right">Biaya</th><th className="px-3 py-3">Kelompok</th><th className="px-3 py-3">Telusuri / aksi</th></tr></thead>
           <tbody className="divide-y divide-slate-100">
             {visibleUnmapped.map((item) => {
               const chosen = selectedGroups[item.normalizedName] || item.suggestedGroupId;
-              return <tr key={item.normalizedName}>
-                <td className="px-3 py-3"><strong className="block text-slate-800">{item.name}</strong>{item.suggestedGroupId && <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-emerald-700"><Sparkles size={11}/>Ada saran kelompok otomatis</span>}</td>
-                <td className="px-3 py-3 text-[10px] text-slate-600">{formatUnits(item.units)}</td>
-                <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-800">{money(item.amount)}</td>
-                <td className="px-3 py-3"><select value={chosen} onChange={(event) => setSelectedGroups((current) => ({ ...current, [item.normalizedName]: event.target.value }))} className="w-full min-w-[150px] rounded-lg border border-slate-200 bg-white px-2 py-2 text-[11px]"><option value="">Pilih kelompok</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></td>
-                <td className="px-3 py-3"><button type="button" onClick={() => void handleMapMaterial(item.name, chosen)} disabled={!chosen || savingName === item.name} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-bold text-emerald-800 disabled:opacity-40">{savingName === item.name ? "Menyimpan…" : "Petakan"}</button></td>
-              </tr>;
+              const expandedMaterial = expandedMaterialKey === item.normalizedName;
+              return <Fragment key={item.normalizedName}>
+                <tr>
+                  <td className="px-3 py-3"><strong className="block text-slate-800">{item.name}</strong>{item.suggestedGroupId && <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-emerald-700"><Sparkles size={11}/>Ada saran kelompok otomatis</span>}</td>
+                  <td className="px-3 py-3 text-[10px] text-slate-600">{formatUnits(item.units)}</td>
+                  <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-800">{money(item.amount)}</td>
+                  <td className="px-3 py-3"><select value={chosen} onChange={(event) => setSelectedGroups((current) => ({ ...current, [item.normalizedName]: event.target.value }))} className="w-full min-w-[150px] rounded-lg border border-slate-200 bg-white px-2 py-2 text-[11px]"><option value="">Pilih kelompok</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></td>
+                  <td className="px-3 py-3"><div className="flex flex-col gap-1.5">
+                    <button type="button" onClick={() => setExpandedMaterialKey(expandedMaterial ? "" : item.normalizedName)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold text-slate-700">{expandedMaterial ? "Tutup nota" : `Lihat ${item.records.length} nota`}</button>
+                    <button type="button" onClick={() => void handleMapMaterial(item.name, chosen)} disabled={!chosen || savingName === item.name} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-bold text-emerald-800 disabled:opacity-40">{savingName === item.name ? "Menyimpan…" : "Petakan"}</button>
+                  </div></td>
+                </tr>
+                {expandedMaterial && <tr><td colSpan={5} className="bg-slate-50 px-3 py-3">
+                  <div className="space-y-2">
+                    {item.records.map((record) => <div key={record.transaction_id + ":" + record.detail_index} className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold text-emerald-800">{new Date(`${record.transaction_date}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })} · {record.book_name}</p>
+                        <p className="mt-1 truncate text-xs font-bold text-slate-800">{record.receipt_number ? `Nota ${record.receipt_number}` : `Nomor urut #${record.entry_no}`} · {record.description || "Tanpa uraian"}</p>
+                        <p className="mt-1 text-[10px] text-slate-500">{record.store_name ? `Toko: ${record.store_name} · ` : ""}{numberFormat(record.volume)} {record.unit} × {money(record.unit_price)} = {money(record.amount)}</p>
+                      </div>
+                      <button type="button" onClick={() => onEditRecord(record)} className="rounded-lg bg-emerald-700 px-3 py-2.5 text-[10px] font-bold text-white hover:bg-emerald-800">Perbaiki nota</button>
+                    </div>)}
+                  </div>
+                </td></tr>}
+              </Fragment>;
             })}
           </tbody>
         </table></div> : <div className="mt-4 rounded-xl bg-slate-50 p-4 text-xs text-slate-600">{filteredRecords.length === 0 ? "Belum ada rincian pembelian material pada filter ini." : unmapped.length === 0 ? <><Check size={15} className="mr-1 inline"/>Semua nama material pada filter ini sudah terpetakan.</> : "Tidak ada nama material yang cocok dengan pencarian."}</div>}
