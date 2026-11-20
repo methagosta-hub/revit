@@ -23,7 +23,6 @@ export function TransactionFormModal({
   onSave,
   onDraftChange,
   onLineChange,
-  onMaterialSelect,
   onAddDetail,
   onRemoveDetail,
   onAddDraft,
@@ -44,7 +43,6 @@ export function TransactionFormModal({
   onSave: (event: FormEvent<HTMLFormElement>) => void;
   onDraftChange: (index: number, patch: Partial<Draft>) => void;
   onLineChange: (draftIndex: number, lineIndex: number, patch: Partial<Draft["details"][number]>) => void;
-  onMaterialSelect: (draftIndex: number, lineIndex: number, materialId: string) => void;
   onAddDetail: (draftIndex: number, line: DetailLine) => void;
   onRemoveDetail: (draftIndex: number, lineIndex: number) => void;
   onAddDraft: () => void;
@@ -80,7 +78,7 @@ export function TransactionFormModal({
             <FormField label="Pilih toko yang pernah digunakan"><select value={draft.store_id} onChange={(event) => { const store = stores.find((item) => item.id === event.target.value); onDraftChange(index, { store_id: event.target.value, store_name: store?.name || "" }); }} className={fieldClass}><option value="">Tidak memilih toko / isi manual</option>{stores.filter((store) => store.is_active || store.id === draft.store_id).map((store) => <option key={store.id} value={store.id} disabled={!store.is_active}>{store.name}{!store.is_active ? " (Nonaktif — transaksi lama)" : ""}</option>)}</select></FormField>
             <FormField label="Nama toko / pemasok (opsional)"><div className="relative"><Store className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={draft.store_name} onChange={(event) => onDraftChange(index, { store_name: event.target.value, store_id: "" })} placeholder="Boleh dikosongkan" className={`${fieldClass} pl-9`} /></div></FormField>
           </div>}
-          {draft.transaction_type === "OUT" && <TransactionDetailEditor draft={draft} materials={materials} onAdd={(line) => onAddDetail(index, line)} onRemove={(lineIndex) => onRemoveDetail(index, lineIndex)} onLineChange={(lineIndex, patch) => onLineChange(index, lineIndex, patch)} onMaterialSelect={(lineIndex, materialId) => onMaterialSelect(index, lineIndex, materialId)} onSplitLines={(lineIndexes) => onSplitDetails(index, lineIndexes)} allowSplit={draft.transaction_type === "OUT" && draft.details.length > 1} />}
+          {draft.transaction_type === "OUT" && <TransactionDetailEditor draft={draft} materials={materials} onAdd={(line) => onAddDetail(index, line)} onRemove={(lineIndex) => onRemoveDetail(index, lineIndex)} onLineChange={(lineIndex, patch) => onLineChange(index, lineIndex, patch)} onSplitLines={(lineIndexes) => onSplitDetails(index, lineIndexes)} allowSplit={draft.transaction_type === "OUT" && draft.details.length > 1} />}
           {draft.transaction_type === "TRANSFER" ? <div className="grid gap-3 sm:grid-cols-2"><FormField label="Dari rekening"><select value={draft.from_account} onChange={(event) => onDraftChange(index, { from_account: event.target.value as Draft["from_account"] })} className={fieldClass}><option value="CASH">Tunai</option><option value="BANK">Bank</option></select></FormField><FormField label="Ke rekening"><select value={draft.to_account} onChange={(event) => onDraftChange(index, { to_account: event.target.value as Draft["to_account"] })} className={fieldClass}><option value="BANK">Bank</option><option value="CASH">Tunai</option></select></FormField></div> : <div className="max-w-sm"><FormField label="Sumber / metode pembayaran"><select value={draft.account} onChange={(event) => onDraftChange(index, { account: event.target.value as Draft["account"] })} className={fieldClass}><option value="CASH">Tunai</option><option value="BANK">Non-tunai / rekening bank</option></select></FormField></div>}
           <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-3 text-xs font-semibold text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50/40"><FileUp size={17} className="shrink-0 text-emerald-700"/><span className="min-w-0 flex-1 truncate">{draft.file ? draft.file.name : "Lampirkan foto nota / bukti transfer (opsional)"}</span><input type="file" accept="image/*,.pdf" className="sr-only" onChange={(event) => onDraftChange(index, { file: event.target.files?.[0] || null })}/></label>
         </section>)}
