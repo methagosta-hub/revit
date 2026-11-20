@@ -84,8 +84,6 @@ export function MaterialSummaryView({
 
   const aliasMap = useMemo(() => new Map(aliases.map((alias) => [normalizeName(alias.normalized_name), alias.group_id])), [aliases]);
   const groupById = useMemo(() => new Map(groups.map((group) => [group.id, group])), [groups]);
-  const bookById = useMemo(() => new Map(books.map((book) => [book.id, book])), [books]);
-
   const filteredRecords = useMemo(() => records.filter((record) =>
     (bookFilter === "all" || !bookFilter || record.book_id === bookFilter)
     && (!startDate || record.transaction_date >= startDate)
@@ -198,6 +196,25 @@ export function MaterialSummaryView({
     }
   }
 
+  async function handleApplySuggestions() {
+    const suggestions = unmapped.filter((item) => item.suggestedGroupId);
+    if (!suggestions.length) return;
+    setSavingName("__bulk__");
+    setNotice("");
+    let mapped = 0;
+    try {
+      for (const item of suggestions) {
+        await onMapMaterial(item.suggestedGroupId, item.name);
+        mapped += 1;
+      }
+      setNotice(`${mapped} nama material berhasil dikelompokkan berdasarkan saran otomatis.`);
+    } catch (cause) {
+      setNotice(`${mapped} nama berhasil dipetakan. Sisanya belum tersimpan: ${cause instanceof Error ? cause.message : "terjadi kesalahan"}`);
+    } finally {
+      setSavingName("");
+    }
+  }
+
   return (
     <section className="mt-4 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -274,7 +291,10 @@ export function MaterialSummaryView({
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><h4 className="text-sm font-black text-slate-900">Pemetaan nama material</h4><p className="mt-1 max-w-2xl text-[10px] leading-5 text-slate-500">Nama yang belum dikenal ditampilkan di sini. Saran otomatis hanya membantu memilih; setelah Anda mengonfirmasi satu kali, nama itu langsung masuk ke kelompok yang benar untuk rekap berikutnya.</p></div>
-          <form onSubmit={handleCreateGroup} className="flex w-full flex-wrap gap-2 sm:w-auto"><input value={newGroupName} onChange={(event) => setNewGroupName(event.target.value)} placeholder="Nama kelompok baru" className={fieldClass + " min-w-[180px] flex-1 sm:w-48"}/><button type="submit" disabled={savingGroup || !newGroupName.trim()} className="flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"><Check size={14}/>Tambah</button></form>
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+            <form onSubmit={handleCreateGroup} className="flex min-w-0 flex-1 flex-wrap gap-2 sm:flex-none"><input value={newGroupName} onChange={(event) => setNewGroupName(event.target.value)} placeholder="Nama kelompok baru" className={fieldClass + " min-w-[180px] flex-1 sm:w-48"}/><button type="submit" disabled={savingGroup || !newGroupName.trim()} className="flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"><Check size={14}/>Tambah</button></form>
+            <button type="button" onClick={() => void handleApplySuggestions()} disabled={savingName === "__bulk__" || !unmapped.some((item) => item.suggestedGroupId)} className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 disabled:opacity-40"><Sparkles size={14}/>{savingName === "__bulk__" ? "Menerapkan…" : "Terapkan saran otomatis"}</button>
+          </div>
         </div>
 
         {visibleUnmapped.length ? <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-left text-xs">
@@ -291,7 +311,28 @@ export function MaterialSummaryView({
               </tr>;
             })}
           </tbody>
-        </table></div> : <div className="mt-4 rounded-xl bg-emerald-50 p-4 text-xs text-emerald-800"><Check size={15} className="mr-1 inline"/>Semua nama material pada filter ini sudah terpetakan.</div>}
+        </table></div> : <div className="mt-4 rounded-xl bg-slate-50 p-4 text-xs text-slate-600">{filteredRecords.length === 0 ? "Belum ada rincian pembelian material pada filter ini." : unmapped.length === 0 ? <><Check size={15} className="mr-1 inline"/>Semua nama material pada filter ini sudah terpetakan.</> : "Tidak ada nama material yang cocok dengan pencarian."}</div>}
+
+        <details className="mt-4 rounded-xl border border-slate-200">
+          <summary className="cursor-pointer px-3 py-3 text-xs font-bold text-slate-700">Kelola alias yang sudah dipetakan ({aliases.length})</summary>
+          <div className="overflow-x-auto border-t border-slate-100 p-3">
+            <table className="w-full min-w-[560px] text-left text-xs">
+              <thead className="text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-2 py-2">Nama alias</th><th className="px-2 py-2">Kelompok saat ini</th><th className="px-2 py-2">Ubah kelompok</th><th className="px-2 py-2">Aksi</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {aliases.map((alias) => {
+                  const currentGroup = groupById.get(alias.group_id);
+                  const chosen = selectedGroups[normalizeName(alias.material_name)] || alias.group_id;
+                  return <tr key={alias.id}>
+                    <td className="px-2 py-2.5 font-semibold text-slate-800">{alias.material_name}</td>
+                    <td className="px-2 py-2.5 text-slate-600">{currentGroup?.name || "Kelompok tidak aktif"}</td>
+                    <td className="px-2 py-2.5"><select value={chosen} onChange={(event) => setSelectedGroups((current) => ({ ...current, [normalizeName(alias.material_name)]: event.target.value }))} className="w-full min-w-[150px] rounded-lg border border-slate-200 bg-white px-2 py-2 text-[11px]"><option value="">Pilih kelompok</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></td>
+                    <td className="px-2 py-2.5"><button type="button" onClick={() => void handleMapMaterial(alias.material_name, chosen)} disabled={!chosen || savingName === alias.material_name} className="rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-700 disabled:opacity-40">{savingName === alias.material_name ? "Menyimpan…" : "Simpan"}</button></td>
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          </div>
+        </details>
       </div>
 
       <p className="text-[10px] leading-5 text-slate-400">Catatan: jumlah volume tidak dijumlahkan lintas satuan. Contohnya 2 dump, 3 colt, dan 8 m³ tetap ditampilkan terpisah. Nilai rupiah tetap dapat dijumlahkan pada tingkat kelompok.</p>
