@@ -4,8 +4,9 @@
 
 begin;
 
--- Validasi agar migrasi hanya memproses data lama Senin-Sabtu atau data baru
--- yang sudah berbentuk Minggu-Sabtu. Hentikan migrasi bila ada rentang tak dikenal.
+-- Validasi data historis Senin-Sabtu dan data baru Minggu-Sabtu.
+-- Versi aplikasi lama mengizinkan tanggal bayar pada hari apa pun dalam periode;
+-- tanggal bayar historis dan tanggal transaksi terkait harus tetap dipertahankan.
 do $$
 begin
   if exists (
@@ -15,13 +16,13 @@ begin
       (
         extract(isodow from week_start) = 1
         and week_end = week_start + 5
-        and pay_date = week_end
+        and pay_date between week_start and week_end
       )
       or
       (
         extract(isodow from week_start) = 7
         and week_end = week_start + 6
-        and pay_date = week_end
+        and pay_date between week_start and week_end
       )
     )
   ) then
@@ -30,6 +31,24 @@ begin
 end;
 $$;
 
+-- Jangan geser kunci minggu bila periode Minggu untuk buku kas yang sama
+-- sudah ada; kondisi ini akan membuat konflik dengan UNIQUE(book_id, week_start).
+do $
+begin
+  if exists (
+    select 1
+    from public.bku_payroll_weeks old_week
+    join public.bku_payroll_weeks sunday_week
+      on sunday_week.book_id = old_week.book_id
+     and sunday_week.week_start = old_week.week_start - 1
+    where extract(isodow from old_week.week_start) = 1
+      and old_week.week_end = old_week.week_start + 5
+  ) then
+    raise exception 'Ditemukan dua rekap untuk periode kerja yang sama (periode lama Senin dan periode baru Minggu). Selesaikan duplikasi sebelum migrasi.';
+  end if;
+end;
+$;
+
 alter table public.bku_payroll_weeks
   drop constraint if exists bku_payroll_monday_check,
   drop constraint if exists bku_payroll_sunday_check,
@@ -37,13 +56,13 @@ alter table public.bku_payroll_weeks
   drop constraint if exists bku_payroll_pay_date_check;
 
 -- Migrasikan kunci periode lama dari Senin ke hari Minggu sebelumnya.
--- week_end dan pay_date tetap pada Sabtu yang sama; nilai total tidak diubah.
+-- week_end dan tanggal pembayaran historis tetap; nilai total tidak diubah.
 -- Kondisi ini juga membuat file aman dijalankan ulang (baris Minggu tidak digeser lagi).
 update public.bku_payroll_weeks
 set week_start = week_start - 1
 where extract(isodow from week_start) = 1
   and week_end = week_start + 5
-  and pay_date = week_end;
+  and pay_date between week_start and week_end;
 
 alter table public.bku_payroll_weeks
   add constraint bku_payroll_sunday_check
@@ -51,7 +70,7 @@ alter table public.bku_payroll_weeks
   add constraint bku_payroll_range_check
     check (week_end = week_start + 6),
   add constraint bku_payroll_pay_date_check
-    check (pay_date = week_end);
+    check (pay_date between week_start and week_end);
 
 -- RPC atomik: menyimpan tujuh hari absensi Minggu-Sabtu dan satu
 -- transaksi kas keluar kategori upah yang tanggal transaksinya selalu Sabtu.
