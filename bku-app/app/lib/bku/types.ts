@@ -236,6 +236,14 @@ export type MaterialAlias = {
   created_at: string;
 };
 
+export type ReportCategory = {
+  transaction_type: "IN" | "OUT";
+  code: string;
+  label: string;
+  sort_order: number;
+  is_active: boolean;
+};
+
 export type MaterialPurchaseRecord = {
   transaction_id: string;
   book_id: string;
