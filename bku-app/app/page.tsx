@@ -21,6 +21,7 @@ import { DayTransactionsDialog } from "@/app/components/calendar/DayTransactions
 import { MoveTransactionsDialog } from "@/app/components/calendar/MoveTransactionsDialog";
 import { TransactionFormModal } from "@/app/components/transactions/TransactionFormModal";
 import { TransactionLedger } from "@/app/components/transactions/TransactionLedger";
+import { TransactionExportDialog } from "@/app/components/transactions/TransactionExportDialog";
 import { WorkerPayrollView } from "@/app/components/workers/WorkerPayrollView";
 import { StoreMasterView } from "@/app/components/stores/StoreMasterView";
 import { ExportPdfModal } from "@/app/components/reports/ExportPdfModal";
@@ -95,6 +96,11 @@ export default function BkuPage() {
 
   const [copySource, setCopySource] = useState<Transaction | null>(null);
   const [copyTargetDate, setCopyTargetDate] = useState(() => dateKey(new Date()));
+
+  const [transactionToExport, setTransactionToExport] = useState<Transaction | null>(null);
+  const [exportDestinationBookId, setExportDestinationBookId] = useState("");
+  const [exportDestinationDate, setExportDestinationDate] = useState("");
+  const [exportTransactionSaving, setExportTransactionSaving] = useState(false);
 
   const [showExport, setShowExport] = useState(false);
   const [exportStartDate, setExportStartDate] = useState("");
@@ -229,6 +235,54 @@ export default function BkuPage() {
   function openCopyTransaction(tx: Transaction) {
     setCopySource(tx);
     setCopyTargetDate(tx.transaction_date);
+  }
+
+  function openExportTransaction(tx: Transaction) {
+    const destinations = booksApi.books.filter((item) => item.id !== tx.book_id);
+    if (!destinations.length) {
+      setToast({ message: "Belum ada proyek lain sebagai tujuan. Buat buku kas proyek kedua terlebih dahulu.", tone: "info" });
+      return;
+    }
+    setTransactionToExport(tx);
+    setExportDestinationBookId("");
+    setExportDestinationDate(tx.transaction_date);
+  }
+
+  function changeExportDestination(bookId: string) {
+    const destination = booksApi.books.find((item) => item.id === bookId);
+    setExportDestinationBookId(bookId);
+    if (!destination || !transactionToExport) return;
+    setExportDestinationDate(
+      transactionToExport.transaction_date < destination.start_date
+        ? destination.start_date
+        : transactionToExport.transaction_date
+    );
+  }
+
+  async function handleExportTransaction() {
+    const source = transactionToExport;
+    const destination = booksApi.books.find((item) => item.id === exportDestinationBookId);
+    if (!source || !destination) return;
+    if (!exportDestinationDate || exportDestinationDate < destination.start_date) {
+      setToast({ message: "Tanggal tujuan tidak boleh lebih awal dari tanggal mulai proyek tujuan.", tone: "error" });
+      return;
+    }
+
+    setExportTransactionSaving(true);
+    try {
+      const result = await transactionsApi.exportTransactionToBook(source, destination.id, exportDestinationDate);
+      setTransactionToExport(null);
+      setExportDestinationBookId("");
+      setExportDestinationDate("");
+      setToast({
+        message: `Nota berhasil diekspor sebagai salinan ke ${destination.name} pada ${dateLabel(exportDestinationDate)} (nomor urut #${result.entryNo}). Nota di proyek asal tetap utuh.`,
+        tone: "success",
+      });
+    } catch (cause) {
+      setToast({ message: cause instanceof Error ? cause.message : "Ekspor nota ke proyek lain gagal.", tone: "error" });
+    } finally {
+      setExportTransactionSaving(false);
+    }
   }
 
   function confirmCopyTransaction() {
@@ -526,7 +580,7 @@ export default function BkuPage() {
               />
             </section>}
 
-            {view === "ledger" && <TransactionLedger transactions={ordered} balances={balances.rows} onEdit={openEditTransaction} onCopy={openCopyTransaction} onDelete={(tx) => void handleDeleteTransaction(tx)}/>}
+            {view === "ledger" && <TransactionLedger transactions={ordered} balances={balances.rows} onEdit={openEditTransaction} onCopy={openCopyTransaction} onExport={openExportTransaction} onDelete={(tx) => void handleDeleteTransaction(tx)}/>}
 
             {view === "payroll" && <WorkerPayrollView
               workers={payrollApi.workers}
@@ -576,8 +630,22 @@ export default function BkuPage() {
         onAdd={openNewEntry}
         onEdit={openEditTransaction}
         onCopy={openCopyTransaction}
+        onExport={openExportTransaction}
         onDelete={(tx) => void handleDeleteTransaction(tx)}
         onEvidence={(path) => void handleOpenEvidence(path)}
+      />
+
+      <TransactionExportDialog
+        transaction={transactionToExport}
+        sourceBookName={book?.name || ""}
+        destinationBooks={booksApi.books.filter((item) => item.id !== (transactionToExport?.book_id || book?.id))}
+        selectedBookId={exportDestinationBookId}
+        targetDate={exportDestinationDate}
+        busy={exportTransactionSaving}
+        onBookChange={changeExportDestination}
+        onDateChange={setExportDestinationDate}
+        onClose={() => { if (!exportTransactionSaving) setTransactionToExport(null); }}
+        onConfirm={() => void handleExportTransaction()}
       />
 
       <MoveTransactionsDialog
