@@ -244,6 +244,8 @@ export type ReportCategory = {
   is_active: boolean;
 };
 
+export type ReportCategoryInput = Pick<ReportCategory, "transaction_type" | "code" | "label" | "sort_order">;
+
 export type MaterialPurchaseRecord = {
   transaction_id: string;
   book_id: string;

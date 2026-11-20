@@ -73,7 +73,7 @@ export function TransactionFormModal({
           <p><strong>Hapus baris:</strong> keluarkan baris material dari nota yang sedang diedit. Jumlah nota dihitung ulang saat disimpan.</p>
         </div>}
         {drafts.map((draft, index) => {
-          const dynamicOptions = reportCategories.filter((item) => item.transaction_type === draft.transaction_type);
+          const dynamicOptions = reportCategories.filter((item) => item.transaction_type === draft.transaction_type && item.is_active);
           const categoryOptions = dynamicOptions.length
             ? dynamicOptions.map((item) => [item.code, item.label] as const)
             : draft.transaction_type === "IN" ? incomeCategories
