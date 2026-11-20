@@ -10,6 +10,7 @@ import { calendarDateDelta } from "@/app/lib/bku/transaction-movement";
 import { useBkuBooks } from "@/app/hooks/useBkuBooks";
 import { useBkuTransactions } from "@/app/hooks/useBkuTransactions";
 import { useBkuMaterialSummary } from "@/app/hooks/useBkuMaterialSummary";
+import { useBkuReportCategories } from "@/app/hooks/useBkuReportCategories";
 import { getMondayDate, useBkuPayroll } from "@/app/hooks/useBkuPayroll";
 import { AppHeader } from "@/app/components/layout/AppHeader";
 import { AppModal } from "@/app/components/layout/AppModal";
@@ -64,6 +65,7 @@ export default function BkuPage() {
   const booksApi = useBkuBooks(supabase);
   const transactionsApi = useBkuTransactions(supabase, booksApi.session, booksApi.book);
   const materialsApi = useBkuMaterialSummary(supabase, booksApi.session, booksApi.books);
+  const reportCategoriesApi = useBkuReportCategories(supabase, booksApi.session);
   const [payrollWeekStart, setPayrollWeekStart] = useState(() => getMondayDate(dateKey(new Date())));
   const payrollApi = useBkuPayroll(supabase, booksApi.session, booksApi.book, payrollWeekStart);
 
@@ -530,6 +532,7 @@ export default function BkuPage() {
         attendanceSignatoryRoles,
         workers: attendanceReport.workers,
         attendance: attendanceReport.attendance,
+        reportCategories: reportCategoriesApi.categories,
       }, reportWindow);
       setShowExport(false);
     } catch (cause) {
@@ -617,7 +620,7 @@ export default function BkuPage() {
               />
             </section>}
 
-            {view === "ledger" && <TransactionLedger transactions={ordered} balances={balances.rows} onEdit={openEditTransaction} onCopy={openCopyTransaction} onExport={openExportTransaction} onDelete={(tx) => void handleDeleteTransaction(tx)}/>}
+            {view === "ledger" && <TransactionLedger transactions={ordered} balances={balances.rows} reportCategories={reportCategoriesApi.categories} onEdit={openEditTransaction} onCopy={openCopyTransaction} onExport={openExportTransaction} onDelete={(tx) => void handleDeleteTransaction(tx)}/>}
 
             {view === "payroll" && <WorkerPayrollView
               workers={payrollApi.workers}
@@ -684,6 +687,7 @@ export default function BkuPage() {
         onExport={openExportTransaction}
         onDelete={(tx) => void handleDeleteTransaction(tx)}
         onEvidence={(path) => void handleOpenEvidence(path)}
+        reportCategories={reportCategoriesApi.categories}
       />
 
       <TransactionExportDialog
@@ -693,6 +697,7 @@ export default function BkuPage() {
         selectedBookId={exportDestinationBookId}
         targetDate={exportDestinationDate}
         busy={exportTransactionSaving}
+        reportCategories={reportCategoriesApi.categories}
         onBookChange={changeExportDestination}
         onDateChange={setExportDestinationDate}
         onClose={() => { if (!exportTransactionSaving) setTransactionToExport(null); }}
@@ -730,6 +735,7 @@ export default function BkuPage() {
         onRemoveDraft={(index) => setDrafts((current) => current.filter((_draft, currentIndex) => currentIndex !== index))}
         onSplitDetails={handleSplitDetails}
         materialCorrection={materialCorrectionContext}
+        reportCategories={reportCategoriesApi.categories}
       />
 
       {showNewBook && <AppModal title="Buat buku kas baru" subtitle="Identitas dan saldo awal pembukuan lembaga / proyek." onClose={() => setShowNewBook(false)}>
