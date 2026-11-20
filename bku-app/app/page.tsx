@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { CalendarDays, LockKeyhole, Plus, RefreshCw, ShieldCheck, Wallet } from "lucide-react";
 import { getBkuSupabase } from "@/lib/supabase";
-import type { AppView, Draft, ProfileInput, SignatoryRole, Transaction, WorkerAttendanceDraft } from "@/app/lib/bku/types";
+import type { AppView, Draft, MaterialPurchaseRecord, ProfileInput, SignatoryRole, Transaction, WorkerAttendanceDraft } from "@/app/lib/bku/types";
 import { amountValue, blankDetail, blankDraft, dateKey, dateLabel, detailLineTotal, fieldClass, isValidDateKey, money } from "@/app/lib/bku/formatters";
 import { buildDaySummaries, calculateBalances, sortTransactions } from "@/app/lib/bku/balances";
 import { calendarDateDelta } from "@/app/lib/bku/transaction-movement";
@@ -93,6 +93,8 @@ export default function BkuPage() {
   const [showEntry, setShowEntry] = useState(false);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [editTargetDate, setEditTargetDate] = useState("");
+  const [materialCorrectionContext, setMaterialCorrectionContext] = useState<MaterialPurchaseRecord | null>(null);
+  const [pendingMaterialCorrection, setPendingMaterialCorrection] = useState<MaterialPurchaseRecord | null>(null);
   const [drafts, setDrafts] = useState<Draft[]>([blankDraft()]);
   const [entrySaving, setEntrySaving] = useState(false);
   const [entryError, setEntryError] = useState("");
@@ -237,6 +239,26 @@ export default function BkuPage() {
     setShowEntry(true);
   }
 
+  function requestMaterialCorrection(record: MaterialPurchaseRecord) {
+    const targetBook = booksApi.books.find((item) => item.id === record.book_id);
+    if (!targetBook) {
+      setToast({ message: "Proyek sumber nota tidak ditemukan. Muat ulang daftar buku kas.", tone: "error" });
+      return;
+    }
+    setPendingMaterialCorrection(record);
+    setView("materials");
+    if (booksApi.book?.id !== targetBook.id) booksApi.setBook(targetBook);
+  }
+
+  useEffect(() => {
+    if (!pendingMaterialCorrection || booksApi.book?.id !== pendingMaterialCorrection.book_id) return;
+    const sourceTransaction = transactionsApi.transactions.find((item) => item.id === pendingMaterialCorrection.transaction_id);
+    if (!sourceTransaction) return;
+    setMaterialCorrectionContext(pendingMaterialCorrection);
+    setPendingMaterialCorrection(null);
+    openEditTransaction(sourceTransaction);
+  }, [pendingMaterialCorrection, booksApi.book?.id, transactionsApi.transactions]);
+
   function openCopyTransaction(tx: Transaction) {
     setCopySource(tx);
     setCopyTargetDate(tx.transaction_date);
@@ -320,17 +342,26 @@ export default function BkuPage() {
         editingTransactionId,
         session: booksApi.session,
       });
+      const wasMaterialCorrection = Boolean(materialCorrectionContext);
       setShowEntry(false);
       setEditingTransactionId(null);
       setEditTargetDate("");
       setDrafts([blankDraft()]);
       setSelectedDate(targetDate);
       setMonth(new Date(`${targetDate}T00:00:00`));
-      setDayDialogDate(targetDate);
+      if (wasMaterialCorrection) {
+        setMaterialCorrectionContext(null);
+        setDayDialogDate(null);
+        await materialsApi.refresh();
+      } else {
+        setDayDialogDate(targetDate);
+      }
       setToast({
-        message: editingTransactionId
-          ? (drafts.length > 1 ? `Nota utama diperbarui dan ${drafts.length - 1} nota baru berhasil dibuat.` : "Nota berhasil diperbarui.")
-          : "Transaksi berhasil disimpan.",
+        message: wasMaterialCorrection
+          ? "Koreksi nota berhasil disimpan. Rekap material telah diperbarui dari nota sumber."
+          : editingTransactionId
+            ? (drafts.length > 1 ? `Nota utama diperbarui dan ${drafts.length - 1} nota baru berhasil dibuat.` : "Nota berhasil diperbarui.")
+            : "Transaksi berhasil disimpan.",
         tone: "success",
       });
     } catch (cause) {
@@ -617,6 +648,7 @@ export default function BkuPage() {
               onRefresh={() => void materialsApi.refresh()}
               onCreateGroup={materialsApi.createGroup}
               onMapMaterial={materialsApi.mapMaterial}
+              onEditRecord={requestMaterialCorrection}
             />}
 
             {view === "profile" && <section className="mt-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -688,7 +720,7 @@ export default function BkuPage() {
         saving={entrySaving}
         error={entryError}
         onClearError={() => setEntryError("")}
-        onClose={() => { setShowEntry(false); setEditingTransactionId(null); setEditTargetDate(""); setEntryError(""); }}
+        onClose={() => { setShowEntry(false); setEditingTransactionId(null); setEditTargetDate(""); setEntryError(""); setMaterialCorrectionContext(null); setPendingMaterialCorrection(null); }}
         onSave={handleSaveEntries}
         onDraftChange={updateDraft}
         onLineChange={updateDraftLine}
@@ -697,6 +729,7 @@ export default function BkuPage() {
         onAddDraft={() => setDrafts((current) => [...current, blankDraft()])}
         onRemoveDraft={(index) => setDrafts((current) => current.filter((_draft, currentIndex) => currentIndex !== index))}
         onSplitDetails={handleSplitDetails}
+        materialCorrection={materialCorrectionContext}
       />
 
       {showNewBook && <AppModal title="Buat buku kas baru" subtitle="Identitas dan saldo awal pembukuan lembaga / proyek." onClose={() => setShowNewBook(false)}>
