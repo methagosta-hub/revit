@@ -293,13 +293,6 @@ export default function BkuPage() {
     }));
   }
 
-  function updateDraftMaterial(draftIndex: number, lineIndex: number, materialId: string) {
-    const material = transactionsApi.materials.find((item) => item.id === materialId);
-    updateDraftLine(draftIndex, lineIndex, material
-      ? { material_id: material.id, name: material.name, unit_price: String(material.unit_price), unit: material.unit }
-      : { material_id: "" });
-  }
-
   function handleSplitDetails(draftIndex: number, lineIndexes: number[]) {
     const selected = Array.from(new Set(lineIndexes)).sort((a, b) => a - b);
     if (!selected.length) return;
@@ -612,8 +605,7 @@ export default function BkuPage() {
         onSave={handleSaveEntries}
         onDraftChange={updateDraft}
         onLineChange={updateDraftLine}
-        onMaterialSelect={updateDraftMaterial}
-        onAddDetail={(draftIndex) => updateDraft(draftIndex, { details: [...drafts[draftIndex].details, blankDetail()] })}
+        onAddDetail={(draftIndex, line) => updateDraft(draftIndex, { details: [...drafts[draftIndex].details, line] })}
         onRemoveDetail={(draftIndex, lineIndex) => updateDraft(draftIndex, { details: drafts[draftIndex].details.filter((_line, index) => index !== lineIndex) })}
         onAddDraft={() => setDrafts((current) => [...current, blankDraft()])}
         onRemoveDraft={(index) => setDrafts((current) => current.filter((_draft, currentIndex) => currentIndex !== index))}
