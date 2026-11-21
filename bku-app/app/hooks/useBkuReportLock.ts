@@ -26,6 +26,7 @@ export function useBkuReportLock(supabase: BkuClient | null, session: Session | 
       setLock(null);
       return;
     }
+    setLock(null);
     setLoading(true);
     try {
       const { data, error } = await supabase.from("bku_book_locks")
