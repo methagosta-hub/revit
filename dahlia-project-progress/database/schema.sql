@@ -231,6 +231,34 @@ begin
       raise exception 'Item RAB tidak ditemukan pada versi aktif';
     end if;
 
+    -- Progres bersifat kumulatif: tidak boleh lebih rendah dari tanggal sebelumnya
+    -- atau lebih tinggi dari snapshot yang sudah tersimpan pada tanggal berikutnya.
+    if exists (
+      select 1
+      from public.progress_reports previous_report
+      join public.progress_report_items previous_item on previous_item.report_id = previous_report.id
+      where previous_report.project_id = p_project_id
+        and previous_report.boq_version = v_project.current_boq_version
+        and previous_report.report_date < p_report_date
+        and previous_item.boq_item_id = v_item_id
+        and previous_item.cumulative_percent > v_percent
+    ) then
+      raise exception 'Progres % tidak boleh lebih kecil dari laporan tanggal sebelumnya', v_item_id;
+    end if;
+
+    if exists (
+      select 1
+      from public.progress_reports next_report
+      join public.progress_report_items next_item on next_item.report_id = next_report.id
+      where next_report.project_id = p_project_id
+        and next_report.boq_version = v_project.current_boq_version
+        and next_report.report_date > p_report_date
+        and next_item.boq_item_id = v_item_id
+        and next_item.cumulative_percent < v_percent
+    ) then
+      raise exception 'Progres % melampaui laporan tanggal berikutnya; periksa urutan snapshot', v_item_id;
+    end if;
+
     v_weight := v_amount / v_total_amount * 100;
     insert into public.progress_report_items(
       report_id, boq_item_id, cumulative_percent,
