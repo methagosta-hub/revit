@@ -32,3 +32,33 @@ Bobot rencana proyek merupakan penjumlahan progres rencana setiap item yang dika
 
 ## Pengembangan
 `npm install`, `npm run dev`, `npm run lint`, `npm run build`.
+
+
+## Pembaruan 21 November 2026 — Menu Pekerjaan, Identitas Sekolah, dan Export Jadwal PDF
+
+Untuk database Dahlia Project Progress yang sudah berjalan, jalankan satu kali migrasi berikut pada **Supabase project khusus Dahlia Project Progress**:
+
+- `database/migrations/20261121_project_menus_school_identity_schedule.sql`
+
+Jangan jalankan migrasi ini pada database Dahlia BKU atau database utama Dahlia Management System.
+
+### Struktur data baru
+
+Hierarki data sekarang menjadi **Proyek → Menu Pekerjaan → Rincian BOQ**. Satu proyek dapat memiliki beberapa menu seperti Kelas Baru, Toilet, Penataan Lingkungan, Kantor, dan sebagainya. Setiap menu memiliki versi RAB, bobot, jadwal, dan riwayat laporan progres masing-masing.
+
+Migrasi membuat satu menu awal bernama **RAB Utama** pada setiap proyek lama. Seluruh item BOQ dan laporan lama ditautkan ke menu tersebut tanpa mengubah ID item, sehingga data lama tetap terbaca.
+
+### Identitas proyek sekolah
+
+Master proyek menyimpan identitas sekolah dan penandatangan: nama proyek/sekolah, alamat, telepon, NPSN, Kepala Sekolah, P2SP, Perencana, dan Pengawas. Nama proyek dipakai sebagai judul sekolah pada dokumen. Kolom lama seperti lokasi, klien, nomor kontrak, serta periode proyek tetap dipertahankan.
+
+### Export Jadwal Pelaksanaan Pekerjaan
+
+Buka **Jadwal / PDF** setelah memilih proyek dan menu. Dokumen mengikuti struktur contoh jadwal pelaksanaan:
+- Uraian pekerjaan, jumlah harga, bobot rencana, dan pembagian bobot rencana per minggu yang dikelompokkan per bulan.
+- Total bobot rencana mingguan dan progres rencana kumulatif mingguan.
+- Kurva progres rencana kumulatif.
+- Opsi tanda tangan Kepala Sekolah, P2SP, Perencana, dan Pengawas; tersedia **Pilih semua** untuk menampilkan keempat penandatangan.
+- Tombol **Cetak / Simpan PDF** membuka dialog cetak browser. Pilih **Save as PDF / Simpan sebagai PDF** untuk menyimpan file. Format halaman disiapkan landscape A3.
+
+Distribusi rencana mingguan dihitung dari tanggal mulai dan selesai setiap item menggunakan kurva smoothstep yang sama dengan perhitungan target rencana pada dashboard; nilai mingguan adalah perubahan bobot rencana antar batas minggu.
