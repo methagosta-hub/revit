@@ -37,17 +37,13 @@ Paket ini merupakan **overlay untuk proyek lokal** `bku-app`. Paket tidak menyam
 
 ## Migrasi Supabase — wajib sebelum menguji fitur baru
 
-Jalankan file `database/migrations/20261119_payroll_split_receipts.sql` secara manual melalui SQL Editor **hanya pada proyek Supabase BKU** (`arqfzltimcehqssxojtz`). Jangan jalankan pada database utama Dahlia.
+Jalankan migrasi secara berurutan melalui SQL Editor **hanya pada proyek Supabase BKU** (`arqfzltimcehqssxojtz`). Jangan jalankan pada database utama Dahlia.
 
-Migrasi ini:
+1. `database/migrations/20261119_payroll_split_receipts.sql` — grup nota, master pekerja, absensi, rekap mingguan, RLS, dan RPC penyimpanan upah.
+2. `database/migrations/20261120_payroll_sunday_saturday.sql` — periode kerja Minggu–Sabtu dan pembayaran otomatis pada Sabtu; mempertahankan histori absensi dan nominal.
+3. `database/migrations/20261121_report_export_and_date_lock.sql` — tabel batas penguncian per buku kas, RLS, dan trigger pengaman transaksi, absensi, serta rekap penggajian.
 
-- menambah `split_group_id`, `split_group_label`, dan `split_group_total` pada `bku_transactions`;
-- membuat master `bku_workers`;
-- membuat `bku_worker_attendance` dengan snapshot nama, jenis pekerja, tarif harian, HOK, dan nilai upah;
-- membuat `bku_payroll_weeks` untuk memastikan satu transaksi kas keluar tertaut pada satu minggu penggajian;
-- menambahkan kebijakan RLS dan RPC `bku_save_weekly_payroll`.
-
-Migrasi dibungkus transaksi dan ditulis dengan `IF NOT EXISTS` / `CREATE OR REPLACE` agar aman dijalankan kembali untuk skema yang sudah sesuai. Tetap tinjau hasil SQL Editor sebelum melanjutkan.
+Migrasi dibungkus transaksi dan menggunakan `IF NOT EXISTS`, `CREATE OR REPLACE`, serta penggantian kebijakan/trigger yang aman untuk skema yang sudah sesuai. Tetap tinjau hasil SQL Editor sebelum melanjutkan.
 
 ## Perilaku fitur
 
