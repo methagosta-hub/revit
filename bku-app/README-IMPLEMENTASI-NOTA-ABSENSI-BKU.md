@@ -62,7 +62,8 @@ Migrasi dibungkus transaksi dan menggunakan `IF NOT EXISTS`, `CREATE OR REPLACE`
 - Pekerja dinonaktifkan, bukan dihapus permanen, sehingga histori tetap ada. Pekerja aktif maupun pekerja nonaktif yang punya absensi pada minggu tersebut tetap ditampilkan saat relevan.
 - Absensi satu minggu dapat disalin ke minggu lain berdasarkan hari yang sama. Hasil salinan tetap harus diperiksa dan disimpan secara eksplisit.
 - Tanggal pembayaran otomatis jatuh pada hari Sabtu di akhir periode. Penyimpanan membuat satu transaksi `OUT` kategori `upah` pada hari tersebut. Penyimpanan ulang minggu yang sama memperbarui transaksi terkait, bukan membuat transaksi gaji ganda.
-- Snapshot nama/jenis/tarif pada minggu yang telah disimpan tidak ikut berubah saat master pekerja diperbarui.
+- Matriks absensi dashboard dan matriks PDF selalu menampilkan nama serta jenis terbaru dari daftar induk pekerja, sehingga perubahan nama langsung terlihat tanpa mengubah HOK atau nominal historis.
+- Snapshot tarif dan nilai upah per hari tetap dipertahankan agar histori pembayaran tidak berubah. Saat minggu tertentu disimpan ulang, snapshot nama/jenis untuk minggu itu mengikuti master terbaru.
 
 ### Export PDF
 
