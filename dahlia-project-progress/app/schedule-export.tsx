@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, CheckSquare, FileDown, Layers, RefreshCw, Square } from "lucide-react";
-import type { BoqItem, Project, WorkMenu } from "@/lib/types";
+import type { BoqItem, Project, Report, ReportItem, WorkMenu } from "@/lib/types";
 import { getProgressSupabase } from "@/lib/supabase";
 import { itemAmount, itemPlannedPercent } from "@/lib/curve";
 import { dateLabel, money, number } from "@/lib/formatters";
@@ -120,51 +120,44 @@ function shadeForCompletion(value: number) {
   };
 }
 
-function ScheduleCurve({ values }: { values: number[] }) {
-  if (!values.length) return null;
-  const width = 1120;
-  const height = 220;
-  const left = 50;
-  const right = 20;
-  const top = 18;
-  const bottom = 35;
-  const innerWidth = width - left - right;
-  const innerHeight = height - top - bottom;
-  const x = (index: number) => left + (values.length <= 1 ? 0 : index / (values.length - 1)) * innerWidth;
-  const y = (value: number) => top + (100 - Math.max(0, Math.min(100, value))) / 100 * innerHeight;
-  const path = values.map((value, index) => `${index ? "L" : "M"} ${x(index).toFixed(1)} ${y(value).toFixed(1)}`).join(" ");
-  const visibleLabels = values.map((_, index) => index).filter((index) =>
-    index === 0 || index === values.length - 1 || index % Math.max(1, Math.ceil(values.length / 12)) === 0
-  );
+function MatrixCurveOverlay({ planned, actual }: { planned: number[]; actual: number[] }) {
+  if (!planned.length) return null;
+  const width = planned.length * 100;
+  const height = 1000;
+  const x = (index: number) => index * 100 + 50;
+  const y = (value: number) => height * (1 - Math.max(0, Math.min(100, value)) / 100);
+  const makePath = (values: number[]) =>
+    values.map((value, index) => `${index ? "L" : "M"} ${x(index).toFixed(1)} ${y(value).toFixed(1)}`).join(" ");
 
   return (
-    <div className="schedule-curve">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Kurva S gabungan progres rencana kumulatif mingguan">
-        {[0, 25, 50, 75, 100].map((value) => (
-          <g key={value}>
-            <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#dbe5ee" strokeDasharray="4 5" />
-            <text x={left - 9} y={y(value) + 4} textAnchor="end" fontSize="11" fill="#60758a">{value}%</text>
-          </g>
-        ))}
-        <path d={path} fill="none" stroke="#226ca8" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-        {values.map((value, index) => (
-          <circle key={index} cx={x(index)} cy={y(value)} r="4" fill="#226ca8" stroke="#ffffff" strokeWidth="1.5">
-            <title>Minggu ${index + 1}: ${percent(value)}</title>
-          </circle>
-        ))}
-        {visibleLabels.map((index) => (
-          <text key={index} x={x(index)} y={height - 10} textAnchor="middle" fontSize="10" fill="#60758a">
-            M{index + 1}
-          </text>
-        ))}
-      </svg>
-    </div>
+    <svg
+      className="schedule-matrix-curve-overlay"
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      role="img"
+      aria-label="Kurva S gabungan: perbandingan progres rencana dan realisasi"
+    >
+      <path className="matrix-curve-plan" d={makePath(planned)} />
+      <path className="matrix-curve-actual" d={makePath(actual)} />
+      {planned.map((value, index) => (
+        <circle key={`p-${index}`} className="matrix-curve-plan-point" cx={x(index)} cy={y(value)} r="5">
+          <title>Rencana minggu ${index + 1}: ${percent(value)}</title>
+        </circle>
+      ))}
+      {actual.map((value, index) => (
+        <circle key={`a-${index}`} className="matrix-curve-actual-point" cx={x(index)} cy={y(value)} r="5">
+          <title>Realisasi minggu ${index + 1}: ${percent(value)}</title>
+        </circle>
+      ))}
+    </svg>
   );
 }
 
 export default function ScheduleExport({ project, menus }: { project: Project; menus: WorkMenu[] }) {
   const supabase = useMemo(() => getProgressSupabase(), []);
   const [itemsByMenu, setItemsByMenu] = useState<Record<string, BoqItem[]>>({});
+  const [reportsByMenu, setReportsByMenu] = useState<Record<string, Report[]>>({});
+  const [reportItemsByMenu, setReportItemsByMenu] = useState<Record<string, ReportItem[]>>({});
   const [settings, setSettings] = useState<Record<string, MenuSettings>>({});
   const [selectedSigners, setSelectedSigners] = useState<SignerKey[]>(["school_head", "p2sp", "planner", "supervisor"]);
   const [loading, setLoading] = useState(false);
@@ -197,6 +190,8 @@ export default function ScheduleExport({ project, menus }: { project: Project; m
     }
     if (!activeMenus.length) {
       setItemsByMenu({});
+      setReportsByMenu({});
+      setReportItemsByMenu({});
       return;
     }
 
@@ -204,21 +199,52 @@ export default function ScheduleExport({ project, menus }: { project: Project; m
     setLoadError("");
     try {
       const results = await Promise.all(activeMenus.map(async (menu) => {
-        const { data, error } = await supabase
-          .from("progress_boq_items")
-          .select("*")
-          .eq("project_id", project.id)
-          .eq("menu_id", menu.id)
-          .eq("boq_version", menu.current_boq_version)
-          .eq("is_active", true)
-          .order("sort_order")
-          .order("item_code");
-        if (error) throw error;
-        return [menu.id, (data || []) as BoqItem[]] as const;
+        const [boqResult, reportResult] = await Promise.all([
+          supabase
+            .from("progress_boq_items")
+            .select("*")
+            .eq("project_id", project.id)
+            .eq("menu_id", menu.id)
+            .eq("boq_version", menu.current_boq_version)
+            .eq("is_active", true)
+            .order("sort_order")
+            .order("item_code"),
+          supabase
+            .from("progress_reports")
+            .select("*")
+            .eq("project_id", project.id)
+            .eq("menu_id", menu.id)
+            .eq("boq_version", menu.current_boq_version)
+            .order("report_date", { ascending: true }),
+        ]);
+        if (boqResult.error) throw boqResult.error;
+        if (reportResult.error) throw reportResult.error;
+
+        const menuReports = (reportResult.data || []) as Report[];
+        const reportIds = menuReports.map((report) => report.id);
+        let details: ReportItem[] = [];
+        if (reportIds.length) {
+          const { data, error } = await supabase
+            .from("progress_report_items")
+            .select("*")
+            .in("report_id", reportIds);
+          if (error) throw error;
+          details = (data || []) as ReportItem[];
+        }
+
+        return {
+          menuId: menu.id,
+          items: (boqResult.data || []) as BoqItem[],
+          reports: menuReports,
+          reportItems: details,
+        };
       }));
-      setItemsByMenu(Object.fromEntries(results));
+
+      setItemsByMenu(Object.fromEntries(results.map((result) => [result.menuId, result.items])));
+      setReportsByMenu(Object.fromEntries(results.map((result) => [result.menuId, result.reports])));
+      setReportItemsByMenu(Object.fromEntries(results.map((result) => [result.menuId, result.reportItems])));
     } catch (cause) {
-      setLoadError(cause instanceof Error ? cause.message : "Rincian RAB menu gagal dimuat.");
+      setLoadError(cause instanceof Error ? cause.message : "Data RAB dan progres aktual gagal dimuat.");
     } finally {
       setLoading(false);
     }
@@ -280,6 +306,36 @@ export default function ScheduleExport({ project, menus }: { project: Project; m
       return total;
     });
   }, [weeklyTotals]);
+
+  const actualTotals = useMemo(() => weeks.map((week) => {
+    let actualAmount = 0;
+
+    selectedMenus.forEach((menu) => {
+      const menuItems = itemsByMenu[menu.id] || [];
+      const reports = (reportsByMenu[menu.id] || [])
+        .filter((report) => report.boq_version === menu.current_boq_version && report.report_date <= week.end)
+        .slice()
+        .sort((a, b) => a.report_date.localeCompare(b.report_date));
+      const latest = reports[reports.length - 1];
+      if (!latest) return;
+
+      const details = (reportItemsByMenu[menu.id] || []).filter((item) => item.report_id === latest.id);
+      const itemLookup = new Map(menuItems.map((item) => [item.id, item]));
+      details.forEach((detail) => {
+        const item = itemLookup.get(detail.boq_item_id);
+        if (!item) return;
+        const snapshotAmount = Number(detail.boq_amount_snapshot ?? itemAmount(item));
+        const completed = Math.max(0, Math.min(100, Number(detail.cumulative_percent || 0)));
+        actualAmount += snapshotAmount * completed / 100;
+      });
+    });
+
+    return totalAmount > 0 ? actualAmount / totalAmount * 100 : 0;
+  }), [weeks, selectedMenus, itemsByMenu, reportsByMenu, reportItemsByMenu, totalAmount]);
+
+  const menusWithoutReports = selectedMenus.filter((menu) =>
+    !(reportsByMenu[menu.id] || []).some((report) => report.boq_version === menu.current_boq_version)
+  );
 
   const lines = useMemo<ScheduleLine[]>(() => {
     const result: ScheduleLine[] = [];
@@ -495,7 +551,7 @@ export default function ScheduleExport({ project, menus }: { project: Project; m
           <p className="pdf-selected-menu-names">Menu: {selectedMenus.map((menu) => menu.name).join(" · ") || "Belum ada menu dipilih"}</p>
         </header>
 
-        {loading ? <div className="empty-state">Memuat rincian RAB menu…</div> :
+        {loading ? <div className="empty-state">Memuat RAB dan laporan progres dari seluruh menu…</div> :
           !selectedMenus.length ? <div className="empty-state">Pilih minimal satu menu untuk menyusun Kurva S gabungan.</div> :
           !totalAmount ? <div className="empty-state">Menu yang dipilih belum memiliki nilai RAB lebih dari nol.</div> :
           (
@@ -505,8 +561,27 @@ export default function ScheduleExport({ project, menus }: { project: Project; m
                   Menu tanpa item aktif tidak akan masuk perhitungan: {menusWithoutItems.map((menu) => menu.name).join(", ")}
                 </div>
               )}
-              <div className="pdf-table-wrap">
+              <div className="matrix-curve-legend">
+                <span><i className="matrix-legend-line plan" /> Rencana</span>
+                <span><i className="matrix-legend-line actual" /> Realisasi aktual</span>
+                <small>Posisi garis menunjukkan progres kumulatif pada minggu tersebut dan dibaca terhadap susunan baris pekerjaan.</small>
+              </div>
+              {menusWithoutReports.length > 0 && (
+                <div className="pdf-warning">
+                  Belum ada input progres untuk: {menusWithoutReports.map((menu) => menu.name).join(", ")}. Garis realisasi menu tersebut masih dihitung 0% sampai laporan progres tersedia.
+                </div>
+              )}
+              <div className="pdf-table-wrap schedule-matrix-scroll">
+                <div className="schedule-matrix-stage">
                 <table className="schedule-table">
+                  <colgroup>
+                    <col style={{ width: "3.5%" }} />
+                    <col style={{ width: "29%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "5.5%" }} />
+                    {weeks.map((week) => <col key={week.index} style={{ width: `${48 / weeks.length}%` }} />)}
+                    <col style={{ width: "3%" }} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th rowSpan={2} className="schedule-no">No.</th>
@@ -569,8 +644,15 @@ export default function ScheduleExport({ project, menus }: { project: Project; m
                       {cumulativeTotals.map((value, index) => <th key={index} className="num">{number(value, 2)}</th>)}
                       <th />
                     </tr>
+                    <tr className="schedule-actual-row">
+                      <th colSpan={4}>PROGRES REALISASI KUMULATIF MINGGUAN (%)</th>
+                      {actualTotals.map((value, index) => <th key={index} className="num">{number(value, 2)}</th>)}
+                      <th />
+                    </tr>
                   </tfoot>
                 </table>
+                <MatrixCurveOverlay planned={cumulativeTotals} actual={actualTotals} />
+                </div>
               </div>
 
               <div className="schedule-heat-legend">
@@ -579,11 +661,6 @@ export default function ScheduleExport({ project, menus }: { project: Project; m
                 <span><i className="heat-swatch medium" /> Berkembang</span>
                 <span><i className="heat-swatch dark" /> Mendekati selesai</span>
               </div>
-
-              <section className="pdf-curve-section">
-                <h3>KURVA S GABUNGAN · PROGRES RENCANA KUMULATIF MINGGUAN (%)</h3>
-                <ScheduleCurve values={cumulativeTotals} />
-              </section>
 
               <footer className="pdf-signatures">
                 <div className="pdf-signature-date">
