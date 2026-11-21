@@ -101,7 +101,7 @@ export default function ScheduleExport({ project, menu, items }: { project: Proj
   const rows = useMemo<ScheduleRow[]>(() => items.map((item) => {
     const amount = itemAmount(item);
     const weight = totalAmount > 0 ? amount / totalAmount * 100 : 0;
-    let previous = itemPlannedPercent(item, project, shiftDate(project.start_date, -1));
+    let previous = 0;
     const weekly = weeks.map((week) => {
       const current = itemPlannedPercent(item, project, week.end);
       const contribution = Math.max(0, current - previous) * weight / 100;
@@ -182,6 +182,8 @@ export default function ScheduleExport({ project, menu, items }: { project: Proj
           <h3>{menu.name.toLocaleUpperCase("id-ID")}</h3>
           {project.npsn && <p>NO. NPSN : {project.npsn}</p>}
           <p>{project.address || project.location || "Alamat sekolah belum diisi"}</p>
+          {project.phone && <p>Telepon: {project.phone}</p>}
+          {project.contract_number && <p>No. Kontrak: {project.contract_number}</p>}
           <p>Periode: {dateLabel(project.start_date)} – {dateLabel(project.end_date)}</p>
         </header>
 
