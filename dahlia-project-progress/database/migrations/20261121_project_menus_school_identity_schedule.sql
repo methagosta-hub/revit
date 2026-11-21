@@ -172,16 +172,16 @@ create policy progress_boq_items_owner_all
     select 1
     from public.progress_project_menus m
     join public.progress_projects p on p.id = m.project_id
-    where m.id = menu_id
-      and m.project_id = project_id
+    where m.id = progress_boq_items.menu_id
+      and m.project_id = progress_boq_items.project_id
       and p.owner_id = (select auth.uid())
   ))
   with check (exists (
     select 1
     from public.progress_project_menus m
     join public.progress_projects p on p.id = m.project_id
-    where m.id = menu_id
-      and m.project_id = project_id
+    where m.id = progress_boq_items.menu_id
+      and m.project_id = progress_boq_items.project_id
       and p.owner_id = (select auth.uid())
   ));
 
@@ -192,7 +192,7 @@ create policy progress_reports_owner_all
   using (exists (
     select 1 from public.progress_projects p
     join public.progress_project_menus m on m.project_id = p.id
-    where p.id = project_id and m.id = menu_id
+    where p.id = progress_reports.project_id and m.id = progress_reports.menu_id
       and p.owner_id = (select auth.uid())
   ))
   with check (
@@ -200,7 +200,7 @@ create policy progress_reports_owner_all
     and exists (
       select 1 from public.progress_projects p
       join public.progress_project_menus m on m.project_id = p.id
-      where p.id = project_id and m.id = menu_id
+      where p.id = progress_reports.project_id and m.id = progress_reports.menu_id
         and p.owner_id = (select auth.uid())
     )
   );
