@@ -255,12 +255,9 @@ export default function ScheduleExport({ project, menus }: { project: Project; m
       const itemCumulative: number[] = [];
       const itemCompletion: number[] = [];
       let previous = itemPlannedPercent(item, project, previousDate);
-      let cumulative = 0;
-
       weeks.forEach((week) => {
         const current = itemPlannedPercent(item, project, week.end);
         const delta = Math.max(0, current - previous);
-        cumulative = current;
         itemWeekly.push(totalAmount > 0 ? amount / totalAmount * delta : 0);
         itemCumulative.push(totalAmount > 0 ? amount / totalAmount * current : 0);
         itemCompletion.push(current);
