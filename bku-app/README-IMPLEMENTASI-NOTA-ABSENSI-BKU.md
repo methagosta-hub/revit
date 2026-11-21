@@ -67,7 +67,7 @@ Migrasi dibungkus transaksi dan menggunakan `IF NOT EXISTS`, `CREATE OR REPLACE`
 ### Export PDF
 
 - Pilih tanggal awal dan akhir serta bagian laporan yang diperlukan: BKU, Matriks Absensi, dan/atau Rekap Total Material.
-- Semua bagian yang dicentang digabung menjadi satu PDF, sementara setiap bagian memiliki halaman/section tersendiri.
+- Setiap bagian yang dicentang dibuat sebagai file PDF terpisah; satu kali proses ekspor dapat membuka satu sampai tiga tab PDF.
 - Rekap material mengakumulasi item di bawah kelompok yang sudah dipetakan, serta menampilkan material yang belum dipetakan. Volume tetap terpisah menurut satuan dan sumber nota ditampilkan per item.
 - Nama dokumen otomatis memakai nama proyek, bagian yang dipilih, periode, timestamp milidetik, dan UUID acak. Ekspor ulang untuk proyek/periode yang sama tetap mendapat nama berbeda.
 - Matriks absensi dibuat per minggu Minggu–Sabtu untuk semua pekerja yang tanggal bergabungnya tidak melewati tanggal akhir laporan. Sel di luar rentang laporan atau sebelum tanggal bergabung dibiarkan kosong.
