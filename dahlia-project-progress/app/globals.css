@@ -274,3 +274,85 @@ input,select,textarea { border-radius:9px; }
     -webkit-print-color-adjust:exact!important;
   }
 }
+
+
+/* Planned vs actual S-curve drawn inside the weekly work matrix */
+.schedule-matrix-scroll { overflow:visible!important; }
+.schedule-matrix-stage { position:relative; min-width:1120px; width:100%; }
+.schedule-matrix-stage .schedule-table { width:100%; table-layout:fixed; }
+.schedule-matrix-curve-overlay {
+  position:absolute;
+  z-index:6;
+  pointer-events:none;
+  left:49%;
+  top:42px;
+  width:48%;
+  height:calc(100% - 96px);
+  overflow:visible;
+}
+.matrix-curve-plan {
+  fill:none;
+  stroke:#1768b0;
+  stroke-width:5;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  vector-effect:non-scaling-stroke;
+  filter:drop-shadow(0 1px 1px rgba(255,255,255,.85));
+}
+.matrix-curve-actual {
+  fill:none;
+  stroke:#e04f4f;
+  stroke-width:4.5;
+  stroke-dasharray:10 6;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  vector-effect:non-scaling-stroke;
+  filter:drop-shadow(0 1px 1px rgba(255,255,255,.9));
+}
+.matrix-curve-plan-point {
+  fill:#1768b0;
+  stroke:#fff;
+  stroke-width:2;
+  vector-effect:non-scaling-stroke;
+}
+.matrix-curve-actual-point {
+  fill:#e04f4f;
+  stroke:#fff;
+  stroke-width:2;
+  vector-effect:non-scaling-stroke;
+}
+.matrix-curve-legend {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px 18px;
+  padding:7px 10px;
+  margin:0 0 6px;
+  border:1px solid #e2eaf2;
+  border-radius:7px;
+  background:#f8fbfe;
+  color:#526b84;
+  font-size:8px;
+}
+.matrix-curve-legend span { display:inline-flex; align-items:center; gap:6px; font-weight:800; }
+.matrix-curve-legend small { color:#8794a4; margin-left:auto; font-size:7px; }
+.matrix-legend-line { display:inline-block; width:25px; height:0; border-top:3px solid #1768b0; }
+.matrix-legend-line.actual { border-top:3px dashed #e04f4f; }
+.schedule-table .schedule-actual-row th {
+  background:#fbeaea;
+  color:#9f3333;
+  font-weight:900;
+}
+.schedule-table .schedule-actual-row th.num { color:#9f3333; }
+@media(max-width:760px) {
+  .matrix-curve-legend small { width:100%; margin-left:0; }
+}
+@media print {
+  .schedule-matrix-scroll { overflow:visible!important; }
+  .schedule-matrix-stage { min-width:0!important; width:100%!important; }
+  .schedule-matrix-curve-overlay { print-color-adjust:exact!important; -webkit-print-color-adjust:exact!important; }
+  .matrix-curve-plan,.matrix-curve-actual,.matrix-curve-plan-point,.matrix-curve-actual-point {
+    print-color-adjust:exact!important;
+    -webkit-print-color-adjust:exact!important;
+  }
+}
