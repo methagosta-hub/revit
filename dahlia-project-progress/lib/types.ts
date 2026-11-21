@@ -10,11 +10,31 @@ export type Project = {
   current_boq_version: number;
   created_at: string;
   updated_at: string;
+  school_head: string;
+  planner: string;
+  supervisor: string;
+  p2sp: string;
+  address: string;
+  phone: string;
+  npsn: string;
+};
+
+export type WorkMenu = {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string;
+  sort_order: number;
+  current_boq_version: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 export type BoqItem = {
   id: string;
   project_id: string;
+  menu_id: string;
   boq_version: number;
   item_code: string;
   work_group: string;
@@ -31,6 +51,7 @@ export type BoqItem = {
 export type Report = {
   id: string;
   project_id: string;
+  menu_id: string;
   boq_version: number;
   report_date: string;
   notes: string;
