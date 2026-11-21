@@ -7,11 +7,13 @@ Paket ini merupakan **overlay untuk proyek lokal** `bku-app`. Paket tidak menyam
 - `app/page.tsx` — komposisi halaman, navigasi Kalender / Buku Transaksi / Absensi & Gaji / Profil.
 - `app/components/transactions/*` — formulir transaksi, beberapa nota dalam satu tanggal, rincian material, pemecahan nota, kartu dan ledger transaksi.
 - `app/components/workers/*` — daftar induk pekerja dan matriks absensi/penggajian mingguan.
-- `app/components/reports/*` — export laporan PDF dengan rentang tanggal dan matriks absensi.
+- `app/components/reports/*` — export PDF terpilih (BKU, Matriks Absensi, Rekap Material), nama file otomatis unik, dan panel penguncian laporan.
 - `app/hooks/useBkuPayroll.ts` — pemuatan daftar pekerja, absensi mingguan, penyalinan absensi, dan penyimpanan penggajian.
 - `app/hooks/useBkuTransactions.ts` — penyimpanan transaksi dan sinkronisasi grup nota terpisah.
 - `app/lib/bku/*` — tipe data, formatter, perhitungan saldo, validasi, dan perpindahan transaksi.
 - `database/migrations/20261119_payroll_split_receipts.sql` — migrasi kolom grup nota, tabel pekerja, absensi, rekap mingguan, RLS, dan RPC penyimpanan upah.
+- `database/migrations/20261120_payroll_sunday_saturday.sql` — mengubah periode absensi menjadi Minggu–Sabtu dan menetapkan pembayaran pada Sabtu.
+- `database/migrations/20261121_report_export_and_date_lock.sql` — membuat kunci laporan per tanggal dan trigger pengaman transaksi, absensi, serta rekap penggajian.
 
 ## Cara memasang pada Windows
 
@@ -35,17 +37,13 @@ Paket ini merupakan **overlay untuk proyek lokal** `bku-app`. Paket tidak menyam
 
 ## Migrasi Supabase — wajib sebelum menguji fitur baru
 
-Jalankan file `database/migrations/20261119_payroll_split_receipts.sql` secara manual melalui SQL Editor **hanya pada proyek Supabase BKU** (`arqfzltimcehqssxojtz`). Jangan jalankan pada database utama Dahlia.
+Jalankan migrasi secara berurutan melalui SQL Editor **hanya pada proyek Supabase BKU** (`arqfzltimcehqssxojtz`). Jangan jalankan pada database utama Dahlia.
 
-Migrasi ini:
+1. `database/migrations/20261119_payroll_split_receipts.sql` — grup nota, master pekerja, absensi, rekap mingguan, RLS, dan RPC penyimpanan upah.
+2. `database/migrations/20261120_payroll_sunday_saturday.sql` — periode kerja Minggu–Sabtu dan pembayaran otomatis pada Sabtu; mempertahankan histori absensi dan nominal.
+3. `database/migrations/20261121_report_export_and_date_lock.sql` — tabel batas penguncian per buku kas, RLS, dan trigger pengaman transaksi, absensi, serta rekap penggajian.
 
-- menambah `split_group_id`, `split_group_label`, dan `split_group_total` pada `bku_transactions`;
-- membuat master `bku_workers`;
-- membuat `bku_worker_attendance` dengan snapshot nama, jenis pekerja, tarif harian, HOK, dan nilai upah;
-- membuat `bku_payroll_weeks` untuk memastikan satu transaksi kas keluar tertaut pada satu minggu penggajian;
-- menambahkan kebijakan RLS dan RPC `bku_save_weekly_payroll`.
-
-Migrasi dibungkus transaksi dan ditulis dengan `IF NOT EXISTS` / `CREATE OR REPLACE` agar aman dijalankan kembali untuk skema yang sudah sesuai. Tetap tinjau hasil SQL Editor sebelum melanjutkan.
+Migrasi dibungkus transaksi dan menggunakan `IF NOT EXISTS`, `CREATE OR REPLACE`, serta penggantian kebijakan/trigger yang aman untuk skema yang sudah sesuai. Tetap tinjau hasil SQL Editor sebelum melanjutkan.
 
 ## Perilaku fitur
 
@@ -59,20 +57,30 @@ Migrasi dibungkus transaksi dan ditulis dengan `IF NOT EXISTS` / `CREATE OR REPL
 
 ### Absensi dan penggajian mingguan
 
-- Matriks Senin–Sabtu menerima HOK 0, 0,25, 0,5, 0,75, atau 1.
+- Matriks Minggu–Sabtu menerima HOK 0, 0,25, 0,5, 0,75, atau 1.
 - Nilai awal daftar induk: Tukang Rp140.000/hari dan Pekerja Rp120.000/hari. Tarif, nama, jenis, dan tanggal mulai bergabung dapat disesuaikan.
 - Pekerja dinonaktifkan, bukan dihapus permanen, sehingga histori tetap ada. Pekerja aktif maupun pekerja nonaktif yang punya absensi pada minggu tersebut tetap ditampilkan saat relevan.
 - Absensi satu minggu dapat disalin ke minggu lain berdasarkan hari yang sama. Hasil salinan tetap harus diperiksa dan disimpan secara eksplisit.
-- Tanggal pembayaran dipilih antara Senin–Sabtu. Penyimpanan membuat satu transaksi `OUT` kategori `upah` pada tanggal itu. Penyimpanan ulang minggu yang sama memperbarui transaksi terkait, bukan membuat transaksi gaji ganda.
+- Tanggal pembayaran otomatis jatuh pada hari Sabtu di akhir periode. Penyimpanan membuat satu transaksi `OUT` kategori `upah` pada hari tersebut. Penyimpanan ulang minggu yang sama memperbarui transaksi terkait, bukan membuat transaksi gaji ganda.
 - Snapshot nama/jenis/tarif pada minggu yang telah disimpan tidak ikut berubah saat master pekerja diperbarui.
 
 ### Export PDF
 
-- Pilih tanggal awal dan akhir.
-- Ringkasan saldo awal menghitung semua transaksi sebelum tanggal awal; transaksi yang ditampilkan dibatasi pada rentang laporan.
-- Matriks absensi dibuat per minggu Senin–Sabtu untuk semua pekerja yang tanggal bergabungnya tidak melewati tanggal akhir laporan. Sel di luar rentang laporan atau sebelum tanggal bergabung dibiarkan kosong.
+- Pilih tanggal awal dan akhir serta bagian laporan yang diperlukan: BKU, Matriks Absensi, dan/atau Rekap Total Material.
+- Setiap bagian yang dicentang dibuat sebagai file PDF terpisah; satu kali proses ekspor dapat membuka satu sampai tiga tab PDF.
+- Rekap material mengakumulasi item di bawah kelompok yang sudah dipetakan, serta menampilkan material yang belum dipetakan. Volume tetap terpisah menurut satuan dan sumber nota ditampilkan per item.
+- Nama dokumen otomatis memakai nama proyek, bagian yang dipilih, periode, timestamp milidetik, dan UUID acak. Ekspor ulang untuk proyek/periode yang sama tetap mendapat nama berbeda.
+- Matriks absensi dibuat per minggu Minggu–Sabtu untuk semua pekerja yang tanggal bergabungnya tidak melewati tanggal akhir laporan. Sel di luar rentang laporan atau sebelum tanggal bergabung dibiarkan kosong.
 - Jika pekerja baru masuk pada minggu ketiga, nama tetap tersedia di matriks minggu sebelumnya tetapi sel hariannya kosong.
 - PDF membuka jendela laporan setelah klik pengguna untuk menghindari pemblokiran popup saat data absensi dimuat.
+
+### Penguncian laporan berdasarkan tanggal
+
+- Panel pengamanan tersedia di halaman buku kas. Pilih tanggal finalisasi, misalnya 29 November 2026, untuk mengunci tanggal tersebut dan seluruh tanggal sebelumnya dalam buku kas yang sedang aktif.
+- Tanggal yang terkunci tidak dapat menerima nota baru, salinan nota, perubahan tanggal, pemindahan, perubahan isi, atau penghapusan transaksi.
+- Absensi dan penyimpanan penggajian yang bersinggungan dengan rentang terkunci juga ditolak.
+- Batas penguncian bisa dimundurkan untuk membuka tanggal setelah batas baru, atau seluruh kunci dapat dibuka kembali. Pemilik buku kas tetap memiliki akses untuk melakukan pembukaan.
+- Trigger database menjadi lapisan pengaman utama; pemeriksaan pada UI hanya memberi peringatan lebih awal sebelum pengguna menyimpan.
 
 ## Pemeriksaan lokal
 

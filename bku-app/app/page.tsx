@@ -12,6 +12,7 @@ import { useBkuTransactions } from "@/app/hooks/useBkuTransactions";
 import { useBkuMaterialSummary } from "@/app/hooks/useBkuMaterialSummary";
 import { useBkuReportCategories } from "@/app/hooks/useBkuReportCategories";
 import { getSundayDate, useBkuPayroll } from "@/app/hooks/useBkuPayroll";
+import { useBkuReportLock } from "@/app/hooks/useBkuReportLock";
 import { AppHeader } from "@/app/components/layout/AppHeader";
 import { AppModal } from "@/app/components/layout/AppModal";
 import { BalanceSummary } from "@/app/components/layout/BalanceSummary";
@@ -29,6 +30,8 @@ import { StoreMasterView } from "@/app/components/stores/StoreMasterView";
 import { ReportCategoryMasterView } from "@/app/components/stores/ReportCategoryMasterView";
 import { MaterialSummaryView } from "@/app/components/materials/MaterialSummaryView";
 import { ExportPdfModal } from "@/app/components/reports/ExportPdfModal";
+import { ReportLockPanel } from "@/app/components/reports/ReportLockPanel";
+import { buildUniquePdfFilename, type PdfExportSection } from "@/app/components/reports/exportFilename";
 import { openBkuPdfReport } from "@/app/components/reports/pdfReport";
 
 function transactionToDraft(tx: Transaction): Draft {
@@ -69,6 +72,7 @@ export default function BkuPage() {
   const reportCategoriesApi = useBkuReportCategories(supabase, booksApi.session);
   const [payrollWeekStart, setPayrollWeekStart] = useState(() => getSundayDate(dateKey(new Date())));
   const payrollApi = useBkuPayroll(supabase, booksApi.session, booksApi.book, payrollWeekStart);
+  const reportLockApi = useBkuReportLock(supabase, booksApi.session, booksApi.book);
 
   const [view, setView] = useState<AppView>("calendar");
   const [month, setMonth] = useState(() => new Date());
@@ -118,6 +122,7 @@ export default function BkuPage() {
   const defaultSignatories: SignatoryRole[] = ["school_head", "p2sp", "supervisor", "planner"];
   const [financialSignatoryRoles, setFinancialSignatoryRoles] = useState<SignatoryRole[]>(defaultSignatories);
   const [attendanceSignatoryRoles, setAttendanceSignatoryRoles] = useState<SignatoryRole[]>(defaultSignatories);
+  const [exportSections, setExportSections] = useState<PdfExportSection[]>(["bku", "attendance", "materials"]);
   const [toast, setToast] = useState<ToastState>(null);
 
   const closeToast = useCallback(() => setToast(null), []);
@@ -125,6 +130,7 @@ export default function BkuPage() {
   const balances = useMemo(() => calculateBalances(booksApi.book, ordered), [booksApi.book, ordered]);
   const daySummaries = useMemo(() => buildDaySummaries(ordered, month), [ordered, month]);
   const selectedRows = useMemo(() => ordered.filter((tx) => tx.transaction_date === (dayDialogDate || selectedDate)), [ordered, dayDialogDate, selectedDate]);
+  const latestTransactionDate = useMemo(() => ordered.reduce((latest, tx) => tx.transaction_date > latest ? tx.transaction_date : latest, booksApi.book?.start_date || dateKey(new Date())), [ordered, booksApi.book?.start_date]);
 
   useEffect(() => {
     if (!booksApi.book) return;
@@ -223,6 +229,10 @@ export default function BkuPage() {
   }
 
   function openNewEntry(date = selectedDate) {
+    if (reportLockApi.isDateLocked(date)) {
+      setToast({ message: `Tanggal ${dateLabel(date)} terkunci. Buka kunci laporan terlebih dahulu.`, tone: "error" });
+      return;
+    }
     setSelectedDate(date);
     setEditTargetDate(date);
     setEditingTransactionId(null);
@@ -233,6 +243,10 @@ export default function BkuPage() {
   }
 
   function openEditTransaction(tx: Transaction) {
+    if (reportLockApi.isDateLocked(tx.transaction_date)) {
+      setToast({ message: `Nota tanggal ${dateLabel(tx.transaction_date)} terkunci. Buka kunci laporan terlebih dahulu untuk mengubahnya.`, tone: "error" });
+      return;
+    }
     setEntryError("");
     setSelectedDate(tx.transaction_date);
     setEditTargetDate(tx.transaction_date);
@@ -317,6 +331,10 @@ export default function BkuPage() {
 
   function confirmCopyTransaction() {
     if (!copySource) return;
+    if (reportLockApi.isDateLocked(copyTargetDate)) {
+      setToast({ message: `Tanggal tujuan ${dateLabel(copyTargetDate)} terkunci. Nota tidak dapat disalin ke tanggal tersebut.`, tone: "error" });
+      return;
+    }
     setSelectedDate(copyTargetDate);
     setEditTargetDate(copyTargetDate);
     setEditingTransactionId(null);
@@ -336,6 +354,11 @@ export default function BkuPage() {
     event.preventDefault();
     if (!booksApi.session) return;
     const targetDate = editingTransactionId ? (editTargetDate || selectedDate) : selectedDate;
+    const originalTransaction = editingTransactionId ? ordered.find((tx) => tx.id === editingTransactionId) : null;
+    if (reportLockApi.isDateLocked(targetDate) || (originalTransaction && reportLockApi.isDateLocked(originalTransaction.transaction_date))) {
+      setEntryError("Tanggal nota termasuk periode yang terkunci. Buka kunci laporan terlebih dahulu sebelum menyimpan perubahan.");
+      return;
+    }
     setEntrySaving(true);
     setEntryError("");
     try {
@@ -433,6 +456,9 @@ export default function BkuPage() {
   }
 
   async function handleSaveWeeklyPayroll(weekStart: string, payDate: string, account: "CASH" | "BANK", rows: WorkerAttendanceDraft[]) {
+    if (reportLockApi.lockedThroughDate && weekStart <= reportLockApi.lockedThroughDate) {
+      throw new Error(`Minggu kerja yang dimulai ${dateLabel(weekStart)} bersinggungan dengan periode terkunci sampai ${dateLabel(reportLockApi.lockedThroughDate)}. Buka kunci terlebih dahulu.`);
+    }
     const result = await payrollApi.saveWeeklyPayroll(weekStart, payDate, account, rows);
     if (booksApi.book?.id) await transactionsApi.loadTransactions(booksApi.book.id);
     setSelectedDate(payDate);
@@ -444,6 +470,10 @@ export default function BkuPage() {
 
   function handleCalendarDrop(sourceDate: string, targetDate: string) {
     if (!booksApi.book || sourceDate === targetDate) return;
+    if (reportLockApi.isDateLocked(sourceDate) || reportLockApi.isDateLocked(targetDate)) {
+      setToast({ message: "Transaksi tidak dapat dipindahkan dari atau ke tanggal yang terkunci. Buka kunci laporan terlebih dahulu.", tone: "error" });
+      return;
+    }
     const sourceRows = ordered.filter((tx) => tx.transaction_date === sourceDate);
     if (!sourceRows.length) return;
     setMoveRequest({ sourceDate, targetDate, initialTransactionIds: [] });
@@ -451,6 +481,11 @@ export default function BkuPage() {
 
   async function handleMoveTransactions(ids: string[]) {
     if (!moveRequest) return;
+    const sourceHasLockedDate = ordered.some((tx) => ids.includes(tx.id) && reportLockApi.isDateLocked(tx.transaction_date));
+    if (sourceHasLockedDate || reportLockApi.isDateLocked(moveRequest.targetDate)) {
+      setToast({ message: "Pemindahan nota dibatalkan karena tanggal sumber atau tujuan terkunci.", tone: "error" });
+      return;
+    }
     setMoving(true);
     try {
       const result = await transactionsApi.moveTransactions(ids, moveRequest.targetDate);
@@ -487,6 +522,10 @@ export default function BkuPage() {
   }
 
   async function handleDeleteTransaction(tx: Transaction) {
+    if (reportLockApi.isDateLocked(tx.transaction_date)) {
+      setToast({ message: `Nota tanggal ${dateLabel(tx.transaction_date)} terkunci. Buka kunci laporan terlebih dahulu untuk menghapusnya.`, tone: "error" });
+      return;
+    }
     if (!window.confirm(`Hapus nota ${tx.receipt_number || tx.description}? Tindakan ini tidak dapat dibatalkan.`)) return;
     try {
       await transactionsApi.deleteTransaction(tx);
@@ -512,17 +551,35 @@ export default function BkuPage() {
       setToast({ message: "Tanggal awal harus sama dengan atau lebih awal dari tanggal akhir.", tone: "error" });
       return;
     }
-    // Buka tab secara sinkron dari klik pengguna agar tidak diblokir popup blocker
-    // ketika data absensi masih dimuat secara asynchronous.
-    const reportWindow = window.open("", "_blank");
-    if (!reportWindow) {
-      setToast({ message: "Jendela laporan diblokir browser. Izinkan pop-up untuk localhost lalu coba kembali.", tone: "error" });
+    if (exportSections.length === 0) {
+      setToast({ message: "Pilih minimal satu jenis laporan untuk diekspor.", tone: "error" });
       return;
     }
-    reportWindow.document.write('<!doctype html><html><body style="font-family:Arial;padding:32px;color:#475569">Menyiapkan laporan BKU…</body></html>');
+    if (exportSections.includes("materials") && materialsApi.loading) {
+      setToast({ message: "Rekap material masih dimuat. Tunggu sampai selesai, lalu ulangi ekspor.", tone: "info" });
+      return;
+    }
+
+    // Buka seluruh tab secara sinkron dari klik pengguna agar tidak diblokir
+    // popup blocker ketika data absensi dimuat secara asynchronous.
+    const reportWindows = new Map<PdfExportSection, Window>();
+    for (const section of exportSections) {
+      const reportWindow = window.open("", "_blank");
+      if (!reportWindow) {
+        reportWindows.forEach((openedWindow) => openedWindow.close());
+        setToast({ message: "Satu atau beberapa jendela PDF diblokir browser. Izinkan pop-up untuk situs ini lalu ulangi ekspor.", tone: "error" });
+        return;
+      }
+      reportWindow.document.write('<!doctype html><html><body style="font-family:Arial;padding:32px;color:#475569">Menyiapkan PDF…</body></html>');
+      reportWindows.set(section, reportWindow);
+    }
+
     try {
-      const attendanceReport = await payrollApi.loadAttendanceReport(exportStartDate, exportEndDate);
-      openBkuPdfReport({
+      const attendanceReport = exportSections.includes("attendance")
+        ? await payrollApi.loadAttendanceReport(exportStartDate, exportEndDate)
+        : { workers: [], attendance: [] };
+
+      const commonOptions = {
         book: reportBook,
         transactions: ordered,
         startDate: exportStartDate,
@@ -533,11 +590,34 @@ export default function BkuPage() {
         attendanceSignatoryRoles,
         workers: attendanceReport.workers,
         attendance: attendanceReport.attendance,
+        materialGroups: materialsApi.groups,
+        materialAliases: materialsApi.aliases,
+        materialRecords: materialsApi.records.filter((item) =>
+          item.book_id === reportBook.id
+          && item.transaction_date >= exportStartDate
+          && item.transaction_date <= exportEndDate
+        ),
         reportCategories: reportCategoriesApi.categories,
-      }, reportWindow);
+      };
+
+      for (const section of exportSections) {
+        const filename = buildUniquePdfFilename({
+          projectName: reportBook.name,
+          startDate: exportStartDate,
+          endDate: exportEndDate,
+          sections: [section],
+        });
+        const targetWindow = reportWindows.get(section);
+        openBkuPdfReport({
+          ...commonOptions,
+          sections: [section],
+          filename,
+        }, targetWindow);
+      }
       setShowExport(false);
+      setToast({ message: `${exportSections.length} file PDF berhasil disiapkan. Simpan masing-masing melalui tab PDF yang terbuka.`, tone: "success" });
     } catch (cause) {
-      reportWindow.close();
+      reportWindows.forEach((openedWindow) => openedWindow.close());
       setToast({ message: cause instanceof Error ? cause.message : "Laporan PDF gagal dibuat.", tone: "error" });
     }
   }
@@ -596,6 +676,21 @@ export default function BkuPage() {
         ) : (
           <>
             <BalanceSummary summary={balances}/>
+            <ReportLockPanel
+              startDate={book.start_date}
+              defaultDate={latestTransactionDate}
+              lockedThroughDate={reportLockApi.lockedThroughDate}
+              loading={reportLockApi.loading}
+              saving={reportLockApi.saving}
+              onSave={async (date) => {
+                await reportLockApi.setLockedThroughDate(date);
+                setToast({ message: `Laporan dikunci sampai ${dateLabel(date)}. Semua tanggal sebelumnya ikut terkunci.`, tone: "success" });
+              }}
+              onUnlock={async () => {
+                await reportLockApi.setLockedThroughDate(null);
+                setToast({ message: "Semua penguncian tanggal pada proyek ini berhasil dibuka kembali.", tone: "success" });
+              }}
+            />
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
               <div className="inline-flex flex-wrap rounded-xl bg-slate-200/70 p-1">
                 {(["calendar", "ledger", "payroll", "stores", "materials", "profile"] as AppView[]).map((item) => <button key={item} type="button" onClick={() => setView(item)} className={`rounded-lg px-3.5 py-2 text-xs font-bold transition sm:px-4 ${view === item ? "bg-white text-emerald-800 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>{item === "calendar" ? "Kalender" : item === "ledger" ? "Buku transaksi" : item === "payroll" ? "Absensi & gaji" : item === "stores" ? "Master Data" : item === "materials" ? "Rekap Material" : "Profil lembaga"}</button>)}
@@ -764,6 +859,8 @@ export default function BkuPage() {
         font={exportFont}
         financialSignatoryRoles={financialSignatoryRoles}
         attendanceSignatoryRoles={attendanceSignatoryRoles}
+        selectedSections={exportSections}
+        onSelectedSectionsChange={setExportSections}
         onStartDateChange={setExportStartDate}
         onEndDateChange={setExportEndDate}
         onThemeChange={setExportTheme}

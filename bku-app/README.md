@@ -30,7 +30,7 @@ Jalankan database/setup.sql di SQL Editor pada proyek Supabase BKU baru. File te
 - Lampiran foto nota/PDF di storage privat.
 - Pengingat nominal lebih dari Rp2.000.000 tanpa mengubah nilai transaksi sebenarnya.
 
-- Export laporan PDF dengan 20 tema visual dan 20 pilihan font modern. Laporan memuat identitas sekolah, ringkasan saldo, transaksi, rincian material per nota, dan ruang tanda tangan.
+- Export PDF dengan pilihan bagian BKU, Matriks Absensi, dan Rekap Total Material per Kelompok / per Item. Bagian yang dipilih digabung ke satu PDF; nama file dibuat otomatis menggunakan nama proyek, jenis laporan, rentang tanggal, timestamp, dan UUID unik.
 
 ## Pembaruan skema database
 Jika database BKU sudah menjalankan versi setup.sql sebelumnya, jalankan kembali file database/setup.sql terbaru. Migrasi menggunakan ADD COLUMN IF NOT EXISTS sehingga menambahkan kolom identitas sekolah dan rincian nota tanpa menghapus transaksi yang sudah ada.
@@ -59,3 +59,19 @@ Untuk memperbarui database BKU yang sebelumnya menggunakan periode Senin–Sabtu
 - `database/migrations/20261120_payroll_sunday_saturday.sql` — mengubah awal periode menjadi Minggu, akhir periode menjadi Sabtu, menetapkan tanggal pembayaran pada Sabtu, dan menyesuaikan kunci periode historis tanpa menghapus absensi maupun mengubah total HOK/nominal yang sudah tersimpan.
 
 Jalankan migrasi ini hanya pada proyek Supabase BKU. Jangan jalankan pada database utama Dahlia.
+
+
+## Export PDF terpilih dan pengamanan tanggal
+Pada dialog **Export PDF**, pilih satu atau beberapa bagian berikut:
+- **BKU** — saldo awal, transaksi masuk/keluar, rincian nota, dan saldo akhir.
+- **Matriks Absensi** — matriks Minggu–Sabtu, total HOK, dan upah pekerja.
+- **Rekap Total Material** — jumlah belanja per kelompok dan rincian akumulasi per item, dengan volume dipisahkan per satuan.
+
+Bagian terpilih akan digabung menjadi satu PDF. Nama dokumen dibentuk otomatis dari nama proyek, jenis bagian, rentang tanggal, waktu ekspor sampai milidetik, serta UUID acak sehingga ekspor berulang tidak memakai nama yang sama.
+
+## Kunci laporan berdasarkan tanggal
+Setelah laporan difinalkan, atur **Pengamanan laporan berdasarkan tanggal** dan pilih batas tanggal, misalnya 29 November 2026. Semua tanggal sampai dan termasuk tanggal tersebut akan terkunci. Penambahan, salin nota ke tanggal terkunci, pemindahan, perubahan, penghapusan transaksi, perubahan absensi, dan penyimpanan rekap penggajian yang bersinggungan dengan tanggal terkunci akan ditolak.
+
+Batas penguncian bisa dimundurkan untuk membuka tanggal setelah batas baru, atau gunakan **Buka semua kunci** untuk membuka seluruh tanggal. Penguncian dibatasi per buku kas/proyek.
+
+Untuk database BKU yang sudah berjalan, jalankan satu kali migrasi `database/migrations/20261121_report_export_and_date_lock.sql` pada proyek Supabase BKU. Jangan jalankan pada database utama Dahlia.
