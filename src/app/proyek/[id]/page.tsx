@@ -1789,7 +1789,7 @@ export default function ProjectWorkspacePage() {
                     </button>}
                     {canEditRab && <button
                       type="button"
-                      onClick={() => void openDivisionDialog('copy', division)
+                      onClick={() => void openDivisionDialog('copy', division)}
                       className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                       title="Salin lokasi beserta item RAB"
                     >
