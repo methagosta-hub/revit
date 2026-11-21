@@ -1,4 +1,4 @@
-type PdfExportSection = "bku" | "attendance" | "materials";
+export type PdfExportSection = "bku" | "attendance" | "materials";
 
 const sectionNames: Record<PdfExportSection, string> = {
   bku: "BKU",
