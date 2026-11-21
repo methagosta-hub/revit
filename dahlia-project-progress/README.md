@@ -52,13 +52,21 @@ Migrasi membuat satu menu awal bernama **RAB Utama** pada setiap proyek lama. Se
 
 Master proyek menyimpan identitas sekolah dan penandatangan: nama proyek/sekolah, alamat, telepon, NPSN, Kepala Sekolah, P2SP, Perencana, dan Pengawas. Nama proyek dipakai sebagai judul sekolah pada dokumen. Kolom lama seperti lokasi, klien, nomor kontrak, serta periode proyek tetap dipertahankan.
 
-### Export Jadwal Pelaksanaan Pekerjaan
+### Kurva S Gabungan dan Jadwal Pelaksanaan PDF
 
-Buka **Jadwal / PDF** setelah memilih proyek dan menu. Dokumen mengikuti struktur contoh jadwal pelaksanaan:
-- Uraian pekerjaan, jumlah harga, bobot rencana, dan pembagian bobot rencana per minggu yang dikelompokkan per bulan.
-- Total bobot rencana mingguan dan progres rencana kumulatif mingguan.
-- Kurva progres rencana kumulatif.
+Buka **Jadwal / PDF** setelah memilih proyek. Halaman ini adalah *Kurva S Builder* tingkat proyek, bukan export satu menu. Builder memuat rincian RAB aktif seluruh menu dalam proyek:
+- Centang menu mana yang dimasukkan atau keluarkan dari dokumen.
+- Atur urutan tampil setiap menu.
+- Pilih tampilan **Per divisi** untuk menampilkan judul menu lalu rincian kelompok pekerjaan (`work_group`), atau **Ringkas** untuk menampilkan identitas menu sebagai satu baris jumlah harga dan bobot.
+- Bobot setiap baris dihitung terhadap total nilai seluruh menu yang dicentang, sehingga bobot gabungan menjadi basis 100%.
+- Kolom minggu dikelompokkan berdasarkan bulan. Tiap sel berisi kontribusi bobot rencana pada minggu tersebut; arsiran hanya tampil ketika ada aktivitas dan semakin gelap sesuai persentase kumulatif pekerjaan pada divisi/menu itu.
+- Bagian bawah memuat total bobot rencana mingguan, progres rencana kumulatif mingguan, dan satu Kurva S gabungan.
 - Opsi tanda tangan Kepala Sekolah, P2SP, Perencana, dan Pengawas; tersedia **Pilih semua** untuk menampilkan keempat penandatangan.
-- Tombol **Cetak / Simpan PDF** membuka dialog cetak browser. Pilih **Save as PDF / Simpan sebagai PDF** untuk menyimpan file. Format halaman disiapkan landscape A3.
 
-Distribusi rencana mingguan dihitung dari tanggal mulai dan selesai setiap item menggunakan kurva smoothstep yang sama dengan perhitungan target rencana pada dashboard; nilai mingguan adalah perubahan bobot rencana antar batas minggu.
+Distribusi rencana mingguan dihitung dari tanggal mulai dan selesai tiap item menggunakan fungsi smoothstep yang sama dengan target rencana dashboard. Nilai mingguan merupakan perubahan progres rencana berbobot antar batas minggu. Kolom mingguan dikelompokkan menurut bulan kalender berdasarkan tanggal mulai minggu.
+
+Tombol **Cetak / Simpan PDF** membuka dialog cetak browser; pilih **Save as PDF / Simpan sebagai PDF**. Format halaman disiapkan landscape A3.
+
+### Tipografi antarmuka
+
+Aplikasi menggunakan **Plus Jakarta Sans** untuk teks antarmuka dan **Space Grotesk** untuk heading serta elemen display agar tampilan lebih modern, tegas, dan futuristik.
