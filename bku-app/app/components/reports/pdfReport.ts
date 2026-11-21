@@ -104,7 +104,8 @@ export function buildBkuPdfHtml(options: PdfReportOptions) {
         const weekTotal = attendance.filter((item) => item.work_date >= weekDates[0] && item.work_date <= weekEnd && item.work_date >= startDate && item.work_date <= endDate).reduce((sum, item) => sum + Number(item.amount || 0), 0);
         const workerRows = [...workers].sort((a, b) => a.worker_type.localeCompare(b.worker_type) || a.name.localeCompare(b.name)).map((worker) => {
           const workerWeekRows = attendance.filter((item) => item.worker_id === worker.id && item.work_date >= weekDates[0] && item.work_date <= weekEnd && item.work_date >= startDate && item.work_date <= endDate);
-          const displayName = workerWeekRows[0]?.worker_name_snapshot || worker.name;
+          // Matriks laporan menampilkan identitas master terbaru; nilai HOK dan upah tetap memakai snapshot absensi.
+          const displayName = worker.name;
           const cells = weekDates.map((date) => {
             if (date < startDate || date > endDate || date < worker.joined_on) return `<td class="attendance-empty"></td>`;
             const item = workerAttendanceMap.get(`${worker.id}|${date}`);
@@ -115,7 +116,7 @@ export function buildBkuPdfHtml(options: PdfReportOptions) {
           const totalPay = rows.reduce((sum, item) => sum + Number(item.amount || 0), 0);
           const historicalRates = Array.from(new Set(rows.map((item) => Number(item.daily_rate_snapshot || 0))));
           const rateLabel = historicalRates.length > 1 ? "Bervariasi" : money(historicalRates[0] ?? Number(worker.daily_rate || 0));
-          return `<tr><td>${workerWeekRows[0]?.worker_type_snapshot === "TUKANG" || (!workerWeekRows.length && worker.worker_type === "TUKANG") ? "Tukang" : "Pekerja"}</td><td class="worker-name">${escapeHtml(displayName)}</td><td class="number">${rateLabel}</td>${cells}<td class="number">${totalHok ? totalHok.toLocaleString("id-ID", { maximumFractionDigits: 2 }) : ""}</td><td class="number attendance-pay">${totalPay ? money(totalPay) : ""}</td></tr>`;
+          return `<tr><td>${worker.worker_type === "TUKANG" ? "Tukang" : "Pekerja"}</td><td class="worker-name">${escapeHtml(displayName)}</td><td class="number">${rateLabel}</td>${cells}<td class="number">${totalHok ? totalHok.toLocaleString("id-ID", { maximumFractionDigits: 2 }) : ""}</td><td class="number attendance-pay">${totalPay ? money(totalPay) : ""}</td></tr>`;
         }).join("");
         return `<div class="attendance-week"><div class="attendance-week-title"><strong>Minggu ${dateLabel(weekStart, { day: "numeric", month: "short", year: "numeric" })} – ${dateLabel(weekEnd, { day: "numeric", month: "short", year: "numeric" })}</strong><span>Total nilai upah berdasarkan absensi: ${money(weekTotal)}</span></div><table class="attendance-table"><colgroup><col style="width:8%"><col style="width:15%"><col style="width:11%"><col style="width:6.5%"><col style="width:6.5%"><col style="width:6.5%"><col style="width:6.5%"><col style="width:6.5%"><col style="width:6.5%"><col style="width:6.5%"><col style="width:8%"><col style="width:12.5%"></colgroup><thead><tr><th>Jenis</th><th>Nama pekerja</th><th>Upah/hari</th>${["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"].map((day) => `<th>${day}</th>`).join("")}<th>Total HOK</th><th>Jumlah upah</th></tr></thead><tbody>${workerRows || `<tr><td colspan="12">Belum ada pekerja pada periode ini.</td></tr>`}</tbody></table></div>`;
       }).join("")}
