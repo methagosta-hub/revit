@@ -80,9 +80,10 @@ function LoginPanel({ supabase }: { supabase: NonNullable<ReturnType<typeof getP
   const [loading,setLoading]=useState(false);
   const [message,setMessage]=useState("");
   const [error,setError]=useState("");
+  const [showResend,setShowResend]=useState(false);
 
   async function submit(event: FormEvent) {
-    event.preventDefault(); setLoading(true); setError(""); setMessage("");
+    event.preventDefault(); setLoading(true); setError(""); setMessage(""); setShowResend(false);
     try {
       if(mode==="signup") {
         const {data,error:authError}=await supabase.auth.signUp({email:email.trim(),password,options:{emailRedirectTo:window.location.origin}});
@@ -90,10 +91,30 @@ function LoginPanel({ supabase }: { supabase: NonNullable<ReturnType<typeof getP
         setMessage(data.session ? "Akun berhasil dibuat. Anda sudah masuk." : "Akun berhasil didaftarkan. Periksa email untuk konfirmasi sebelum masuk.");
       } else {
         const {error:authError}=await supabase.auth.signInWithPassword({email:email.trim(),password});
-        if(authError) throw authError;
+        if(authError) {
+          if(authError.code==="email_not_confirmed" || authError.message.toLowerCase().includes("email not confirmed")) setShowResend(true);
+          throw authError;
+        }
       }
     } catch(cause) {
       setError(cause instanceof Error?cause.message:"Autentikasi gagal.");
+    } finally { setLoading(false); }
+  }
+
+  async function resendConfirmation() {
+    if(!email.trim()) { setError("Masukkan alamat email terlebih dahulu."); return; }
+    setLoading(true); setError(""); setMessage("");
+    try {
+      const {error:resendError}=await supabase.auth.resend({
+        type:"signup",
+        email:email.trim(),
+        options:{emailRedirectTo:window.location.origin},
+      });
+      if(resendError) throw resendError;
+      setMessage("Permintaan konfirmasi berhasil dikirim. Periksa kotak masuk dan folder spam.");
+      setShowResend(false);
+    } catch(cause) {
+      setError(cause instanceof Error?cause.message:"Email konfirmasi gagal dikirim.");
     } finally { setLoading(false); }
   }
 
@@ -116,6 +137,7 @@ function LoginPanel({ supabase }: { supabase: NonNullable<ReturnType<typeof getP
       <label className="field">Password<input type="password" required minLength={6} value={password} onChange={(e)=>setPassword(e.target.value)} placeholder="Minimal 6 karakter"/></label>
       {error&&<div className="error-box">{error}</div>}
       {message&&<div className="info-box">{message}</div>}
+      {showResend&&mode==="login"&&<button className="btn soft" type="button" disabled={loading||!email.trim()} onClick={()=>void resendConfirmation()} style={{width:"100%",justifyContent:"center",marginTop:10}}>{loading?"Mengirim…":"Kirim ulang email konfirmasi"}</button>}
       <button className="btn primary" type="submit" disabled={loading} style={{width:"100%",justifyContent:"center",marginTop:16}}>{loading?"Memproses…":mode==="login"?"Masuk":"Daftar akun"}</button>
       <div className="login-switch">{mode==="login"?"Belum mempunyai akun?":"Sudah mempunyai akun?"} <button type="button" className="link-btn" onClick={()=>{setMode(mode==="login"?"signup":"login");setError("");setMessage("");}}>{mode==="login"?"Buat akun":"Masuk"}</button></div>
     </form></section>
