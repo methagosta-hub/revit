@@ -174,7 +174,7 @@ export default function HomePage() {
     try{
       const [itemResult,reportResult]=await Promise.all([
         supabase.from("progress_boq_items").select("*").eq("project_id",target.id).eq("boq_version",target.current_boq_version).eq("is_active",true).order("sort_order").order("item_code"),
-        supabase.from("progress_reports").select("*").eq("project_id",target.id).eq("boq_version",target.current_boq_version).order("report_date",{ascending:true}),
+        supabase.from("progress_reports").select("*").eq("project_id",target.id).order("report_date",{ascending:true}),
       ]);
       if(itemResult.error)throw itemResult.error;
       if(reportResult.error)throw reportResult.error;
@@ -202,7 +202,8 @@ export default function HomePage() {
   useEffect(()=>{if(project)void loadProjectData(project);},[project?.id,project?.current_boq_version,loadProjectData]);
 
   const weights=useMemo(()=>calculateWeights(items),[items]);
-  const latestReport=reports[reports.length-1]||null;
+  const currentVersionReports=useMemo(()=>reports.filter((row)=>row.boq_version===(project?.current_boq_version||1)),[reports,project?.current_boq_version]);
+  const latestReport=currentVersionReports[currentVersionReports.length-1]||null;
   const latestReportItems=useMemo(()=>latestReport?reportItems.filter((row)=>row.report_id===latestReport.id):[],[latestReport,reportItems]);
   const actualProgress=latestReport?reportProgress(latestReportItems):0;
   const targetProgress=project&&items.length?plannedProgress(project,items,latestReport?.report_date||reportDate):0;
@@ -211,7 +212,7 @@ export default function HomePage() {
 
   const currentReportId=reports.find((item)=>item.report_date===reportDate)?.id;
   const reportLocked=Boolean(currentReportId);
-  const itemEditingLocked=reports.length>0;
+  const itemEditingLocked=currentVersionReports.length>0;
   const filteredItems=items.filter((item)=>[item.item_code,item.description,item.work_group].join(" ").toLowerCase().includes(search.toLowerCase()));
 
   async function createProject(event:FormEvent){
@@ -287,8 +288,8 @@ export default function HomePage() {
   async function loadDraftForDate(value:string){
     if(!supabase||!project)return;
     setReportDate(value);
-    const existing=reports.find((row)=>row.report_date===value);
-    const source=existing||[...reports].reverse().find((row)=>row.report_date<value);
+    const existing=currentVersionReports.find((row)=>row.report_date===value);
+    const source=existing||[...currentVersionReports].reverse().find((row)=>row.report_date<value);
     if(!source){
       setReportNotes("");
       setDraftProgress(Object.fromEntries(items.map((item)=>[item.id,"0"])));
@@ -411,7 +412,7 @@ export default function HomePage() {
           </div></>}
         </section>}
         {view==="rab"&&<section>
-          <div className="page-heading"><div><h2>Rencana Anggaran Biaya</h2><p>Masukkan item pekerjaan dan jadwal pelaksanaan. Bobot dihitung otomatis dari nilai tiap item dibanding total RAB.</p></div><div className="heading-actions"><span className="badge">RAB v{project?.current_boq_version||1}</span>{reports.length>0&&<button className="btn soft" onClick={()=>void createBoqRevision()} disabled={saving}><GitBranchPlus size={13}/> Buat revisi RAB</button>}</div></div>
+          <div className="page-heading"><div><h2>Rencana Anggaran Biaya</h2><p>Masukkan item pekerjaan dan jadwal pelaksanaan. Bobot dihitung otomatis dari nilai tiap item dibanding total RAB.</p></div><div className="heading-actions"><span className="badge">RAB v{project?.current_boq_version||1}</span>{currentVersionReports.length>0&&<button className="btn soft" onClick={()=>void createBoqRevision()} disabled={saving}><GitBranchPlus size={13}/> Buat revisi RAB</button>}</div></div>
           {!project?<div className="empty-state">Buat atau pilih proyek terlebih dahulu.</div>:<>
             {itemEditingLocked&&<div className="warn-box" style={{marginBottom:14}}>Versi RAB ini sudah digunakan pada {reports.length} laporan progres. Item dikunci untuk menjaga bobot historis. Gunakan <strong>Buat revisi RAB</strong> untuk menyusun baseline baru tanpa mengubah riwayat versi sebelumnya.</div>}
             {!itemEditingLocked&&<form className="card" onSubmit={saveItem}>
@@ -463,8 +464,8 @@ export default function HomePage() {
         {view==="reports"&&<section>
           <div className="page-heading"><div><h2>Riwayat laporan progres</h2><p>Setiap tanggal laporan menyimpan snapshot kumulatif per item untuk versi RAB aktif.</p></div><div className="heading-actions"><button className="btn" onClick={()=>window.print()} disabled={!reports.length}><Printer size={13}/> Cetak</button><button className="btn primary" onClick={()=>setView("progress")} disabled={!project}><Plus size={13}/> Laporan baru</button></div></div>
           {!reports.length?<div className="empty-state"><CalendarDays size={25}/><h3>Belum ada laporan progres</h3><p>Input progres lapangan untuk membuat riwayat dan membentuk garis aktual Kurva S.</p></div>:
-          <div className="card"><div className="card-title"><div><h3>Daftar tanggal laporan</h3><p>RAB versi {project?.current_boq_version||1}</p></div></div><div className="table-wrap"><table><thead><tr><th>Tanggal laporan</th><th className="number-cell">Progres aktual</th><th className="number-cell">Target rencana</th><th className="number-cell">Deviasi</th><th>Catatan</th><th>Aksi</th></tr></thead><tbody>
-            {reports.slice().reverse().map((report)=>{const value=reportProgress(reportItems.filter((row)=>row.report_id===report.id));const plan=project&&items.length?plannedProgress(project,items,report.report_date):0;const diff=value-plan;return <tr key={report.id}><td className="td-strong">{dateLabel(report.report_date)}</td><td className="number-cell td-strong">{number(value,2)}%</td><td className="number-cell">{number(plan,2)}%</td><td className="number-cell" style={{color:diff>=0?"#128b79":"#bc6d40"}}>{diff>0?"+":""}{number(diff,2)}%</td><td>{report.notes||"—"}</td><td><button className="btn small" onClick={()=>{setReportDate(report.report_date);const rows=reportItems.filter((row)=>row.report_id===report.id);setDraftProgress(Object.fromEntries(items.map((item)=>[item.id,String(rows.find((row)=>row.boq_item_id===item.id)?.cumulative_percent??0)])));setReportNotes(report.notes||"");setView("progress");}}>Lihat / ubah</button></td></tr>;})}
+          <div className="card"><div className="card-title"><div><h3>Daftar tanggal laporan</h3><p>RAB versi {project?.current_boq_version||1}</p></div></div><div className="table-wrap"><table><thead><tr><th>Tanggal laporan</th><th>Versi RAB</th><th className="number-cell">Progres aktual</th><th className="number-cell">Target rencana</th><th className="number-cell">Deviasi</th><th>Catatan</th><th>Aksi</th></tr></thead><tbody>
+            {reports.slice().reverse().map((report)=>{const value=reportProgress(reportItems.filter((row)=>row.report_id===report.id));const sameVersion=report.boq_version===project?.current_boq_version;const plan=sameVersion&&project&&items.length?plannedProgress(project,items,report.report_date):null;const diff=plan===null?null:value-plan;return <tr key={report.id}><td className="td-strong">{dateLabel(report.report_date)}</td><td><span className={`badge ${sameVersion?"":"gray"}`}>RAB v{report.boq_version}</span></td><td className="number-cell td-strong">{number(value,2)}%</td><td className="number-cell">{plan===null?"—":`${number(plan,2)}%`}</td><td className="number-cell" style={{color:diff===null?"#8794a6":diff>=0?"#128b79":"#bc6d40"}}>{diff===null?"Versi lama":`${diff>0?"+":""}${number(diff,2)}%`}</td><td>{report.notes||"—"}</td><td><button className="btn small" disabled={!sameVersion} onClick={()=>{setReportDate(report.report_date);const rows=reportItems.filter((row)=>row.report_id===report.id);setDraftProgress(Object.fromEntries(items.map((item)=>[item.id,String(rows.find((row)=>row.boq_item_id===item.id)?.cumulative_percent??0)])));setReportNotes(report.notes||"");setView("progress");}}>{sameVersion?"Lihat / ubah":"Riwayat tersimpan"}</button></td></tr>;})}
           </tbody></table></div></div>}
         </section>}
       </div>
