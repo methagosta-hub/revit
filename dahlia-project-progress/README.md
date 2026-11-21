@@ -60,7 +60,9 @@ Buka **Jadwal / PDF** setelah memilih proyek. Halaman ini adalah *Kurva S Builde
 - Pilih tampilan **Per divisi** untuk menampilkan judul menu lalu rincian kelompok pekerjaan (`work_group`), atau **Ringkas** untuk menampilkan identitas menu sebagai satu baris jumlah harga dan bobot.
 - Bobot setiap baris dihitung terhadap total nilai seluruh menu yang dicentang, sehingga bobot gabungan menjadi basis 100%.
 - Kolom minggu dikelompokkan berdasarkan bulan. Tiap sel berisi kontribusi bobot rencana pada minggu tersebut; arsiran hanya tampil ketika ada aktivitas dan semakin gelap sesuai persentase kumulatif pekerjaan pada divisi/menu itu.
-- Bagian bawah memuat total bobot rencana mingguan, progres rencana kumulatif mingguan, dan satu Kurva S gabungan.
+- Laporan progres input dari setiap menu aktif (tabel `progress_reports` dan `progress_report_items`) juga dimuat untuk menu dan versi RAB yang dipilih.
+- **Kurva S rencana dan realisasi aktual digambar langsung di atas matriks kolom mingguan**, dengan garis biru solid untuk rencana dan merah putus-putus untuk realisasi. Posisi vertikal menunjukkan tingkat progres kumulatif terhadap susunan baris pekerjaan, sehingga titik kurva dapat dibaca bersama divisi/menu yang dilalui.
+- Bagian bawah tabel memuat bobot rencana mingguan, progres rencana kumulatif, dan progres realisasi kumulatif. Grafik terpisah di bawah matriks tidak digunakan lagi.
 - Opsi tanda tangan Kepala Sekolah, P2SP, Perencana, dan Pengawas; tersedia **Pilih semua** untuk menampilkan keempat penandatangan.
 
 Distribusi rencana mingguan dihitung dari tanggal mulai dan selesai tiap item menggunakan fungsi smoothstep yang sama dengan target rencana dashboard. Nilai mingguan merupakan perubahan progres rencana berbobot antar batas minggu. Kolom mingguan dikelompokkan menurut bulan kalender berdasarkan tanggal mulai minggu.
