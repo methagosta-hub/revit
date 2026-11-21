@@ -208,7 +208,7 @@ export default function HomePage() {
   const actualProgress=latestReport?reportProgress(latestReportItems):0;
   const targetProgress=project&&items.length?plannedProgress(project,items,latestReport?.report_date||reportDate):0;
   const deviation=actualProgress-targetProgress;
-  const curvePoints=useMemo(()=>project?buildCurvePoints(project,items,reports,reportItems):[],[project,items,reports,reportItems]);
+  const curvePoints=useMemo(()=>project?buildCurvePoints(project,items,currentVersionReports,reportItems):[],[project,items,currentVersionReports,reportItems]);
 
   const currentReportId=currentVersionReports.find((item)=>item.report_date===reportDate)?.id;
   const reportLocked=Boolean(currentReportId);
