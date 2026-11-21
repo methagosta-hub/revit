@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  Activity, AlertCircle, ArrowDownRight, ArrowUpRight, BarChart3, BriefcaseBusiness,
+  Activity, AlertCircle, ArrowDownRight, ArrowUpRight, BarChart3, BriefcaseBusiness, Layers,
   CalendarDays, CheckCircle2, ChevronDown, CircleDollarSign, ClipboardList, FilePlus2,
   FolderKanban, LogOut, Plus, RefreshCw, Save, Settings2, ShieldCheck, TrendingUp,
   WalletCards, X, Pencil, Trash2, GitBranchPlus, Printer,
@@ -306,8 +306,8 @@ export default function HomePage() {
 
   async function saveItem(event:FormEvent){
     event.preventDefault();if(!supabase||!project)return;
-    setSaving(true);setError("");
     if(!menu){setError("Pilih menu pekerjaan terlebih dahulu.");return;}
+    setSaving(true);setError("");
     const payload={
       project_id:project.id,menu_id:menu.id,boq_version:menu.current_boq_version,
       item_code:itemDraft.item_code.trim(),work_group:itemDraft.work_group.trim()||"Umum",
