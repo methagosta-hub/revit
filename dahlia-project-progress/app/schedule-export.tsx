@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, CheckSquare, FileDown, Layers, RefreshCw, Square } from "lucide-react";
 import type { BoqItem, Project, WorkMenu } from "@/lib/types";
 import { getProgressSupabase } from "@/lib/supabase";
@@ -169,9 +169,7 @@ export default function ScheduleExport({ project, menus }: { project: Project; m
   const [selectedSigners, setSelectedSigners] = useState<SignerKey[]>(["school_head", "p2sp", "planner", "supervisor"]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
-  const [reportDate, setReportDate] = useState(() =>
-    new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric" }).format(new Date())
-  );
+  const reportDate = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric" }).format(new Date());
 
   const activeMenus = useMemo(
     () => menus.filter((menu) => menu.is_active).slice().sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
@@ -230,13 +228,12 @@ export default function ScheduleExport({ project, menus }: { project: Project; m
     void loadItems();
   }, [loadItems]);
 
-  const selectedMenus = useMemo(() => activeMenus
-    .filter((menu) => settings[menu.id]?.include !== false)
-    .slice()
-    .sort((a, b) => (settings[a.id]?.order || a.sort_order) - (settings[b.id]?.order || b.sort_order)),
-  [activeMenus, settings]);
+  const orderedMenus = useMemo(() => activeMenus.slice().sort((a, b) =>
+    (settings[a.id]?.order || a.sort_order) - (settings[b.id]?.order || b.sort_order)
+  ), [activeMenus, settings]);
 
-  const allSelected = activeMenus.length > 0 && selectedMenus.length === activeMenus.length;
+  const selectedMenus = useMemo(() => orderedMenus.filter((menu) => settings[menu.id]?.include !== false), [orderedMenus, settings]);
+
   const weeks = useMemo(() => buildWeeks(project), [project.start_date, project.end_date]);
   const months = useMemo(() => buildMonthGroups(weeks), [weeks]);
   const allSelectedItems = useMemo(
@@ -393,7 +390,7 @@ export default function ScheduleExport({ project, menus }: { project: Project; m
   }
 
   function moveMenu(menuId: string, direction: -1 | 1) {
-    const ordered = selectedMenus.slice();
+    const ordered = orderedMenus.slice();
     const index = ordered.findIndex((menu) => menu.id === menuId);
     const nextIndex = index + direction;
     if (index < 0 || nextIndex < 0 || nextIndex >= ordered.length) return;
@@ -431,7 +428,7 @@ export default function ScheduleExport({ project, menus }: { project: Project; m
         {!activeMenus.length && <div className="empty-state"><Layers size={25} /><h3>Belum ada menu aktif</h3><p>Tambahkan menu pekerjaan terlebih dahulu sebelum menyusun Kurva S.</p></div>}
 
         <div className="curve-menu-config-list">
-          {activeMenus.map((menu, index) => {
+          {orderedMenus.map((menu, index) => {
             const config = settings[menu.id] || { include: true, mode: "divisions" as DisplayMode, order: index + 1 };
             const count = (itemsByMenu[menu.id] || []).length;
             const menuTotal = (itemsByMenu[menu.id] || []).reduce((sum, item) => sum + itemAmount(item), 0);
