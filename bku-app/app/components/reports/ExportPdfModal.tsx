@@ -1,10 +1,17 @@
 "use client";
 
 import type { SignatoryRole } from "@/app/lib/bku/types";
+import type { PdfExportSection } from "@/app/components/reports/exportFilename";
 import { exportFonts, exportThemes, fieldClass } from "@/app/lib/bku/formatters";
 import { AppModal } from "@/app/components/layout/AppModal";
 import { FormField } from "@/app/components/layout/FormField";
 import { Download, FileText } from "lucide-react";
+
+const exportSections: { id: PdfExportSection; label: string; description: string }[] = [
+  { id: "bku", label: "Buku Kas Umum (BKU)", description: "Saldo awal, transaksi masuk/keluar, rincian nota, dan saldo akhir." },
+  { id: "attendance", label: "Matriks Absensi", description: "Kehadiran Minggu–Sabtu, total HOK, dan nilai upah per pekerja." },
+  { id: "materials", label: "Rekap Total Material", description: "Total belanja per kelompok dan rincian total per item." },
+];
 
 const roles: { id: SignatoryRole; label: string }[] = [
   { id: "school_head", label: "Kepala Sekolah" },
@@ -21,6 +28,8 @@ export function ExportPdfModal({
   font,
   financialSignatoryRoles,
   attendanceSignatoryRoles,
+  selectedSections,
+  onSelectedSectionsChange,
   onStartDateChange,
   onEndDateChange,
   onThemeChange,
@@ -37,6 +46,8 @@ export function ExportPdfModal({
   font: string;
   financialSignatoryRoles: SignatoryRole[];
   attendanceSignatoryRoles: SignatoryRole[];
+  selectedSections: PdfExportSection[];
+  onSelectedSectionsChange: (sections: PdfExportSection[]) => void;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onThemeChange: (value: string) => void;
@@ -49,7 +60,7 @@ export function ExportPdfModal({
   if (!open) return null;
   const theme = exportThemes.find((item) => item.id === themeId) || exportThemes[0];
   return (
-    <AppModal title="Export laporan BKU ke PDF" subtitle="Pilih rentang tanggal dan gaya dokumen. Hanya transaksi dalam periode yang dipilih akan ditampilkan." onClose={onClose} wide>
+    <AppModal title="Export laporan BKU ke PDF" subtitle="Pilih jenis laporan dan rentang tanggal. Semua bagian yang dicentang akan digabung ke dalam satu PDF." onClose={onClose} wide>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,.7fr)]">
         <div className="space-y-4">
           <section className="rounded-2xl border border-slate-200 p-4">
@@ -59,6 +70,33 @@ export function ExportPdfModal({
               <FormField label="Tanggal akhir"><input type="date" required value={endDate} min={startDate || undefined} onChange={(event) => onEndDateChange(event.target.value)} className={fieldClass}/></FormField>
             </div>
             <p className="mt-2 text-[10px] leading-5 text-slate-500">Saldo awal laporan dihitung otomatis berdasarkan transaksi sebelum tanggal awal. Saldo akhir dihitung sampai transaksi terakhir pada tanggal akhir.</p>
+          </section>
+          <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-black text-slate-800">Pilih bagian yang akan diekspor</h3>
+              <span className="text-[10px] font-semibold text-emerald-700">{selectedSections.length} dari 3 dipilih</span>
+            </div>
+            <div className="space-y-2">
+              {exportSections.map((section) => (
+                <label key={section.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 hover:border-emerald-300">
+                  <input
+                    type="checkbox"
+                    checked={selectedSections.includes(section.id)}
+                    onChange={(event) => onSelectedSectionsChange(
+                      event.target.checked
+                        ? [...selectedSections, section.id]
+                        : selectedSections.filter((item) => item !== section.id)
+                    )}
+                    className="mt-0.5 h-4 w-4 accent-emerald-700"
+                  />
+                  <span className="min-w-0">
+                    <strong className="block text-xs text-slate-800">{section.label}</strong>
+                    <span className="mt-0.5 block text-[10px] leading-5 text-slate-500">{section.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="mt-2 text-[10px] leading-5 text-slate-500">Bagian terpilih dibuat sebagai satu dokumen PDF. Nama file dibuat otomatis dan diberi kode unik pada setiap ekspor.</p>
           </section>
           <section className="grid gap-3 sm:grid-cols-2">
             <FormField label="Tema dokumen"><select value={themeId} onChange={(event) => onThemeChange(event.target.value)} className={fieldClass}>{exportThemes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></FormField>
@@ -89,7 +127,7 @@ export function ExportPdfModal({
           <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-bold text-slate-700">Isi laporan</p><ul className="mt-2 space-y-1.5 text-[11px] leading-5 text-slate-500"><li>Identitas sekolah dan periode</li><li>Saldo awal sebelum periode</li><li>Daftar nota dan rincian material</li><li>Rekap kas masuk dan kas keluar</li><li>Saldo akhir tunai dan bank</li><li>Matriks absensi pekerja per minggu, nama, HOK, dan nilai upah</li><li>Kolom tanda tangan</li></ul></div>
         </aside>
       </div>
-      <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600">Batal</button><button type="button" onClick={onExport} disabled={!startDate || !endDate || startDate > endDate} className="flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50"><Download size={15}/>Buat PDF</button></div>
+      <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600">Batal</button><button type="button" onClick={onExport} disabled={!startDate || !endDate || startDate > endDate || selectedSections.length === 0} className="flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50"><Download size={15}/>Buat PDF</button></div>
     </AppModal>
   );
 }
