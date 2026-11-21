@@ -568,8 +568,8 @@ export default function HomePage() {
           </tbody></table></div></div>}
         </section>}
         {view==="schedule"&&<section>
-          <div className="page-heading"><div><h2>Jadwal pelaksanaan dan export PDF</h2><p>Dokumen jadwal memakai tanggal rencana tiap item serta bobot RAB pada menu aktif.</p></div><div className="heading-actions"><button className="btn" onClick={()=>setView("menus")}><Layers size={13}/> Ganti menu</button></div></div>
-          {!project?<div className="empty-state">Pilih proyek terlebih dahulu.</div>:!menu?<div className="empty-state"><h3>Menu pekerjaan belum dipilih</h3><p>Pilih menu untuk menyusun jadwal dan export PDF.</p><button className="btn primary" onClick={()=>setView("menus")}>Pilih menu</button></div>:<ScheduleExport project={project} menu={menu} items={items}/>}
+          <div className="page-heading"><div><h2>Kurva S Gabungan Proyek</h2><p>Susun satu jadwal dan Kurva S dari beberapa menu pekerjaan. Pilih menu, tentukan tampilan per divisi atau ringkas, lalu atur urutan penyajian.</p></div><div className="heading-actions"><button className="btn" onClick={()=>setView("menus")}><Layers size={13}/> Kelola menu proyek</button></div></div>
+          {!project?<div className="empty-state">Pilih proyek terlebih dahulu.</div>:<ScheduleExport project={project} menus={menus}/>}
         </section>}
       </div>
     </main>
