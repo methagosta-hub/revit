@@ -377,8 +377,11 @@ $function$;
 revoke all on function public.progress_save_report(uuid, uuid, date, text, jsonb) from public, anon;
 grant execute on function public.progress_save_report(uuid, uuid, date, text, jsonb) to authenticated;
 
+-- Drop the previous project-scoped function before reusing its UUID signature with menu semantics.
+drop function if exists public.progress_create_boq_revision(uuid);
+
 -- Create a new baseline version for only the selected menu.
-create or replace function public.progress_create_boq_revision(p_menu_id uuid)
+create function public.progress_create_boq_revision(p_menu_id uuid)
 returns integer
 language plpgsql
 security invoker
