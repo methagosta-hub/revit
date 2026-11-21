@@ -212,7 +212,7 @@ export default function HomePage() {
   const currentReportId=reports.find((item)=>item.report_date===reportDate)?.id;
   const reportLocked=Boolean(currentReportId);
   const itemEditingLocked=reports.length>0;
-  const filteredItems=items.filter((item)=>[${"item.item_code"},${"item.description"},${"item.work_group"}].join(" ").toLowerCase().includes(search.toLowerCase()));
+  const filteredItems=items.filter((item)=>[item.item_code,item.description,item.work_group].join(" ").toLowerCase().includes(search.toLowerCase()));
 
   async function createProject(event:FormEvent){
     event.preventDefault();if(!supabase||!session?.user)return;
