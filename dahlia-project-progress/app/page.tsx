@@ -85,7 +85,7 @@ function LoginPanel({ supabase }: { supabase: NonNullable<ReturnType<typeof getP
     event.preventDefault(); setLoading(true); setError(""); setMessage("");
     try {
       if(mode==="signup") {
-        const {data,error:authError}=await supabase.auth.signUp({email:email.trim(),password});
+        const {data,error:authError}=await supabase.auth.signUp({email:email.trim(),password,options:{emailRedirectTo:window.location.origin}});
         if(authError) throw authError;
         setMessage(data.session ? "Akun berhasil dibuat. Anda sudah masuk." : "Akun berhasil didaftarkan. Periksa email untuk konfirmasi sebelum masuk.");
       } else {
