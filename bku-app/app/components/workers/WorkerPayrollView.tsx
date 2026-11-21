@@ -123,12 +123,12 @@ export function WorkerPayrollView({
       return;
     }
     const rows = eligibleWorkers.map((worker) => {
-      const historical = attendance.find((row) => row.worker_id === worker.id);
       return {
         worker_id: worker.id,
         daily_rate: Number(weeklyRateByWorker[worker.id] ?? worker.daily_rate),
-        worker_name_snapshot: historical?.worker_name_snapshot || worker.name,
-        worker_type_snapshot: historical?.worker_type_snapshot || worker.worker_type,
+        // Saat minggu ini disimpan ulang, gunakan identitas master terbaru.
+        worker_name_snapshot: worker.name,
+        worker_type_snapshot: worker.worker_type,
         days: daysByWorker[worker.id] || [0, 0, 0, 0, 0, 0, 0],
       };
     });
@@ -174,9 +174,10 @@ export function WorkerPayrollView({
               {eligibleWorkers.map((worker) => {
                 const days = daysByWorker[worker.id] || [0, 0, 0, 0, 0, 0, 0];
                 const totalHok = days.reduce((sum, value) => sum + Number(value || 0), 0);
-                const historical = attendance.find((row) => row.worker_id === worker.id);
-                const displayName = historical?.worker_name_snapshot || worker.name;
-                const displayType = historical?.worker_type_snapshot || worker.worker_type;
+                // Nama dan jenis ditampilkan dari master pekerja agar perubahan nama langsung tercermin.
+                // Snapshot absensi tetap disimpan untuk histori, tetapi tidak mengunci label matriks.
+                const displayName = worker.name;
+                const displayType = worker.worker_type;
                 return <tr key={worker.id} className="hover:bg-slate-50/60"><td className="sticky left-0 bg-white px-3 py-2.5 font-semibold text-slate-800">{displayName}</td><td className="px-3 py-2.5 text-[10px] text-slate-500">{displayType === "TUKANG" ? "Tukang" : "Pekerja"}</td><td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{money(Number(weeklyRateByWorker[worker.id] ?? worker.daily_rate))}</td>{days.map((value, dayIndex) => { const workDate = addCalendarDays(sunday, dayIndex); const beforeJoin = workDate < worker.joined_on; return <td key={dayIndex} className="px-1 py-2"><input type="number" min="0" max="1" step="0.25" disabled={beforeJoin} aria-label={`${displayName} ${DAY_LABELS[dayIndex]}`} value={beforeJoin ? "" : value || ""} onChange={(event) => updateCell(worker.id, dayIndex, event.target.value)} placeholder={beforeJoin ? "—" : "–"} className="h-9 w-[66px] rounded-lg border border-slate-200 bg-white px-2 text-center text-xs outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-50 disabled:bg-slate-100 disabled:text-slate-300"/></td>; })}<td className="px-3 py-2.5 text-right font-semibold tabular-nums">{totalHok.toLocaleString("id-ID", { maximumFractionDigits: 2 })}</td><td className="whitespace-nowrap px-3 py-2.5 text-right font-black text-emerald-800 tabular-nums">{money(totalHok * Number(weeklyRateByWorker[worker.id] ?? worker.daily_rate))}</td></tr>;
               })}
               {!eligibleWorkers.length && <tr><td colSpan={12} className="px-3 py-10 text-center text-slate-400">Belum ada pekerja aktif yang bergabung sampai minggu ini. Tambahkan pekerja pada Daftar Induk Pekerja.</td></tr>}
