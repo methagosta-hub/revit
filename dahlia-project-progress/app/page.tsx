@@ -207,7 +207,7 @@ export default function HomePage() {
     if(queryError)throw queryError;
     const rows=(data||[]) as WorkMenu[];
     setMenus(rows);
-    setMenu((current)=>rows.find((row)=>row.id===current?.id&&row.is_active)||rows.find((row)=>row.is_active)||rows[0]||null);
+    setMenu((current)=>rows.find((row)=>row.id===current?.id&&row.is_active)||rows.find((row)=>row.is_active)||null);
   },[supabase]);
 
   const loadProjectData=useCallback(async(target:Project,targetMenu:WorkMenu)=>{
@@ -322,7 +322,7 @@ export default function HomePage() {
         ? await supabase.from("progress_boq_items").update(payload).eq("id",editingItemId).eq("project_id",project.id).eq("menu_id",menu.id)
         : await supabase.from("progress_boq_items").insert(payload);
       if(result.error)throw result.error;
-      setItemDraft(emptyItem);setEditingItemId(null);await loadProjectData(project);setToast("Item RAB berhasil disimpan.");
+      setItemDraft(emptyItem);setEditingItemId(null);await loadProjectData(project,menu);setToast("Item RAB berhasil disimpan.");
     }catch(cause){setError(cause instanceof Error?cause.message:"Item RAB gagal disimpan.");}
     finally{setSaving(false);}
   }
@@ -331,7 +331,7 @@ export default function HomePage() {
     if(!supabase||!project||!menu||!window.confirm("Hapus item " + item.item_code + " – " + item.description + "?"))return;
     const {error:deleteError}=await supabase.from("progress_boq_items").delete().eq("id",item.id).eq("project_id",project.id).eq("menu_id",menu.id);
     if(deleteError){setError(deleteError.message);return;}
-    await loadProjectData(project);setToast("Item RAB dihapus.");
+    await loadProjectData(project,menu);setToast("Item RAB dihapus.");
   }
 
   function startEditItem(item:BoqItem){
@@ -484,7 +484,7 @@ export default function HomePage() {
             <div className="stat-card"><div className="stat-head">Deviasi terhadap rencana <span className="stat-icon">{deviation>=0?<ArrowUpRight size={16}/>:<ArrowDownRight size={16}/>}</span></div><div className="stat-value" style={{color:deviation>=0?"#118f80":"#bc6c3d"}}>{deviation>0?"+":""}{number(deviation,2)}%</div><div className="stat-foot">{deviation>=0?"Di atas atau sesuai rencana":"Di bawah rencana"}</div></div>
           </div>
           <div className="grid two-col">
-            <div className="card"><div className="card-title"><div><h3>Kurva S proyek</h3><p>Perbandingan progres rencana dan realisasi berdasarkan bobot RAB.</p></div><span className="badge">RAB v{project.current_boq_version}</span></div><CurveChart points={curvePoints}/><div className="info-box" style={{marginTop:8}}>Garis rencana dihitung dari jadwal mulai–selesai tiap item dengan pola smoothstep (awal dan akhir landai, bagian tengah lebih cepat). Sesuaikan jadwal item pada RAB untuk mengubah kurva rencana.</div></div>
+            <div className="card"><div className="card-title"><div><h3>Kurva S proyek</h3><p>Perbandingan progres rencana dan realisasi berdasarkan bobot RAB.</p></div><span className="badge">RAB v{menu?.current_boq_version||1}</span></div><CurveChart points={curvePoints}/><div className="info-box" style={{marginTop:8}}>Garis rencana dihitung dari jadwal mulai–selesai tiap item dengan pola smoothstep (awal dan akhir landai, bagian tengah lebih cepat). Sesuaikan jadwal item pada RAB untuk mengubah kurva rencana.</div></div>
             <div className="card"><div className="card-title"><div><h3>Informasi pelaksanaan</h3><p>Periode dan catatan pelaporan proyek.</p></div></div>
               <div style={{display:"grid",gap:13}}>
                 <div><div className="eyebrow">PERIODE KONTRAK</div><strong>{dateLabel(project.start_date)} – {dateLabel(project.end_date)}</strong></div>
@@ -530,7 +530,7 @@ export default function HomePage() {
               <div className="form-actions"><button className="btn primary" disabled={saving}><Plus size={13}/>{saving?"Menyimpan…":"Simpan item RAB"}</button></div>
             </form>}
             <div className="grid stats-grid section-gap">
-              <div className="stat-card"><div className="stat-head">Total RAB</div><div className="stat-value">{money(weights.total)}</div><div className="stat-foot">Versi aktif {project.current_boq_version}</div></div>
+              <div className="stat-card"><div className="stat-head">Total RAB</div><div className="stat-value">{money(weights.total)}</div><div className="stat-foot">Menu {menu?.name||"—"} · versi {menu?.current_boq_version||1}</div></div>
               <div className="stat-card"><div className="stat-head">Jumlah item</div><div className="stat-value">{items.length}</div><div className="stat-foot">Item pekerjaan aktif</div></div>
               <div className="stat-card"><div className="stat-head">Total kelompok</div><div className="stat-value">{new Set(items.map((item)=>item.work_group)).size}</div><div className="stat-foot">Kelompok pekerjaan</div></div>
               <div className="stat-card"><div className="stat-head">Bobot total</div><div className="stat-value">100%</div><div className="stat-foot">Dinormalisasi dari total nilai RAB</div></div>
