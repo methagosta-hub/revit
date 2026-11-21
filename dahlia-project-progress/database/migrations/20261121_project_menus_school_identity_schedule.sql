@@ -71,14 +71,13 @@ where m.project_id = i.project_id
 -- For any project that already had menus before a rerun/custom setup, attach
 -- remaining legacy items to its first menu deterministically.
 update public.progress_boq_items i
-set menu_id = chosen.id
-from lateral (
+set menu_id = (
   select m.id
   from public.progress_project_menus m
   where m.project_id = i.project_id
   order by m.sort_order, m.created_at, m.id
   limit 1
-) chosen
+)
 where i.menu_id is null;
 
 do $boq_menu_fk$
@@ -124,14 +123,13 @@ where m.project_id = r.project_id
   and m.name = 'RAB Utama';
 
 update public.progress_reports r
-set menu_id = chosen.id
-from lateral (
+set menu_id = (
   select m.id
   from public.progress_project_menus m
   where m.project_id = r.project_id
   order by m.sort_order, m.created_at, m.id
   limit 1
-) chosen
+)
 where r.menu_id is null;
 
 do $report_menu_fk$
