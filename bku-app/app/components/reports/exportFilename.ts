@@ -33,17 +33,20 @@ function localTimestamp(date: Date) {
 }
 
 function uniqueToken() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().replace(/-/g, "");
+  }
   if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
-    const bytes = new Uint8Array(6);
+    const bytes = new Uint8Array(16);
     crypto.getRandomValues(bytes);
     return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
   }
-  return Math.random().toString(36).slice(2, 10).padEnd(8, "0");
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
 }
 
 /**
  * Membentuk judul dokumen yang juga dipakai browser sebagai nama saran file PDF.
- * Timestamp milidetik + token acak 48-bit mencegah benturan nama pada ekspor berulang.
+ * Timestamp milidetik + UUID acak menjaga nama file tetap unik pada ekspor berulang.
  */
 export function buildUniquePdfFilename(input: {
   projectName: string;
