@@ -551,8 +551,6 @@ export default function BkuPage() {
       setToast({ message: "Tanggal awal harus sama dengan atau lebih awal dari tanggal akhir.", tone: "error" });
       return;
     }
-    // Buka tab secara sinkron dari klik pengguna agar tidak diblokir popup blocker
-    // ketika data absensi masih dimuat secara asynchronous.
     if (exportSections.length === 0) {
       setToast({ message: "Pilih minimal satu jenis laporan untuk diekspor.", tone: "error" });
       return;
@@ -561,23 +559,27 @@ export default function BkuPage() {
       setToast({ message: "Rekap material masih dimuat. Tunggu sampai selesai, lalu ulangi ekspor.", tone: "info" });
       return;
     }
-    const reportWindow = window.open("", "_blank");
-    if (!reportWindow) {
-      setToast({ message: "Jendela laporan diblokir browser. Izinkan pop-up untuk localhost lalu coba kembali.", tone: "error" });
-      return;
+
+    // Buka seluruh tab secara sinkron dari klik pengguna agar tidak diblokir
+    // popup blocker ketika data absensi dimuat secara asynchronous.
+    const reportWindows = new Map<PdfExportSection, Window>();
+    for (const section of exportSections) {
+      const reportWindow = window.open("", "_blank");
+      if (!reportWindow) {
+        reportWindows.forEach((openedWindow) => openedWindow.close());
+        setToast({ message: "Satu atau beberapa jendela PDF diblokir browser. Izinkan pop-up untuk situs ini lalu ulangi ekspor.", tone: "error" });
+        return;
+      }
+      reportWindow.document.write('<!doctype html><html><body style="font-family:Arial;padding:32px;color:#475569">Menyiapkan PDF…</body></html>');
+      reportWindows.set(section, reportWindow);
     }
-    reportWindow.document.write('<!doctype html><html><body style="font-family:Arial;padding:32px;color:#475569">Menyiapkan laporan BKU…</body></html>');
+
     try {
       const attendanceReport = exportSections.includes("attendance")
         ? await payrollApi.loadAttendanceReport(exportStartDate, exportEndDate)
         : { workers: [], attendance: [] };
-      const filename = buildUniquePdfFilename({
-        projectName: reportBook.name,
-        startDate: exportStartDate,
-        endDate: exportEndDate,
-        sections: exportSections,
-      });
-      openBkuPdfReport({
+
+      const commonOptions = {
         book: reportBook,
         transactions: ordered,
         startDate: exportStartDate,
@@ -588,7 +590,6 @@ export default function BkuPage() {
         attendanceSignatoryRoles,
         workers: attendanceReport.workers,
         attendance: attendanceReport.attendance,
-        sections: exportSections,
         materialGroups: materialsApi.groups,
         materialAliases: materialsApi.aliases,
         materialRecords: materialsApi.records.filter((item) =>
@@ -596,12 +597,27 @@ export default function BkuPage() {
           && item.transaction_date >= exportStartDate
           && item.transaction_date <= exportEndDate
         ),
-        filename,
         reportCategories: reportCategoriesApi.categories,
-      }, reportWindow);
+      };
+
+      for (const section of exportSections) {
+        const filename = buildUniquePdfFilename({
+          projectName: reportBook.name,
+          startDate: exportStartDate,
+          endDate: exportEndDate,
+          sections: [section],
+        });
+        const targetWindow = reportWindows.get(section);
+        openBkuPdfReport({
+          ...commonOptions,
+          sections: [section],
+          filename,
+        }, targetWindow);
+      }
       setShowExport(false);
+      setToast({ message: `${exportSections.length} file PDF berhasil disiapkan. Simpan masing-masing melalui tab PDF yang terbuka.`, tone: "success" });
     } catch (cause) {
-      reportWindow.close();
+      reportWindows.forEach((openedWindow) => openedWindow.close());
       setToast({ message: cause instanceof Error ? cause.message : "Laporan PDF gagal dibuat.", tone: "error" });
     }
   }
