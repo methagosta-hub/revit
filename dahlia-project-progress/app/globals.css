@@ -2,7 +2,7 @@
 
 :root { color-scheme: light; --ink:#17243b; --muted:#6b7890; --line:#e5eaf1; --paper:#ffffff; --wash:#f4f7fb; --navy:#142944; --blue:#3577d4; --teal:#129a8a; --orange:#dd9142; --red:#c95656; }
 * { box-sizing: border-box; }
-html, body { margin:0; min-height:100%; background:var(--wash); color:var(--ink); font-family:Inter, "Segoe UI", Arial, sans-serif; }
+html, body { margin:0; min-height:100%; background:var(--wash); color:var(--ink); font-family:var(--font-jakarta), "Segoe UI", Arial, sans-serif; }
 body { font-size:14px; line-height:1.5; }
 button,input,select,textarea { font:inherit; }
 button { cursor:pointer; }
@@ -186,4 +186,91 @@ tbody tr:hover td { background:#fbfdff; }
   .schedule-table tr { page-break-inside:avoid; }
   .pdf-heading { margin-bottom:7px!important; }
   .pdf-curve-section,.pdf-signatures { page-break-inside:avoid; }
+}
+
+
+/* Modern Jakarta Sans / Space Grotesk interface */
+h1,h2,h3,h4,.stat-value,.brand strong,.eyebrow {
+  font-family:var(--font-space),var(--font-jakarta),sans-serif;
+  letter-spacing:-.025em;
+}
+h1,h2,h3 { text-wrap:balance; }
+.card,.stat-card,.login-card {
+  border-color:#e1e9f2;
+  box-shadow:0 8px 28px rgba(20,41,68,.045);
+}
+.btn { border-radius:10px; font-weight:700; letter-spacing:-.01em; }
+.btn.primary { box-shadow:0 5px 14px rgba(53,119,212,.18); }
+input,select,textarea { border-radius:9px; }
+.nav-btn { font-weight:700; letter-spacing:-.015em; }
+.badge { letter-spacing:.015em; }
+
+/* Project-wide S-curve builder */
+.schedule-builder { display:grid; gap:16px; }
+.schedule-builder-card { padding:20px; border:1px solid #dce6f0; background:linear-gradient(145deg,#ffffff 0%,#f9fbff 100%); }
+.schedule-builder-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:15px; }
+.schedule-builder-heading h3 { font-size:19px; margin:3px 0 5px; color:#162d49; }
+.schedule-builder-heading p { max-width:740px; color:#718198; font-size:11px; margin:0; }
+.schedule-builder-actions { display:flex; flex-wrap:wrap; gap:7px; justify-content:flex-end; }
+.curve-menu-config-list { display:grid; gap:9px; }
+.curve-menu-config { display:grid; grid-template-columns:minmax(220px,1.5fr) minmax(170px,1fr) minmax(72px,.25fr); align-items:center; gap:14px; padding:12px 14px; border:1px solid #e4eaf2; border-radius:13px; background:#fff; position:relative; transition:border-color .15s,background .15s,box-shadow .15s; }
+.curve-menu-config.included { border-color:#b9d4ec; background:linear-gradient(100deg,#f6fbff,#fff 70%); box-shadow:inset 3px 0 0 #3989c8; }
+.curve-menu-select { display:flex; align-items:flex-start; gap:10px; min-width:0; cursor:pointer; }
+.curve-menu-select input { width:16px; height:16px; margin:2px 0 0; accent-color:#287bb4; flex:none; }
+.curve-menu-select-copy { display:grid; min-width:0; gap:3px; }
+.curve-menu-select-copy strong { color:#203a58; font-size:12px; line-height:1.3; }
+.curve-menu-select-copy small { color:#8391a4; font-size:9px; line-height:1.4; }
+.curve-menu-controls,.curve-menu-order { display:grid; gap:5px; }
+.curve-config-label { color:#8a97a9; font-size:8px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+.curve-mode-switch { display:inline-flex; width:max-content; max-width:100%; padding:3px; gap:2px; border:1px solid #e4eaf1; border-radius:9px; background:#f2f6fa; }
+.curve-mode-switch button { border:0; border-radius:6px; padding:6px 10px; background:transparent; color:#748399; font-size:9px; font-weight:800; white-space:nowrap; }
+.curve-mode-switch button.active { background:#fff; color:#1d6494; box-shadow:0 1px 4px rgba(26,54,82,.12); }
+.curve-menu-order > div { display:flex; gap:5px; }
+.icon-btn { display:grid; place-items:center; width:28px; height:27px; border:1px solid #e0e7ef; border-radius:7px; background:#fff; color:#58708b; }
+.icon-btn:disabled { opacity:.32; cursor:not-allowed; }
+.curve-menu-empty { grid-column:1/-1; color:#b06a36; font-size:9px; margin-top:-5px; }
+.curve-selection-summary { display:flex; flex-wrap:wrap; gap:7px 18px; margin-top:12px; padding:11px 13px; border-radius:10px; background:#edf4fa; color:#61768c; font-size:9px; }
+.curve-selection-summary strong { color:#1d4568; font-family:var(--font-space),sans-serif; font-size:12px; }
+.schedule-builder .signer-toolbar { margin-top:18px; padding-top:15px; border-top:1px solid #e7edf3; }
+.schedule-builder .signer-option { min-height:64px; }
+.pdf-selected-menu-names { margin-top:4px!important; font-weight:700; color:#3e5e7a!important; }
+.pdf-warning { margin:0 0 8px; padding:6px 9px; border:1px solid #ead8b7; border-radius:5px; background:#fff9eb; color:#87642e; font-size:8px; }
+.schedule-table .schedule-row-menu-heading td { background:#e2eaf2; font-weight:900; color:#203c59; }
+.schedule-table .schedule-row-menu-heading td:nth-child(2) { letter-spacing:.025em; }
+.schedule-table .schedule-row-division td { background:#f8fafc; }
+.schedule-table .schedule-row-summary td { background:#f0f5fa; font-weight:850; }
+.schedule-table .schedule-row-division .schedule-item-description strong { font-weight:750; }
+.schedule-table .schedule-row-division .schedule-line-number { color:#54728f; }
+.schedule-table .schedule-row-summary .schedule-item-description strong { color:#173d5f; }
+.schedule-table td.schedule-heat-cell { font-weight:800; border-color:#9caebd; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+.schedule-heat-legend { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:7px 13px; margin:8px 0 0; color:#718198; font-size:7px; }
+.schedule-heat-legend strong { margin-right:auto; color:#536c84; font-weight:700; }
+.heat-swatch { width:17px; height:9px; display:inline-block; vertical-align:middle; border:1px solid rgba(40,70,95,.15); border-radius:2px; margin-right:4px; }
+.heat-swatch.light { background:hsl(207 72% 90%); }
+.heat-swatch.medium { background:hsl(207 72% 65%); }
+.heat-swatch.dark { background:hsl(207 72% 38%); }
+.schedule-export-action { display:flex; align-items:center; justify-content:flex-end; gap:12px; padding:4px 2px 12px; color:#8290a2; font-size:9px; }
+.schedule-export-action .btn { min-width:170px; justify-content:center; }
+.pdf-document { border-color:#d5dee8; box-shadow:0 10px 30px rgba(20,41,68,.07); }
+.pdf-heading h1 { font-family:var(--font-space),sans-serif; letter-spacing:.045em; }
+.schedule-curve svg { max-height:200px; }
+@media(max-width:1050px) {
+  .schedule-builder-heading { flex-direction:column; }
+  .schedule-builder-actions { justify-content:flex-start; }
+}
+@media(max-width:760px) {
+  .curve-menu-config { grid-template-columns:minmax(0,1fr) auto; gap:10px; }
+  .curve-menu-controls { grid-column:1; }
+  .curve-menu-order { grid-column:2; grid-row:1/span 2; }
+  .curve-menu-empty { grid-column:1/-1; }
+  .schedule-builder-card { padding:14px; }
+  .schedule-export-action { align-items:flex-start; flex-direction:column; }
+}
+@media print {
+  .schedule-builder-card,.schedule-export-action { display:none!important; }
+  .pdf-document { box-shadow:none!important; }
+  .schedule-table td.schedule-heat-cell,.schedule-table .schedule-row-menu-heading td,.schedule-table .schedule-row-summary td {
+    print-color-adjust:exact!important;
+    -webkit-print-color-adjust:exact!important;
+  }
 }
