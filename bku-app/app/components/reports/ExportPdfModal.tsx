@@ -60,7 +60,7 @@ export function ExportPdfModal({
   if (!open) return null;
   const theme = exportThemes.find((item) => item.id === themeId) || exportThemes[0];
   return (
-    <AppModal title="Export laporan BKU ke PDF" subtitle="Pilih jenis laporan dan rentang tanggal. Semua bagian yang dicentang akan digabung ke dalam satu PDF." onClose={onClose} wide>
+    <AppModal title="Export laporan BKU ke PDF" subtitle="Pilih jenis laporan dan rentang tanggal. Setiap bagian yang dicentang akan dibuat sebagai file PDF tersendiri." onClose={onClose} wide>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,.7fr)]">
         <div className="space-y-4">
           <section className="rounded-2xl border border-slate-200 p-4">
@@ -96,7 +96,7 @@ export function ExportPdfModal({
                 </label>
               ))}
             </div>
-            <p className="mt-2 text-[10px] leading-5 text-slate-500">Bagian terpilih dibuat sebagai satu dokumen PDF. Nama file dibuat otomatis dan diberi kode unik pada setiap ekspor.</p>
+            <p className="mt-2 text-[10px] leading-5 text-slate-500">Setiap bagian yang dipilih menjadi file PDF tersendiri. Nama setiap file dibuat otomatis dan diberi kode unik.</p>
           </section>
           <section className="grid gap-3 sm:grid-cols-2">
             <FormField label="Tema dokumen"><select value={themeId} onChange={(event) => onThemeChange(event.target.value)} className={fieldClass}>{exportThemes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></FormField>
