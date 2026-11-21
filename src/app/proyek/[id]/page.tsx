@@ -1062,6 +1062,7 @@ export default function ProjectWorkspacePage() {
 
   const handleDeleteDivision = async () => {
     if (!divisionDeleteTarget || !projectId || deletingDivision) return;
+    const target = divisionDeleteTarget;
     if (!canEditRab) {
       setErrorMessage('Penghapusan lokasi hanya tersedia pada proyek berstatus DRAFT atau REVIEW.');
       return;
@@ -1075,7 +1076,7 @@ export default function ProjectWorkspacePage() {
       const { data, error } = await supabase
         .from('rab_divisions')
         .delete()
-        .eq('id', divisionDeleteTarget.id)
+        .eq('id', target.id)
         .eq('project_id', projectId)
         .select('id')
         .maybeSingle();
@@ -1085,11 +1086,11 @@ export default function ProjectWorkspacePage() {
         throw new Error('Lokasi tidak terhapus. Periksa hak akses atau muat ulang halaman, lalu coba kembali.');
       }
 
-      setDivisionDeleteTarget(null);
       await recalculateProjectTotal(projectId);
       await loadData(true);
+      setDivisionDeleteTarget(null);
       setSuccessMessage(
-        `Lokasi "${divisionDeleteTarget.name}" berhasil dihapus beserta seluruh item RAB dan rincian yang terhubung.`,
+        `Lokasi "${target.name}" berhasil dihapus beserta seluruh item RAB dan rincian yang terhubung.`,
       );
     } catch (error) {
       console.error('Gagal menghapus lokasi RAB:', error);
@@ -1097,7 +1098,7 @@ export default function ProjectWorkspacePage() {
       const lowerMessage = message.toLowerCase();
       setErrorMessage(
         lowerMessage.includes('foreign key') || lowerMessage.includes('violates')
-          ? `Lokasi "${divisionDeleteTarget.name}" belum dapat dihapus karena masih direferensikan oleh data laporan atau transaksi. Data terkait harus diselesaikan terlebih dahulu. Detail: ${message}`
+          ? `Lokasi "${target.name}" belum dapat dihapus karena masih direferensikan oleh data laporan atau transaksi. Data terkait harus diselesaikan terlebih dahulu. Detail: ${message}`
           : `Gagal menghapus lokasi RAB: ${message}`,
       );
     } finally {
