@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { FileDown, CheckSquare, Square } from "lucide-react";
 import type { BoqItem, Project, WorkMenu } from "@/lib/types";
 import { itemAmount, itemPlannedPercent } from "@/lib/curve";
@@ -210,7 +210,7 @@ export default function ScheduleExport({ project, menu, items }: { project: Proj
                       const groupWeight = groupRows.reduce((sum, row) => sum + row.weight, 0);
                       const groupWeekly = weeks.map((_, index) => groupRows.reduce((sum, row) => sum + row.weekly[index], 0));
                       return (
-                        <tbody key={groupName}>
+                        <Fragment key={groupName}>
                           <tr className="schedule-group-row">
                             <td colSpan={2}>{groupName.toLocaleUpperCase("id-ID")}</td>
                             <td className="num">{money(groupAmount)}</td>
@@ -234,7 +234,7 @@ export default function ScheduleExport({ project, menu, items }: { project: Proj
                               </tr>
                             );
                           })}
-                        </tbody>
+                        </Fragment>
                       );
                     });
                   })()}
