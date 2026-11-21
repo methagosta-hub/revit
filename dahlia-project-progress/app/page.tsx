@@ -10,9 +10,10 @@ import {
 import { getProgressSupabase } from "@/lib/supabase";
 import { buildCurvePoints, calculateWeights, itemAmount, itemPlannedPercent, plannedProgress, reportProgress } from "@/lib/curve";
 import { dateLabel, localDateKey, money, number } from "@/lib/formatters";
-import type { BoqItem, CurvePoint, Project, Report, ReportItem } from "@/lib/types";
+import type { BoqItem, CurvePoint, Project, Report, ReportItem, WorkMenu } from "@/lib/types";
+import ScheduleExport from "@/app/schedule-export";
 
-type View = "dashboard" | "projects" | "rab" | "progress" | "reports";
+type View = "dashboard" | "projects" | "menus" | "rab" | "progress" | "reports" | "schedule";
 type ItemDraft = {
   id?: string;
   item_code: string;
@@ -26,12 +27,15 @@ type ItemDraft = {
 };
 type ProjectDraft = {
   name: string; client_name: string; location: string; contract_number: string; start_date: string; end_date: string;
+  school_head: string; planner: string; supervisor: string; p2sp: string; address: string; phone: string; npsn: string;
 };
-
+type MenuDraft = { name: string; description: string };
 const emptyProject: ProjectDraft = {
   name: "", client_name: "", location: "", contract_number: "",
   start_date: localDateKey(new Date()), end_date: localDateKey(new Date(new Date().setMonth(new Date().getMonth() + 6))),
+  school_head: "", planner: "", supervisor: "", p2sp: "", address: "", phone: "", npsn: "",
 };
+const emptyMenu: MenuDraft = { name: "", description: "" };
 const emptyItem: ItemDraft = {
   item_code: "", work_group: "Pekerjaan Persiapan", description: "", unit: "ls",
   quantity: "1", unit_price: "0", planned_start_date: "", planned_end_date: "",
@@ -151,6 +155,8 @@ export default function HomePage() {
   const [view,setView]=useState<View>("dashboard");
   const [projects,setProjects]=useState<Project[]>([]);
   const [project,setProject]=useState<Project|null>(null);
+  const [menus,setMenus]=useState<WorkMenu[]>([]);
+  const [menu,setMenu]=useState<WorkMenu|null>(null);
   const [items,setItems]=useState<BoqItem[]>([]);
   const [reports,setReports]=useState<Report[]>([]);
   const [reportItems,setReportItems]=useState<ReportItem[]>([]);
@@ -160,6 +166,10 @@ export default function HomePage() {
   const [toast,setToast]=useState("");
   const [projectDraft,setProjectDraft]=useState<ProjectDraft>(emptyProject);
   const [showProjectForm,setShowProjectForm]=useState(false);
+  const [projectEditingId,setProjectEditingId]=useState<string|null>(null);
+  const [menuDraft,setMenuDraft]=useState<MenuDraft>(emptyMenu);
+  const [showMenuForm,setShowMenuForm]=useState(false);
+  const [editingMenuId,setEditingMenuId]=useState<string|null>(null);
   const [itemDraft,setItemDraft]=useState<ItemDraft>(emptyItem);
   const [editingItemId,setEditingItemId]=useState<string|null>(null);
   const [reportDate,setReportDate]=useState(localDateKey(new Date()));
@@ -190,13 +200,23 @@ export default function HomePage() {
     if(!rows.length){setItems([]);setReports([]);setReportItems([]);}
   },[supabase,session?.user?.id]);
 
-  const loadProjectData=useCallback(async(target:Project)=>{
+  const loadMenus=useCallback(async(target:Project)=>{
+    if(!supabase)return;
+    setMenus([]);setMenu(null);setItems([]);setReports([]);setReportItems([]);
+    const {data,error:queryError}=await supabase.from("progress_project_menus").select("*").eq("project_id",target.id).order("sort_order").order("created_at");
+    if(queryError)throw queryError;
+    const rows=(data||[]) as WorkMenu[];
+    setMenus(rows);
+    setMenu((current)=>rows.find((row)=>row.id===current?.id&&row.is_active)||rows.find((row)=>row.is_active)||rows[0]||null);
+  },[supabase]);
+
+  const loadProjectData=useCallback(async(target:Project,targetMenu:WorkMenu)=>{
     if(!supabase)return;
     setLoading(true);setError("");
     try{
       const [itemResult,reportResult]=await Promise.all([
-        supabase.from("progress_boq_items").select("*").eq("project_id",target.id).eq("boq_version",target.current_boq_version).eq("is_active",true).order("sort_order").order("item_code"),
-        supabase.from("progress_reports").select("*").eq("project_id",target.id).order("report_date",{ascending:true}),
+        supabase.from("progress_boq_items").select("*").eq("project_id",target.id).eq("menu_id",targetMenu.id).eq("boq_version",targetMenu.current_boq_version).eq("is_active",true).order("sort_order").order("item_code"),
+        supabase.from("progress_reports").select("*").eq("project_id",target.id).eq("menu_id",targetMenu.id).order("report_date",{ascending:true}),
       ]);
       if(itemResult.error)throw itemResult.error;
       if(reportResult.error)throw reportResult.error;
@@ -221,10 +241,11 @@ export default function HomePage() {
   },[supabase]);
 
   useEffect(()=>{if(session?.user&&supabase)void loadProjects().catch((cause)=>setError(cause instanceof Error?cause.message:"Daftar proyek gagal dimuat."));},[session?.user?.id,supabase,loadProjects]);
-  useEffect(()=>{if(project)void loadProjectData(project);},[project?.id,project?.current_boq_version,loadProjectData]);
+  useEffect(()=>{if(project)void loadMenus(project).catch((cause)=>setError(cause instanceof Error?cause.message:"Menu pekerjaan gagal dimuat."));else{setMenus([]);setMenu(null);}},[project?.id,loadMenus]);
+  useEffect(()=>{if(project&&menu&&menu.project_id===project.id)void loadProjectData(project,menu);else{setItems([]);setReports([]);setReportItems([]);}},[project?.id,menu?.id,menu?.current_boq_version,loadProjectData]);
 
   const weights=useMemo(()=>calculateWeights(items),[items]);
-  const currentVersionReports=useMemo(()=>reports.filter((row)=>row.boq_version===(project?.current_boq_version||1)),[reports,project?.current_boq_version]);
+  const currentVersionReports=useMemo(()=>reports.filter((row)=>row.boq_version===(menu?.current_boq_version||1)),[reports,menu?.current_boq_version]);
   const latestReport=currentVersionReports[currentVersionReports.length-1]||null;
   const latestReportItems=useMemo(()=>latestReport?reportItems.filter((row)=>row.report_id===latestReport.id):[],[latestReport,reportItems]);
   const actualProgress=latestReport?reportProgress(latestReportItems):0;
@@ -237,29 +258,58 @@ export default function HomePage() {
   const itemEditingLocked=currentVersionReports.length>0;
   const filteredItems=items.filter((item)=>[item.item_code,item.description,item.work_group].join(" ").toLowerCase().includes(search.toLowerCase()));
 
+  function projectPayload(){
+    return {name:projectDraft.name.trim(),client_name:projectDraft.client_name.trim(),location:projectDraft.location.trim(),
+      contract_number:projectDraft.contract_number.trim(),start_date:projectDraft.start_date,end_date:projectDraft.end_date,
+      school_head:projectDraft.school_head.trim(),planner:projectDraft.planner.trim(),supervisor:projectDraft.supervisor.trim(),
+      p2sp:projectDraft.p2sp.trim(),address:projectDraft.address.trim(),phone:projectDraft.phone.trim(),npsn:projectDraft.npsn.trim(),updated_at:new Date().toISOString()};
+  }
+  function editProject(target:Project){
+    setProjectEditingId(target.id);
+    setProjectDraft({name:target.name||"",client_name:target.client_name||"",location:target.location||"",contract_number:target.contract_number||"",start_date:target.start_date,end_date:target.end_date,school_head:target.school_head||"",planner:target.planner||"",supervisor:target.supervisor||"",p2sp:target.p2sp||"",address:target.address||"",phone:target.phone||"",npsn:target.npsn||""});
+    setShowProjectForm(true);setView("projects");
+  }
   async function createProject(event:FormEvent){
     event.preventDefault();if(!supabase||!session?.user)return;
     if(projectDraft.end_date<projectDraft.start_date){setError("Tanggal selesai harus setelah tanggal mulai.");return;}
     setSaving(true);setError("");
     try{
-      const {data,error:insertError}=await supabase.from("progress_projects").insert({
-        owner_id:session.user.id,name:projectDraft.name.trim(),client_name:projectDraft.client_name.trim(),
-        location:projectDraft.location.trim(),contract_number:projectDraft.contract_number.trim(),
-        start_date:projectDraft.start_date,end_date:projectDraft.end_date,current_boq_version:1,
-      }).select("*").single();
-      if(insertError)throw insertError;
-      const newProject=data as Project;
-      setProjects((current)=>[newProject,...current]);setProject(newProject);setProjectDraft(emptyProject);setShowProjectForm(false);setView("rab");
-      setToast("Proyek berhasil dibuat. Selanjutnya susun RAB item pekerjaan.");
-    }catch(cause){setError(cause instanceof Error?cause.message:"Proyek gagal dibuat.");}
-    finally{setSaving(false);}
+      if(projectEditingId){
+        const {data,error:updateError}=await supabase.from("progress_projects").update(projectPayload()).eq("id",projectEditingId).select("*").single();
+        if(updateError)throw updateError;const updated=data as Project;
+        setProjects((current)=>current.map((row)=>row.id===updated.id?updated:row));setProject(updated);setToast("Identitas proyek sekolah berhasil diperbarui.");
+      }else{
+        const {data,error:insertError}=await supabase.from("progress_projects").insert({owner_id:session.user.id,...projectPayload(),current_boq_version:1}).select("*").single();
+        if(insertError)throw insertError;const newProject=data as Project;
+        const {data:menuData,error:menuError}=await supabase.from("progress_project_menus").insert({project_id:newProject.id,name:"RAB Utama",sort_order:1}).select("*").single();
+        if(menuError)throw menuError;setProjects((current)=>[newProject,...current]);setProject(newProject);setMenus([menuData as WorkMenu]);setMenu(menuData as WorkMenu);setView("rab");setToast("Proyek dan menu RAB Utama berhasil dibuat.");
+      }
+      setProjectDraft(emptyProject);setProjectEditingId(null);setShowProjectForm(false);
+    }catch(cause){setError(cause instanceof Error?cause.message:"Data proyek gagal disimpan.");}finally{setSaving(false);}
+  }
+  async function saveMenu(event:FormEvent){
+    event.preventDefault();if(!supabase||!project)return;if(!menuDraft.name.trim()){setError("Nama menu wajib diisi.");return;}
+    setSaving(true);setError("");
+    try{
+      const payload={name:menuDraft.name.trim(),description:menuDraft.description.trim(),updated_at:new Date().toISOString()};
+      const result=editingMenuId?await supabase.from("progress_project_menus").update(payload).eq("id",editingMenuId).eq("project_id",project.id).select("*").single():await supabase.from("progress_project_menus").insert({...payload,project_id:project.id,sort_order:menus.length+1}).select("*").single();
+      if(result.error)throw result.error;const saved=result.data as WorkMenu;
+      setMenus((current)=>editingMenuId?current.map((row)=>row.id===saved.id?saved:row):[...current,saved]);setMenu(saved);setMenuDraft(emptyMenu);setEditingMenuId(null);setShowMenuForm(false);setToast(editingMenuId?"Menu pekerjaan diperbarui.":"Menu pekerjaan baru ditambahkan.");
+    }catch(cause){setError(cause instanceof Error?cause.message:"Menu pekerjaan gagal disimpan.");}finally{setSaving(false);}
+  }
+  async function toggleMenu(menuRow:WorkMenu){
+    if(!supabase||!project)return;const {error:updateError}=await supabase.from("progress_project_menus").update({is_active:!menuRow.is_active,updated_at:new Date().toISOString()}).eq("id",menuRow.id).eq("project_id",project.id);
+    if(updateError){setError(updateError.message);return;}const updated={...menuRow,is_active:!menuRow.is_active};setMenus((current)=>current.map((row)=>row.id===updated.id?updated:row));
+    if(menu?.id===updated.id&&!updated.is_active)setMenu(menus.find((row)=>row.id!==updated.id&&row.is_active)||null);else if(!menu&&updated.is_active)setMenu(updated);
+    setToast(updated.is_active?"Menu diaktifkan kembali.":"Menu dinonaktifkan; RAB dan laporan tetap tersimpan.");
   }
 
   async function saveItem(event:FormEvent){
     event.preventDefault();if(!supabase||!project)return;
     setSaving(true);setError("");
+    if(!menu){setError("Pilih menu pekerjaan terlebih dahulu.");return;}
     const payload={
-      project_id:project.id,boq_version:project.current_boq_version,
+      project_id:project.id,menu_id:menu.id,boq_version:menu.current_boq_version,
       item_code:itemDraft.item_code.trim(),work_group:itemDraft.work_group.trim()||"Umum",
       description:itemDraft.description.trim(),unit:itemDraft.unit.trim()||"ls",
       quantity:Number(itemDraft.quantity||0),unit_price:Number(itemDraft.unit_price||0),
@@ -269,7 +319,7 @@ export default function HomePage() {
     };
     try{
       const result=editingItemId
-        ? await supabase.from("progress_boq_items").update(payload).eq("id",editingItemId).eq("project_id",project.id)
+        ? await supabase.from("progress_boq_items").update(payload).eq("id",editingItemId).eq("project_id",project.id).eq("menu_id",menu.id)
         : await supabase.from("progress_boq_items").insert(payload);
       if(result.error)throw result.error;
       setItemDraft(emptyItem);setEditingItemId(null);await loadProjectData(project);setToast("Item RAB berhasil disimpan.");
@@ -278,8 +328,8 @@ export default function HomePage() {
   }
 
   async function deleteItem(item:BoqItem){
-    if(!supabase||!project||!window.confirm(`Hapus item ${item.item_code} – ${item.description}?`))return;
-    const {error:deleteError}=await supabase.from("progress_boq_items").delete().eq("id",item.id).eq("project_id",project.id);
+    if(!supabase||!project||!menu||!window.confirm("Hapus item " + item.item_code + " – " + item.description + "?"))return;
+    const {error:deleteError}=await supabase.from("progress_boq_items").delete().eq("id",item.id).eq("project_id",project.id).eq("menu_id",menu.id);
     if(deleteError){setError(deleteError.message);return;}
     await loadProjectData(project);setToast("Item RAB dihapus.");
   }
@@ -295,14 +345,13 @@ export default function HomePage() {
   }
 
   async function createBoqRevision(){
-    if(!supabase||!project||!window.confirm("Buat versi RAB baru? Seluruh item aktif akan disalin ke versi baru. Riwayat laporan versi lama tetap tersimpan dan tidak akan dihitung ulang."))return;
+    if(!supabase||!project||!menu||!window.confirm("Buat versi RAB baru untuk menu ini? Item menu disalin ke versi berikutnya dan laporan versi lama tetap tersimpan."))return;
     setSaving(true);setError("");
     try{
-      const {data,error:rpcError}=await supabase.rpc("progress_create_boq_revision",{p_project_id:project.id});
-      if(rpcError)throw rpcError;
-      const revised={...project,current_boq_version:Number(data)};
-      setProject(revised);setProjects((current)=>current.map((row)=>row.id===project.id?revised:row));
-      setToast(`Versi RAB ${data} dibuat. Anda dapat mengubah item tanpa menimpa laporan versi sebelumnya.`);
+      const {data,error:rpcError}=await supabase.rpc("progress_create_boq_revision",{p_menu_id:menu.id});
+      if(rpcError)throw rpcError;const revisedMenu={...menu,current_boq_version:Number(data)};
+      setMenu(revisedMenu);setMenus((current)=>current.map((row)=>row.id===menu.id?revisedMenu:row));
+      setToast("Versi RAB " + data + " dibuat untuk menu " + menu.name + ".");
     }catch(cause){setError(cause instanceof Error?cause.message:"Revisi RAB gagal dibuat.");}
     finally{setSaving(false);}
   }
@@ -323,7 +372,7 @@ export default function HomePage() {
   }
 
   async function saveProgressReport(event:FormEvent){
-    event.preventDefault();if(!supabase||!project)return;
+    event.preventDefault();if(!supabase||!project||!menu)return;
     if(reportDate<project.start_date||reportDate>project.end_date){setError("Tanggal laporan berada di luar periode proyek.");return;}
     if(!items.length||weights.total<=0){setError("RAB belum tersedia atau total nilai RAB masih nol.");return;}
     const itemPayload=items.map((item)=>({
@@ -335,10 +384,10 @@ export default function HomePage() {
     setSaving(true);setError("");
     try{
       const {error:rpcError}=await supabase.rpc("progress_save_report",{
-        p_project_id:project.id,p_report_date:reportDate,p_notes:reportNotes,p_items:itemPayload,
+        p_project_id:project.id,p_menu_id:menu.id,p_report_date:reportDate,p_notes:reportNotes,p_items:itemPayload,
       });
       if(rpcError)throw rpcError;
-      await loadProjectData(project);setToast("Laporan progres kumulatif berhasil disimpan.");
+      await loadProjectData(project,menu);setToast("Laporan progres kumulatif berhasil disimpan untuk menu ini.");
     }catch(cause){setError(cause instanceof Error?cause.message:"Laporan progres gagal disimpan.");}
     finally{setSaving(false);}
   }
@@ -352,7 +401,7 @@ export default function HomePage() {
   if(!session)return <LoginPanel supabase={supabase}/>;
 
   const tabTitle:Record<View,string>={
-    dashboard:"Ringkasan Proyek",projects:"Master Proyek",rab:"Rencana Anggaran Biaya",progress:"Input Progres Lapangan",reports:"Riwayat Laporan",
+    dashboard:"Ringkasan Proyek",projects:"Identitas Proyek Sekolah",menus:"Menu Pekerjaan",rab:"Rencana Anggaran Biaya",progress:"Input Progres Lapangan",reports:"Riwayat Laporan",schedule:"Jadwal & Export PDF",
   };
   const currentUser=session.user.email||"Pengguna";
   const lastDate=latestReport?.report_date||"Belum ada";
@@ -365,11 +414,11 @@ export default function HomePage() {
         <div className="nav-label">Menu utama</div>
         <nav className="nav-list">
           {([
-            ["dashboard",BarChart3,"Dashboard"],["projects",FolderKanban,"Master Proyek"],["rab",ClipboardList,"RAB Pekerjaan"],["progress",Activity,"Input Progres"],["reports",CalendarDays,"Riwayat Laporan"],
+            ["dashboard",BarChart3,"Dashboard"],["projects",FolderKanban,"Identitas Proyek"],["menus",BriefcaseBusiness,"Menu Pekerjaan"],["rab",ClipboardList,"Rincian RAB"],["progress",Activity,"Input Progres"],["reports",CalendarDays,"Riwayat"],["schedule",FilePlus2,"Jadwal / PDF"],
           ] as const).map(([id,Icon,label])=><button key={id} className={`nav-btn ${view===id?"active":""}`} onClick={()=>setView(id)}><Icon size={16}/>{label}</button>)}
         </nav>
       </div>
-      <div className="side-project"><small>Proyek aktif</small><strong>{project?.name||"Belum ada proyek"}</strong><span>{project? `RAB v${project.current_boq_version} · ${dateLabel(project.start_date,{month:"short",year:"numeric"})} – ${dateLabel(project.end_date,{month:"short",year:"numeric"})}`:"Buat proyek untuk mulai menyusun RAB."}</span></div>
+      <div className="side-project"><small>Proyek aktif</small><strong>{project?.name||"Belum ada proyek"}</strong><span>{project? (menu?.name||"Pilih menu") + " · RAB v" + (menu?.current_boq_version||1) + " · " + dateLabel(project.start_date,{month:"short",year:"numeric"}) + " – " + dateLabel(project.end_date,{month:"short",year:"numeric"}):"Buat proyek untuk mulai menyusun RAB."}</span></div>
     </aside>
     <main className="main-area">
       <header className="topbar">
