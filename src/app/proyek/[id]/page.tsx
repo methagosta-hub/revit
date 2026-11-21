@@ -25,6 +25,7 @@ import {
   Pencil,
   Download,
   Save,
+  Trash2,
   X,
 } from 'lucide-react';
 import AhspPickerModal, {
@@ -503,6 +504,8 @@ export default function ProjectWorkspacePage() {
   const [projectChoices, setProjectChoices] = useState<ProjectChoice[]>([]);
   const [loadingProjectChoices, setLoadingProjectChoices] = useState(false);
   const [divisionActionBusy, setDivisionActionBusy] = useState(false);
+  const [divisionDeleteTarget, setDivisionDeleteTarget] = useState<RABDivision | null>(null);
+  const [deletingDivision, setDeletingDivision] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -1054,6 +1057,52 @@ export default function ProjectWorkspacePage() {
       console.error('Gagal menghapus item RAB:', error);
       setErrorMessage(`Gagal menghapus item RAB: ${getErrorMessage(error)}`);
       throw error;
+    }
+  };
+
+  const handleDeleteDivision = async () => {
+    if (!divisionDeleteTarget || !projectId || deletingDivision) return;
+    const target = divisionDeleteTarget;
+    if (!canEditRab) {
+      setErrorMessage('Penghapusan lokasi hanya tersedia pada proyek berstatus DRAFT atau REVIEW.');
+      return;
+    }
+
+    setDeletingDivision(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      const { data, error } = await supabase
+        .from('rab_divisions')
+        .delete()
+        .eq('id', target.id)
+        .eq('project_id', projectId)
+        .select('id')
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data?.id) {
+        throw new Error('Lokasi tidak terhapus. Periksa hak akses atau muat ulang halaman, lalu coba kembali.');
+      }
+
+      await recalculateProjectTotal(projectId);
+      await loadData(true);
+      setDivisionDeleteTarget(null);
+      setSuccessMessage(
+        `Lokasi "${target.name}" berhasil dihapus beserta seluruh item RAB dan rincian yang terhubung.`,
+      );
+    } catch (error) {
+      console.error('Gagal menghapus lokasi RAB:', error);
+      const message = getErrorMessage(error);
+      const lowerMessage = message.toLowerCase();
+      setErrorMessage(
+        lowerMessage.includes('foreign key') || lowerMessage.includes('violates')
+          ? `Lokasi "${target.name}" belum dapat dihapus karena masih direferensikan oleh data laporan atau transaksi. Data terkait harus diselesaikan terlebih dahulu. Detail: ${message}`
+          : `Gagal menghapus lokasi RAB: ${message}`,
+      );
+    } finally {
+      setDeletingDivision(false);
     }
   };
 
@@ -1732,6 +1781,14 @@ export default function ProjectWorkspacePage() {
                     </button>}
                     {canEditRab && <button
                       type="button"
+                      onClick={() => setDivisionDeleteTarget(division)}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                      title={`Hapus lokasi ${division.name} beserta seluruh item RAB`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Hapus
+                    </button>}
+                    {canEditRab && <button
+                      type="button"
                       onClick={() => void openDivisionDialog('copy', division)}
                       className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                       title="Salin lokasi beserta item RAB"
@@ -1994,6 +2051,75 @@ export default function ProjectWorkspacePage() {
                 </button>
               </div>
             </form>
+          </section>
+        </div>
+      )}
+
+      {divisionDeleteTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4">
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-division-title"
+            aria-describedby="delete-division-description"
+            className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6"
+          >
+            <div className="mb-4 flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 id="delete-division-title" className="text-lg font-bold text-slate-900">Hapus Lokasi Pekerjaan?</h2>
+                <p id="delete-division-description" className="mt-1 text-sm leading-5 text-slate-600">
+                  Anda akan menghapus lokasi <strong>{divisionDeleteTarget.name}</strong> beserta seluruh item RAB di dalamnya.
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Tutup"
+                disabled={deletingDivision}
+                onClick={() => setDivisionDeleteTarget(null)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 disabled:opacity-50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4">
+              <p className="text-sm font-semibold text-rose-900">Tindakan ini tidak dapat dibatalkan.</p>
+              <ul className="mt-2 space-y-1 text-xs leading-5 text-rose-800">
+                <li>• {divisionDeleteTarget.items?.length ?? 0} item AHSP akan ikut dihapus.</li>
+                <li>• Rincian analisa dan backup volume yang melekat pada item tersebut ikut terhapus sesuai relasi database.</li>
+                <li>• Total RAB proyek akan dihitung ulang setelah penghapusan.</li>
+              </ul>
+              <p className="mt-3 text-xs leading-5 text-rose-800">
+                Jika lokasi masih digunakan oleh laporan atau data transaksi, database dapat menolak penghapusan untuk melindungi riwayat tersebut.
+              </p>
+            </div>
+
+            {errorMessage && (
+              <p role="alert" className="mb-4 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{errorMessage}</p>
+            )}
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={deletingDivision}
+                onClick={() => setDivisionDeleteTarget(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={deletingDivision}
+                onClick={() => void handleDeleteDivision()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deletingDivision ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {deletingDivision ? 'Menghapus Lokasi...' : 'Ya, Hapus Lokasi'}
+              </button>
+            </div>
           </section>
         </div>
       )}
