@@ -210,7 +210,7 @@ export default function HomePage() {
   const deviation=actualProgress-targetProgress;
   const curvePoints=useMemo(()=>project?buildCurvePoints(project,items,reports,reportItems):[],[project,items,reports,reportItems]);
 
-  const currentReportId=reports.find((item)=>item.report_date===reportDate)?.id;
+  const currentReportId=currentVersionReports.find((item)=>item.report_date===reportDate)?.id;
   const reportLocked=Boolean(currentReportId);
   const itemEditingLocked=currentVersionReports.length>0;
   const filteredItems=items.filter((item)=>[item.item_code,item.description,item.work_group].join(" ").toLowerCase().includes(search.toLowerCase()));
