@@ -24,6 +24,8 @@ class _FieldHomePageState extends State<FieldHomePage>
   late final FieldRepository _repository;
   late final FieldSyncService _sync;
   late Future<_HomeData> _homeFuture;
+  bool _syncStarted = false;
+  bool _syncEnabled = false;
 
   @override
   void initState() {
@@ -31,7 +33,7 @@ class _FieldHomePageState extends State<FieldHomePage>
     WidgetsBinding.instance.addObserver(this);
     final client = Supabase.instance.client;
     _repository = FieldRepository(client: client, outbox: widget.outbox);
-    _sync = FieldSyncService(client: client, outbox: widget.outbox)..start();
+    _sync = FieldSyncService(client: client, outbox: widget.outbox);
     _homeFuture = _loadHome();
   }
 
@@ -39,6 +41,11 @@ class _FieldHomePageState extends State<FieldHomePage>
     final contextData = await _repository.getContext();
     final isDirector = contextData['field_role'] == 'director';
     final isSubcontractor = contextData['field_role'] == 'subcontractor';
+    _syncEnabled = !isDirector;
+    if (_syncEnabled && !_syncStarted) {
+      _syncStarted = true;
+      _sync.start();
+    }
     final projects = isDirector
         ? await _repository.listDirectorProjects()
         : await _repository.listProjects();
@@ -60,7 +67,7 @@ class _FieldHomePageState extends State<FieldHomePage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && _syncEnabled) {
       _sync.syncPending();
     }
   }

@@ -28,6 +28,53 @@ $function$;
 revoke all on function dahlia_private.field_user_is_director()
   from public, anon, authenticated;
 
+
+-- An account carrying the Director company role is read-only in Dahlia Field,
+-- even if an older employee/subcontractor link remains attached to that user.
+create or replace function dahlia_private.field_user_is_internal()
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, dahlia_private, auth, pg_temp
+as $function$
+  select not dahlia_private.field_user_is_director()
+     and exists (
+       select 1
+       from dahlia_private.field_user_links l
+       join public.user_profiles up on up.id = l.user_id
+       join public.employees e on e.id = l.employee_id and e.status = 'active'
+       where l.user_id = auth.uid()
+         and l.field_role = 'internal'
+         and up.is_active = true
+     );
+$function$;
+
+create or replace function dahlia_private.field_user_is_subcontractor()
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, dahlia_private, auth, pg_temp
+as $function$
+  select not dahlia_private.field_user_is_director()
+     and exists (
+       select 1
+       from dahlia_private.field_user_links l
+       join public.user_profiles up on up.id = l.user_id
+       join public.subcontractors s on s.id = l.subcontractor_id
+       where l.user_id = auth.uid()
+         and l.field_role = 'subcontractor'
+         and up.is_active = true
+         and s.status = 'active'
+     );
+$function$;
+
+revoke all on function dahlia_private.field_user_is_internal()
+  from public, anon, authenticated;
+revoke all on function dahlia_private.field_user_is_subcontractor()
+  from public, anon, authenticated;
+
 create or replace function public.dahlia_field_get_context()
 returns jsonb
 language plpgsql

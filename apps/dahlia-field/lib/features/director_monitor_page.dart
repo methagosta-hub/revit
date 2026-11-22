@@ -48,7 +48,7 @@ class DirectorMonitorPage extends StatelessWidget {
                   const SizedBox(height: 14),
                   Row(
                     children: [
-                      _Metric('$projectCount', 'Proyek'),
+                      _Metric('${projects.length}', 'Proyek'),
                       _Metric('$reportingProjects', 'Ada laporan'),
                       _Metric('$reportTotal', 'Total laporan'),
                     ],
