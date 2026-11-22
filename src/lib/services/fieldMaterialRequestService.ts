@@ -38,7 +38,7 @@ export type FieldMaterialRequest = {
 };
 
 function throwDbError(error: { message: string }, action: string): never {
-  throw new Error(\`\${action}: \${error.message}\`);
+  throw new Error(`${action}: ${error.message}`);
 }
 
 export async function fetchFieldMaterialRequestsForReview(
