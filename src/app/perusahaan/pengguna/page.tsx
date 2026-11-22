@@ -661,6 +661,7 @@ function UserManagementContent() {
                       <option key={employee.employee_id} value={employee.employee_id}>
                         {employee.full_name} · {employee.employee_number ?? 'Tanpa nomor'}
                         {employee.preferred_name ? ` · ${employee.preferred_name}` : ''}
+                        {employee.position_title ? ` · ${employee.position_title}` : ''}
                       </option>
                     ))}
                   </select>
