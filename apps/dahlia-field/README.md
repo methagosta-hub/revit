@@ -34,9 +34,13 @@ A separate Android companion for Dahlia Management System. This app is built as 
 
 The repository CI creates the Android host in a temporary folder and copies its generated android/ directory into this Flutter package, so native Android scaffolding does not need to be mixed with the existing web application's root.
 
-## Database migration and staging
+## Database migration and deployment
 
-The 20261122000*_dahlia_field_mobile_*.sql files are additive migrations. They have been committed for review only; they have not been run against production. Apply migrations 001–006 in order to an isolated Supabase staging project after checking the exact migration diff. Validate with separate Mandor and subcontractor test users before considering a production migration.
+Migrations `202611220001` through `202611220006` were applied to the Dahlia Management production Supabase project on 22 November 2026. Do not re-run, rewrite, or reset these applied migrations. Subsequent dashboard/mobile integration changes must use a new forward-only migration, reviewed and applied in sequence.
+
+Migration `202611220007_dahlia_field_dashboard_workflow.sql` adds the Dashboard account-link lookup APIs, a unique employee-to-Field-account mapping, and an atomic approved Field PR to official Purchase Order conversion. It is prepared on the integration feature branch and has **not** been applied to production. Apply it only after the matching Dashboard code is reviewed and ready to deploy.
+
+A Field material request is a purchase requisition (PR), not an official Purchase Order. Mandor supplies project, material description, unit, quantity, need-by date, priority and notes. Purchasing reviews the PR, selects an active supplier, enters the unit prices from the supplier quotation, then converts the approved PR into a normal PO. The PO uses the existing approval and warehouse receiving lifecycle. Approving a PR alone never creates a PO.
 
 ### Account linking
 
