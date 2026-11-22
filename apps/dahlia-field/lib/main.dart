@@ -7,8 +7,8 @@ import 'features/login_page.dart';
 
 const String _supabaseUrl =
     String.fromEnvironment('DAHLIA_SUPABASE_URL');
-const String _supabaseAnonKey =
-    String.fromEnvironment('DAHLIA_SUPABASE_ANON_KEY');
+const String _supabasePublishableKey =
+    String.fromEnvironment('DAHLIA_SUPABASE_PUBLISHABLE_KEY');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,12 +17,12 @@ Future<void> main() async {
   await outbox.initialize();
 
   final configured = _supabaseUrl.startsWith('https://') &&
-      _supabaseAnonKey.isNotEmpty;
+      _supabasePublishableKey.startsWith('sb_publishable_');
 
   if (configured) {
     await Supabase.initialize(
       url: _supabaseUrl,
-      anonKey: _supabaseAnonKey,
+      publishableKey: _supabasePublishableKey,
     );
   }
 

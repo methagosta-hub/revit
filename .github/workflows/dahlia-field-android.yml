@@ -82,12 +82,13 @@ jobs:
       - name: Build release APK
         working-directory: apps/dahlia-field
         env:
-          DAHLIA_SUPABASE_URL: ${{ vars.DAHLIA_SUPABASE_URL }}
-          DAHLIA_SUPABASE_ANON_KEY: ${{ vars.DAHLIA_SUPABASE_ANON_KEY }}
+          # Supabase publishable key is intended for client apps. Never use service_role here.
+          DAHLIA_SUPABASE_URL: https://ggqpenjrptqescagvcze.supabase.co
+          DAHLIA_SUPABASE_PUBLISHABLE_KEY: sb_publishable_J_FFHUsphFJVmEz08yvHfg_9Ykaa3B9
         run: |
           flutter build apk --release \
             --dart-define=DAHLIA_SUPABASE_URL="$DAHLIA_SUPABASE_URL" \
-            --dart-define=DAHLIA_SUPABASE_ANON_KEY="$DAHLIA_SUPABASE_ANON_KEY"
+            --dart-define=DAHLIA_SUPABASE_PUBLISHABLE_KEY="$DAHLIA_SUPABASE_PUBLISHABLE_KEY"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
