@@ -49,6 +49,7 @@ export async function fetchWarehouseIssuePageData(): Promise<WarehouseIssuePageD
     supabase
       .from('projects')
       .select('id, title, client')
+      .eq('status', 'DIKERJAKAN')
       .order('title', { ascending: true }),
     supabase
       .from('project_material_issues')

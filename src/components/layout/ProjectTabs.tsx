@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { ComponentType } from 'react';
 import { useParams, usePathname } from 'next/navigation';
+import { useAuth } from '@/components/auth/AuthProvider';
 import {
   Calculator,
   ClipboardList,
@@ -31,12 +32,17 @@ const executionLinks: ProjectSectionLink[] = [
   { label: 'Pusat Pelaksanaan', suffix: '/pelaksanaan-pekerjaan', icon: ClipboardCheck },
 ];
 
-const planningSuffixes = planningLinks.map((item) => item.suffix).filter(Boolean);
 const executionSuffixes = executionLinks.map((item) => item.suffix);
 
 export default function ProjectTabs() {
   const params = useParams<{ id: string }>();
   const pathname = usePathname();
+  const { access } = useAuth();
+  const isPortfolioAccount = access?.profile?.is_demo_user === true;
+  const visiblePlanningLinks = isPortfolioAccount
+    ? planningLinks.filter((item) => item.suffix !== '/kelola')
+    : planningLinks;
+  const planningSuffixes = visiblePlanningLinks.map((item) => item.suffix).filter(Boolean);
   const projectId = String(params?.id ?? '');
 
   if (!projectId) return null;
@@ -52,9 +58,9 @@ export default function ProjectTabs() {
   );
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur print:hidden">
-      <div className="px-4 py-3 sm:px-6">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+    <header className="sticky top-14 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur print:hidden xl:top-0">
+      <div className="min-w-0 px-3 py-2.5 sm:px-4 sm:py-3 xl:px-6">
+        <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2 sm:mb-3">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">
               DAHLIA Construction
@@ -71,11 +77,11 @@ export default function ProjectTabs() {
           </Link>
         </div>
 
-        <nav aria-label="Modul proyek" className="flex items-center gap-2 overflow-x-auto pb-1">
+        <nav aria-label="Modul proyek" className="dahlia-horizontal-tabs flex items-center gap-1.5 pb-1 sm:gap-2">
           <Link
             href={projectBase}
             aria-current={isPlanning ? 'page' : undefined}
-            className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition sm:gap-2 sm:px-3.5 sm:py-2 sm:text-sm ${
               isPlanning
                 ? 'bg-blue-700 text-white shadow-sm'
                 : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
@@ -88,7 +94,7 @@ export default function ProjectTabs() {
           <Link
             href={`${projectBase}/pelaksanaan-pekerjaan`}
             aria-current={isExecution ? 'page' : undefined}
-            className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition sm:gap-2 sm:px-3.5 sm:py-2 sm:text-sm ${
               isExecution
                 ? 'bg-emerald-700 text-white shadow-sm'
                 : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
@@ -98,7 +104,7 @@ export default function ProjectTabs() {
             Pelaksanaan
           </Link>
 
-          <Link
+          {!isPortfolioAccount && <Link
             href={`/proyek/${projectId}/pelaksanaan-pekerjaan/laporan`}
             aria-current={
               pathname === `${projectBase}/pelaksanaan-pekerjaan/laporan`
@@ -113,12 +119,12 @@ export default function ProjectTabs() {
           >
             <BarChart3 className="h-4 w-4" />
             Laporan
-          </Link>
+          </Link>}
         </nav>
 
         {isPlanning ? (
-          <nav aria-label="Menu Perencanaan" className="mt-3 flex items-center gap-1 overflow-x-auto border-t border-slate-100 pt-2">
-            {planningLinks.map((item) => {
+          <nav aria-label="Menu Perencanaan" className="dahlia-horizontal-tabs mt-2 flex items-center gap-1 border-t border-slate-100 pt-2 sm:mt-3 sm:gap-1.5">
+            {visiblePlanningLinks.map((item) => {
               const href = `${projectBase}${item.suffix}`;
               const isActive = item.suffix
                 ? pathname === href || pathname.startsWith(`${href}/`)
@@ -144,7 +150,7 @@ export default function ProjectTabs() {
         ) : null}
 
         {isExecution ? (
-          <nav aria-label="Menu Pelaksanaan" className="mt-3 flex items-center gap-1 overflow-x-auto border-t border-slate-100 pt-2">
+          <nav aria-label="Menu Pelaksanaan" className="dahlia-horizontal-tabs mt-2 flex items-center gap-1 border-t border-slate-100 pt-2 sm:mt-3 sm:gap-1.5">
             {executionLinks.map((item) => {
               const href = `${projectBase}${item.suffix}`;
               const Icon = item.icon;

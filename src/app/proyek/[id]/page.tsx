@@ -18,24 +18,31 @@ import {
   Plus,
   Database,
   Copy,
+  GripVertical,
+  Lock,
+  ChevronUp,
+  ChevronDown,
   Pencil,
   Download,
   Save,
+  Trash2,
   X,
 } from 'lucide-react';
 import AhspPickerModal, {
   type SelectedAhspBatchPayload,
 } from '@/components/rab/AhspPickerModal';
-import RabTable, {
+import {
   type RabTableItem,
   type RabItemUpdate,
   type RabComponentsUpdate,
 } from '@/components/rab/RabTable';
+import RabCategoryBoard from '@/components/rab/RabCategoryBoard';
 import { fetchProjectDetail, recalculateProjectTotal } from '@/lib/services/projectService';
 import { generateRABExcel } from '@/lib/excel-generator';
 import { formatRupiah } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import type { Project } from '@/types/rab';
+import { getMyAccess, hasPermission } from '@/lib/services/authService';
+import type { Project, ProjectCategory } from '@/types/rab';
 
 type RABDivision = {
   id: string;
@@ -51,6 +58,7 @@ type WorkspaceProject = Omit<Project, 'divisions'> & {
   client?: string;
   location?: string;
   status?: string;
+  project_category?: ProjectCategory;
   school_npsn?: string | null;
   principal_name?: string | null;
   p2sp_chair_name?: string | null;
@@ -64,6 +72,8 @@ type WorkspaceProject = Omit<Project, 'divisions'> & {
   profit_margin?: number | string | null;
   divisions?: RABDivision[] | null;
 };
+
+type PdfSigner = { role: string; name: string; identifier: string };
 
 type ProjectChoice = {
   id: string;
@@ -340,45 +350,22 @@ function getAhspCodeClassification(codeValue: string): AhspCodeClassification {
   };
 }
 
-function compareAhspCodes(aValue: string, bValue: string): number {
-  const a = String(aValue || '').trim().toUpperCase().split('.');
-  const b = String(bValue || '').trim().toUpperCase().split('.');
-  const aFieldRank = WORK_FIELDS.findIndex((field) => field.code === a[0]);
-  const bFieldRank = WORK_FIELDS.findIndex((field) => field.code === b[0]);
-
-  if (aFieldRank !== -1 && bFieldRank !== -1 && aFieldRank !== bFieldRank) {
-    return aFieldRank - bFieldRank;
-  }
-
-  const length = Math.max(a.length, b.length);
-  for (let index = 0; index < length; index += 1) {
-    const left = a[index] ?? '';
-    const right = b[index] ?? '';
-    if (left === right) continue;
-
-    const leftNumber = /^\d+$/.test(left) ? Number(left) : null;
-    const rightNumber = /^\d+$/.test(right) ? Number(right) : null;
-
-    if (leftNumber !== null && rightNumber !== null) return leftNumber - rightNumber;
-    const textCompare = left.localeCompare(right, 'id', { numeric: true, sensitivity: 'base' });
-    if (textCompare !== 0) return textCompare;
-  }
-  return 0;
-}
-
 function buildAhspItemGroups(items: RabTableItem[]): AhspItemGroup[] {
-  const groups = new Map<string, AhspItemGroup>();
-  const sortedItems = [...items].sort((left, right) =>
-    compareAhspCodes(String(left.code || ''), String(right.code || '')),
+  // Setiap item ditempatkan pada kombinasi bidang/divisi/subkategori AHSP.
+  // Urutan kategori mengikuti kemunculan pertama pada sort_order, sedangkan
+  // urutan item di dalam kategori tetap mengikuti sort_order tersimpan.
+  const orderedItems = [...items].sort(
+    (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
   );
+  const groupsByKey = new Map<string, AhspItemGroup>();
 
-  for (const item of sortedItems) {
+  for (const item of orderedItems) {
     const classification = getAhspCodeClassification(String(item.code || ''));
-    const existing = groups.get(classification.key);
+    const existing = groupsByKey.get(classification.key);
     if (existing) {
       existing.items.push(item);
     } else {
-      groups.set(classification.key, {
+      groupsByKey.set(classification.key, {
         key: classification.key,
         prefix: classification.prefix,
         classification,
@@ -387,9 +374,7 @@ function buildAhspItemGroups(items: RabTableItem[]): AhspItemGroup[] {
     }
   }
 
-  return Array.from(groups.values()).sort((left, right) =>
-    compareAhspCodes(left.prefix, right.prefix),
-  );
+  return Array.from(groupsByKey.values());
 }
 
 function getErrorMessage(error: unknown): string {
@@ -487,12 +472,19 @@ export default function ProjectWorkspacePage() {
   const projectId = params?.id;
 
   const [project, setProject] = useState<WorkspaceProject | null>(null);
+  const [canManageRabPermission, setCanManageRabPermission] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [pdfTheme, setPdfTheme] = useState<PdfThemeKey>('emerald');
   const [pdfFont, setPdfFont] = useState<PdfFontKey>('robotoCondensed');
   const [pdfBoldWeight, setPdfBoldWeight] = useState<PdfBoldWeight>(800);
+  const [pdfSignatureCount, setPdfSignatureCount] = useState<1 | 2 | 3>(2);
+  const [pdfSigners, setPdfSigners] = useState<PdfSigner[]>([
+    { role: 'Disusun oleh', name: '', identifier: '' },
+    { role: 'Mengetahui', name: '', identifier: '' },
+    { role: 'Menyetujui', name: '', identifier: '' },
+  ]);
   const activePdfTheme = PDF_THEMES[pdfTheme];
 
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -502,6 +494,9 @@ export default function ProjectWorkspacePage() {
   const [newLocationName, setNewLocationName] = useState('');
   const [creatingLocation, setCreatingLocation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [draggedDivisionId, setDraggedDivisionId] = useState<string | null>(null);
+  const [dropDivisionId, setDropDivisionId] = useState<string | null>(null);
+  const [reorderingDivisions, setReorderingDivisions] = useState(false);
 
   const [divisionDialog, setDivisionDialog] = useState<DivisionDialogState | null>(null);
   const [divisionNameDraft, setDivisionNameDraft] = useState('');
@@ -509,6 +504,8 @@ export default function ProjectWorkspacePage() {
   const [projectChoices, setProjectChoices] = useState<ProjectChoice[]>([]);
   const [loadingProjectChoices, setLoadingProjectChoices] = useState(false);
   const [divisionActionBusy, setDivisionActionBusy] = useState(false);
+  const [divisionDeleteTarget, setDivisionDeleteTarget] = useState<RABDivision | null>(null);
+  const [deletingDivision, setDeletingDivision] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -526,8 +523,24 @@ export default function ProjectWorkspacePage() {
     setErrorMessage('');
 
     try {
-      const data = await fetchProjectDetail(projectId);
-      setProject(data ? (data as unknown as WorkspaceProject) : null);
+      const [data, access] = await Promise.all([fetchProjectDetail(projectId), getMyAccess()]);
+      if (!data) {
+        setProject(null);
+      } else {
+        const loadedProject = data as unknown as WorkspaceProject;
+        setProject({
+          ...loadedProject,
+          divisions: [...(loadedProject.divisions ?? [])]
+            .sort((left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0))
+            .map((division) => ({
+              ...division,
+              items: [...(division.items ?? [])].sort(
+                (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
+              ),
+            })),
+        });
+      }
+      setCanManageRabPermission(hasPermission(access, 'rab.manage', projectId));
     } catch (error) {
       console.error('Gagal memuat detail proyek:', error);
       setProject(null);
@@ -541,6 +554,19 @@ export default function ProjectWorkspacePage() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!project) return;
+    setPdfSigners([
+      { role: 'Disusun oleh', name: project.planning_consultant || '', identifier: project.planning_consultant_skk || '' },
+      { role: 'Mengetahui', name: project.principal_name || '', identifier: project.principal_nip || '' },
+      { role: 'Menyetujui', name: project.supervisory_consultant || '', identifier: project.supervisory_consultant_skk || '' },
+    ]);
+  }, [project?.id]);
+
+  const canEditRab = canManageRabPermission && ['DRAFT', 'REVIEW'].includes(String(project?.status ?? 'DRAFT'));
+  const canManageRab = canManageRabPermission && ['DRAFT', 'REVIEW', 'FINAL RAB'].includes(String(project?.status ?? 'DRAFT'));
+
 
   // Memuat keluarga font modern pada halaman agar pratinjau sesuai dengan hasil PDF.
   // PDF tetap memakai fallback sans-serif bila jaringan tidak tersedia.
@@ -620,12 +646,20 @@ export default function ProjectWorkspacePage() {
       `;
     }
 
-    // Hilangkan blok tanda tangan/footer laporan dari hasil PDF.
-    reportClone.querySelector('.pdf-report-footer')?.remove();
     const reportMarkup = reportClone.outerHTML;
+    const isPortfolio = project.project_category === 'PORTOFOLIO';
+    const demoWatermark = isPortfolio
+      ? '<div class="pdf-demo-watermark" aria-hidden="true">LAPORAN DUMMY/SAMPEL</div>'
+      : '';
 
     const printStyles = `
       @page { size: A4 portrait; margin: 12mm 14mm 13mm; }
+      .pdf-demo-watermark {
+        position: fixed; z-index: 9999; top: 42%; left: 0; width: 100%;
+        transform: rotate(-32deg); text-align: center; pointer-events: none;
+        color: #9f1239; opacity: .15; font-size: 28pt; line-height: 1.2;
+        font-weight: 900; letter-spacing: 4px; white-space: nowrap;
+      }
       * { box-sizing: border-box; }
       html, body { margin: 0; padding: 0; width: 100%; min-height: 0; background: #fff; }
       body { font-family: ${PDF_FONTS[pdfFont].css}; font-weight: 400; color: #1e293b; font-size: 9pt; line-height: 1.35; }
@@ -649,6 +683,16 @@ export default function ProjectWorkspacePage() {
       #rab-print-report .pdf-rab-table tbody { display: table-row-group !important; }
       #rab-print-report .pdf-rab-table tr { break-inside: avoid; page-break-inside: avoid; }
       #rab-print-report .pdf-location-section { break-inside: auto; page-break-inside: auto; }
+      .pdf-report-footer { margin-top: 14mm; padding-top: 5mm; border-top: 2px solid ${activePdfTheme.accent}; break-inside: avoid; page-break-inside: avoid; }
+      .pdf-signature-grid { display: grid; gap: 10mm; align-items: start; margin-top: 7mm; }
+      .pdf-signature-grid.signature-count-1 { grid-template-columns: 1fr; justify-items: end; }
+      .pdf-signature-grid.signature-count-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .pdf-signature-grid.signature-count-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .pdf-signature-item { display: flex; flex-direction: column; min-height: 30mm; gap: 3px; text-align: center; }
+      .pdf-signature-grid.signature-count-1 .pdf-signature-item { width: 48%; }
+      .pdf-signature-role { color: #64748b; font-size: 7.5pt; }
+      .pdf-signature-name { margin-top: auto; padding-top: 18mm; border-bottom: 1px solid #64748b; font-size: 8pt; font-weight: 700; }
+      .pdf-signature-id { color: #64748b; font-size: 7pt; }
       @media print {
         html, body { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
       }
@@ -668,7 +712,7 @@ export default function ProjectWorkspacePage() {
             <link rel="stylesheet" href="${PDF_GOOGLE_FONTS_URL}" />
             <style>${printStyles}</style>
           </head>
-          <body>${reportMarkup}</body>
+          <body>${demoWatermark}${reportMarkup}</body>
         </html>`;
       const printBlob = new Blob([printDocument], { type: 'text/html;charset=utf-8' });
       printUrl = URL.createObjectURL(printBlob);
@@ -829,6 +873,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleAddAhsp = async (batch: SelectedAhspBatchPayload) => {
+    if (!canEditRab) throw new Error('RAB terkunci pada status proyek saat ini.');
     if (!activeDivisionId || submitting) {
       throw new Error('Lokasi pekerjaan tujuan belum dipilih.');
     }
@@ -865,13 +910,13 @@ export default function ProjectWorkspacePage() {
       const currentDivision = divisions.find((division) => division.id === activeDivisionId);
       if (!currentDivision) throw new Error('Lokasi pekerjaan tidak ditemukan. Segarkan proyek lalu coba kembali.');
 
-      // Untuk satu AHSP, uraian pekerjaan mengikuti nama resmi Master AHSP.
-      // Kelompok hanya dibuat bila minimal dua AHSP dipilih bersama.
-      const groupName = batch.items.length === 1
-        ? String(masterById.get(batch.items[0].masterAhspId)?.name ?? batch.items[0].name).trim()
-        : batch.groupName.trim();
-      if (!groupName) {
-        throw new Error('Nama item pekerjaan wajib diisi untuk kelompok yang berisi beberapa AHSP.');
+      // Mode terpisah menjadikan tiap AHSP satu item RAB mandiri.
+      // Mode kelompok mempertahankan alur lama: beberapa AHSP berada di bawah
+      // satu kelompok pekerjaan dengan work_group_id yang sama.
+      const groupedAsSubwork = batch.mode === 'group' && batch.items.length > 1;
+      const groupName = groupedAsSubwork ? batch.groupName.trim() : '';
+      if (groupedAsSubwork && !groupName) {
+        throw new Error('Nama item pekerjaan induk wajib diisi untuk kelompok subpekerjaan.');
       }
       if (groupName.length > 255) {
         throw new Error('Nama item pekerjaan maksimal 255 karakter.');
@@ -881,7 +926,7 @@ export default function ProjectWorkspacePage() {
         (max, item) => Math.max(max, Number(item.sort_order ?? 0)),
         0,
       );
-      const workGroupId = batch.items.length > 1 ? crypto.randomUUID() : null;
+      const workGroupId = groupedAsSubwork ? crypto.randomUUID() : null;
 
       const insertRows = batch.items.map((payload, index) => {
         const sourceAhsp = masterById.get(payload.masterAhspId);
@@ -928,8 +973,10 @@ export default function ProjectWorkspacePage() {
       await loadData(true);
       setSuccessMessage(
         batch.items.length === 1
-          ? `AHSP "${groupName}" berhasil ditambahkan ke lokasi ${activeDivisionName}.`
-          : `${batch.items.length} AHSP berhasil disimpan sebagai satu item pekerjaan "${groupName}" pada lokasi ${activeDivisionName}.`,
+          ? `AHSP "${batch.items[0].name}" berhasil ditambahkan ke lokasi ${activeDivisionName}.`
+          : groupedAsSubwork
+            ? `${batch.items.length} AHSP berhasil dimasukkan sebagai subpekerjaan dalam kelompok "${groupName}" pada lokasi ${activeDivisionName}.`
+            : `${batch.items.length} AHSP berhasil ditambahkan sebagai ${batch.items.length} item pekerjaan terpisah pada lokasi ${activeDivisionName}.`,
       );
     } catch (error) {
       console.error('Gagal menambahkan paket AHSP ke RAB:', error);
@@ -941,6 +988,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleUpdateItem = async (itemId: string, changes: RabItemUpdate) => {
+    if (!canEditRab) throw new Error('Perubahan item RAB hanya tersedia pada status DRAFT atau REVIEW.');
     try {
       const { error } = await supabase
         .from('rab_items')
@@ -950,7 +998,6 @@ export default function ProjectWorkspacePage() {
           // Kolom unit tidak disertakan: satuan RAB adalah snapshot terkunci
           // dari Master AHSP ketika item pertama kali dimasukkan.
           volume: changes.volume,
-          unit_price: changes.unit_price,
           total_price: changes.total_price,
         })
         .eq('id', itemId);
@@ -968,6 +1015,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleUpdateComponents = async (itemId: string, changes: RabComponentsUpdate) => {
+    if (!canEditRab) throw new Error('Perubahan komponen RAB hanya tersedia pada status DRAFT atau REVIEW.');
     try {
       // Perubahan analisa hanya menyentuh snapshot pada rab_items proyek ini.
       // Tidak ada UPDATE/INSERT ke master_ahsp atau master_ahsp_components.
@@ -993,6 +1041,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleDeleteItem = async (item: RabTableItem) => {
+    if (!canEditRab) throw new Error('Penghapusan item RAB hanya tersedia pada status DRAFT atau REVIEW.');
     try {
       const { error } = await supabase
         .from('rab_items')
@@ -1011,7 +1060,136 @@ export default function ProjectWorkspacePage() {
     }
   };
 
+  const handleDeleteDivision = async () => {
+    if (!divisionDeleteTarget || !projectId || deletingDivision) return;
+    const target = divisionDeleteTarget;
+    if (!canEditRab) {
+      setErrorMessage('Penghapusan lokasi hanya tersedia pada proyek berstatus DRAFT atau REVIEW.');
+      return;
+    }
+
+    setDeletingDivision(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      const { data, error } = await supabase
+        .from('rab_divisions')
+        .delete()
+        .eq('id', target.id)
+        .eq('project_id', projectId)
+        .select('id')
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data?.id) {
+        throw new Error('Lokasi tidak terhapus. Periksa hak akses atau muat ulang halaman, lalu coba kembali.');
+      }
+
+      await recalculateProjectTotal(projectId);
+      await loadData(true);
+      setDivisionDeleteTarget(null);
+      setSuccessMessage(
+        `Lokasi "${target.name}" berhasil dihapus beserta seluruh item RAB dan rincian yang terhubung.`,
+      );
+    } catch (error) {
+      console.error('Gagal menghapus lokasi RAB:', error);
+      const message = getErrorMessage(error);
+      const lowerMessage = message.toLowerCase();
+      setErrorMessage(
+        lowerMessage.includes('foreign key') || lowerMessage.includes('violates')
+          ? `Lokasi "${target.name}" belum dapat dihapus karena masih direferensikan oleh data laporan atau transaksi. Data terkait harus diselesaikan terlebih dahulu. Detail: ${message}`
+          : `Gagal menghapus lokasi RAB: ${message}`,
+      );
+    } finally {
+      setDeletingDivision(false);
+    }
+  };
+
+  const handleReorderItems = async (divisionId: string, orderedIds: string[]) => {
+    if (!canManageRab) throw new Error('Akun Anda tidak memiliki izin rab.manage untuk mengurutkan RAB.');
+    const division = (project?.divisions ?? []).find((entry) => entry.id === divisionId);
+    if (!division) throw new Error('Lokasi pekerjaan tidak ditemukan. Muat ulang halaman lalu coba kembali.');
+
+    const currentItems = [...(division.items ?? [])].sort(
+      (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
+    );
+    const currentIds = new Set(currentItems.map((item) => item.id));
+    const requestedIds = new Set(orderedIds);
+    if (
+      orderedIds.length !== currentItems.length ||
+      requestedIds.size !== currentItems.length ||
+      orderedIds.some((id) => !currentIds.has(id))
+    ) {
+      throw new Error('Daftar item berubah saat pengurutan. Segarkan halaman lalu ulangi drag-and-drop.');
+    }
+    if (orderedIds.every((id, index) => id === currentItems[index]?.id)) return;
+
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      const { error } = await supabase.rpc('reorder_project_rab_categories', {
+        p_division_id: divisionId,
+        p_item_ids: orderedIds,
+      });
+      if (error) throw error;
+      await loadData(true);
+      setSuccessMessage('Urutan item pekerjaan berhasil disimpan sesuai susunan RAB.');
+    } catch (error) {
+      console.error('Gagal menyimpan urutan item RAB:', error);
+      const message = `Gagal menyimpan urutan item: ${getErrorMessage(error)}. Pastikan migrasi pengurutan RAB sudah dijalankan.`;
+      setErrorMessage(message);
+      throw new Error(message);
+    }
+  };
+
+  const handleReorderDivisions = async (targetId: string) => {
+    if (!canManageRab || !draggedDivisionId || draggedDivisionId === targetId || reorderingDivisions) return;
+    const current = [...(project?.divisions ?? [])].sort(
+      (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
+    );
+    const fromIndex = current.findIndex((entry) => entry.id === draggedDivisionId);
+    const toIndex = current.findIndex((entry) => entry.id === targetId);
+    if (fromIndex < 0 || toIndex < 0) {
+      setDraggedDivisionId(null);
+      setDropDivisionId(null);
+      return;
+    }
+
+    const [moved] = current.splice(fromIndex, 1);
+    current.splice(toIndex, 0, moved);
+    if (current.every((entry, index) => entry.id === project?.divisions?.[index]?.id)) {
+      setDraggedDivisionId(null);
+      setDropDivisionId(null);
+      return;
+    }
+
+    setReorderingDivisions(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      const results = await Promise.all(
+        current.map((entry, index) =>
+          supabase.from('rab_divisions').update({ sort_order: index + 1 }).eq('id', entry.id),
+        ),
+      );
+      const failed = results.find((result) => result.error);
+      if (failed?.error) throw failed.error;
+      await loadData(true);
+      setSuccessMessage('Urutan menu/lokasi pekerjaan berhasil disimpan.');
+    } catch (error) {
+      console.error('Gagal menyimpan urutan lokasi pekerjaan:', error);
+      setErrorMessage(`Gagal mengurutkan menu/lokasi pekerjaan: ${getErrorMessage(error)}`);
+      await loadData(true);
+    } finally {
+      setDraggedDivisionId(null);
+      setDropDivisionId(null);
+      setReorderingDivisions(false);
+    }
+  };
+
   const openDivisionDialog = async (mode: 'edit' | 'copy' | 'export', division: RABDivision) => {
+    if (mode !== 'export' && !canEditRab) { setErrorMessage('Data lokasi RAB terkunci pada status proyek saat ini.'); return; }
     setErrorMessage('');
     setSuccessMessage('');
     setDivisionNameDraft(
@@ -1030,6 +1208,7 @@ export default function ProjectWorkspacePage() {
           .from('projects')
           .select('id, title, client')
           .neq('id', projectId ?? '')
+          .in('status', ['DRAFT', 'REVIEW'])
           .order('updated_at', { ascending: false });
         if (error) throw error;
         const choices = (data ?? []) as ProjectChoice[];
@@ -1324,6 +1503,16 @@ export default function ProjectWorkspacePage() {
         </div>
       </header>
 
+      {project && !canEditRab && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            RAB berstatus <strong>{project.status}</strong> dan dikunci dari perubahan isi. 
+            {project.status === 'FINAL RAB' && canManageRab ? ' Urutan kategori masih dapat disesuaikan sebelum proyek dimulai.' : ' Untuk perubahan nilai, kembalikan status proyek ke REVIEW melalui halaman Pengelolaan Proyek.'}
+          </p>
+        </div>
+      )}
+
       {(errorMessage || successMessage) && (
         <div
           role="status"
@@ -1372,7 +1561,7 @@ export default function ProjectWorkspacePage() {
         <div className="space-y-1">
           <p className="text-xs font-medium text-slate-400">Status Dokumen</p>
           <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-            {project.status || 'Draft'}
+            {project.status || 'DRAFT'}
           </span>
         </div>
         <div className="space-y-1 sm:text-left xl:text-right">
@@ -1447,6 +1636,41 @@ export default function ProjectWorkspacePage() {
           </div>
           <span className="rounded-md px-3 py-1.5 text-[10px] font-bold text-white" style={{ backgroundColor: activePdfTheme.accent }}>A4 PORTRAIT</span>
         </div>
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Pengaturan Tanda Tangan PDF</h3>
+              <p className="mt-1 text-xs text-slate-500">Tentukan nama, jabatan, dan tata letak penandatangan pada dokumen.</p>
+            </div>
+            <label className="text-xs font-semibold text-slate-600">
+              Jumlah penandatangan
+              <select value={pdfSignatureCount} onChange={(event) => setPdfSignatureCount(Number(event.target.value) as 1 | 2 | 3)} className="mt-1 block rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                <option value={1}>1 orang · kanan bawah</option>
+                <option value={2}>2 orang · kiri dan kanan</option>
+                <option value={3}>3 orang · sejajar tengah</option>
+              </select>
+            </label>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {pdfSigners.slice(0, pdfSignatureCount).map((signer, index) => (
+              <div key={index} className="rounded-xl border border-slate-200 p-3">
+                <p className="mb-2 text-xs font-bold text-slate-700">Penandatangan {index + 1}</p>
+                <label className="block text-xs font-medium text-slate-600">
+                  Jabatan / keterangan
+                  <input value={signer.role} onChange={(event) => setPdfSigners((current) => current.map((entry, entryIndex) => entryIndex === index ? { ...entry, role: event.target.value } : entry))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Contoh: Disusun oleh" />
+                </label>
+                <label className="mt-2 block text-xs font-medium text-slate-600">
+                  Nama penandatangan
+                  <input value={signer.name} onChange={(event) => setPdfSigners((current) => current.map((entry, entryIndex) => entryIndex === index ? { ...entry, name: event.target.value } : entry))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Nama lengkap" />
+                </label>
+                <label className="mt-2 block text-xs font-medium text-slate-600">
+                  NIP / SKK / identitas (opsional)
+                  <input value={signer.identifier} onChange={(event) => setPdfSigners((current) => current.map((entry, entryIndex) => entryIndex === index ? { ...entry, identifier: event.target.value } : entry))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="NIP, SKK, atau keterangan" />
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       <section className="space-y-4">
@@ -1460,7 +1684,7 @@ export default function ProjectWorkspacePage() {
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:items-end">
-            <button
+            {canEditRab && <button
               type="button"
               onClick={() => {
                 setNewLocationName('');
@@ -1471,9 +1695,9 @@ export default function ProjectWorkspacePage() {
             >
               <Plus className="h-4 w-4" />
               Tambah Lokasi Pekerjaan
-            </button>
+            </button>}
             <span className="text-xs text-slate-400">
-              Buat satu item pekerjaan, lalu gabungkan beberapa AHSP di dalamnya
+              Susun RAB per bidang, kategori, subkategori, dan item. AHSP massal dapat menjadi item terpisah atau subpekerjaan.
             </span>
           </div>
         </div>
@@ -1482,50 +1706,56 @@ export default function ProjectWorkspacePage() {
           divisions.map((division, divisionIndex) => {
             const divisionTotal =
               divisionTotals.find((entry) => entry.id === division.id)?.total ?? 0;
-            const items = division.items ?? [];
-            const groupedItemsById = new Map<string, RabTableItem[]>();
-            items.forEach((item) => {
-              if (!item.work_group_id) return;
-              const existing = groupedItemsById.get(item.work_group_id) ?? [];
-              existing.push(item);
-              groupedItemsById.set(item.work_group_id, existing);
-            });
-            const groupedWorkItems = Array.from(groupedItemsById.entries())
-              .map(([id, groupItems]) => ({
-                id,
-                name: groupItems.find((item) => item.work_group_name?.trim())?.work_group_name?.trim() || 'Item Pekerjaan',
-                items: [...groupItems].sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0)),
-              }))
-              .sort((a, b) => Number(a.items[0]?.sort_order ?? 0) - Number(b.items[0]?.sort_order ?? 0));
-            // Kelompok yang hanya berisi satu AHSP diperlakukan seperti item
-            // biasa, termasuk data lama yang pernah disimpan dengan group_id.
-            const workGroups = groupedWorkItems.filter((group) => group.items.length > 1);
-            const singleAhspWorkItems = groupedWorkItems
-              .filter((group) => group.items.length === 1)
-              .flatMap((group) => group.items);
-            const legacyItems = [
-              ...items.filter((item) => !item.work_group_id),
-              ...singleAhspWorkItems,
-            ];
-            const ahspGroups = buildAhspItemGroups(legacyItems);
-            const workItemCount = new Set(items.map((item) => item.work_group_id || item.id)).size;
+            const orderedItems = [...(division.items ?? [])].sort(
+              (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
+            );
+            const workItemCount = new Set(orderedItems.map((item) => item.work_group_id || item.id)).size;
 
             return (
               <article
                 key={division.id || divisionIndex}
-                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                onDragOver={(event) => {
+                  if (!canManageRab || !draggedDivisionId || draggedDivisionId === division.id || reorderingDivisions) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'move';
+                  setDropDivisionId(division.id);
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  void handleReorderDivisions(division.id);
+                }}
+                className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition ${dropDivisionId === division.id ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-slate-200'} ${draggedDivisionId === division.id ? 'opacity-50' : ''}`}
               >
                 <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold text-white">
-                      {divisionIndex + 1}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {canManageRab && (
+                        <span
+                          draggable={!reorderingDivisions}
+                          onDragStart={(event) => {
+                            if (!canManageRab || reorderingDivisions) { event.preventDefault(); return; }
+                            setDraggedDivisionId(division.id);
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', division.id);
+                          }}
+                          onDragEnd={() => { setDraggedDivisionId(null); setDropDivisionId(null); }}
+                          title="Tarik untuk mengubah urutan menu/lokasi pekerjaan"
+                          aria-label={`Tarik untuk mengurutkan lokasi ${division.name}`}
+                          className="cursor-grab rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 active:cursor-grabbing"
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </span>
+                      )}
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold text-white">
+                        {divisionIndex + 1}
+                      </span>
+                    </div>
                     <div className="min-w-0">
                       <h3 className="truncate text-sm font-bold uppercase tracking-wide text-slate-900">
                         {division.name}
                       </h3>
                       <p className="mt-0.5 text-xs text-slate-500">
-                        {workItemCount} item pekerjaan · {items.length} AHSP
+                        {workItemCount} item pekerjaan · {orderedItems.length} AHSP
                       </p>
                     </div>
                   </div>
@@ -1533,30 +1763,38 @@ export default function ProjectWorkspacePage() {
                     <span className="mr-1 text-sm font-bold tabular-nums text-slate-900">
                       {formatRupiah(divisionTotal)}
                     </span>
-                    <button
+                    {canEditRab && <button
                       type="button"
                       onClick={() => openAhspPicker(division.id, division.name)}
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Tambah Item Pekerjaan
-                    </button>
-                    <button
+                    </button>}
+                    {canEditRab && <button
                       type="button"
                       onClick={() => void openDivisionDialog('edit', division)}
                       className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                       title="Ubah nama lokasi pekerjaan"
                     >
                       <Pencil className="h-3.5 w-3.5" /> Edit
-                    </button>
-                    <button
+                    </button>}
+                    {canEditRab && <button
+                      type="button"
+                      onClick={() => setDivisionDeleteTarget(division)}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                      title={`Hapus lokasi ${division.name} beserta seluruh item RAB`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Hapus
+                    </button>}
+                    {canEditRab && <button
                       type="button"
                       onClick={() => void openDivisionDialog('copy', division)}
                       className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                       title="Salin lokasi beserta item RAB"
                     >
                       <Copy className="h-3.5 w-3.5" /> Salin
-                    </button>
+                    </button>}
                     <button
                       type="button"
                       onClick={() => void openDivisionDialog('export', division)}
@@ -1568,99 +1806,17 @@ export default function ProjectWorkspacePage() {
                   </div>
                 </div>
 
-                {workGroups.length > 0 || ahspGroups.length > 0 ? (
-                  <div className="space-y-4 p-3 sm:p-5">
-                    {workGroups.map((workGroup) => {
-                      const groupTotal = workGroup.items.reduce(
-                        (sum, item) => sum + Number(item.total_price || 0),
-                        0,
-                      );
-                      return (
-                        <section
-                          key={workGroup.id}
-                          className="overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm"
-                        >
-                          <div className="flex flex-col gap-2 border-b border-indigo-100 bg-indigo-50/70 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-                            <div className="min-w-0">
-                              <h4 className="text-sm font-bold text-slate-900">{workGroup.name}</h4>
-                            </div>
-                            <div className="flex items-center justify-between gap-3 sm:justify-end">
-                              <span className="text-xs text-slate-500">Subtotal item pekerjaan</span>
-                              <span className="text-sm font-bold tabular-nums text-indigo-900">
-                                {formatRupiah(groupTotal)}
-                              </span>
-                            </div>
-                          </div>
-                          <RabTable
-                            items={workGroup.items}
-                            onUpdate={handleUpdateItem}
-                            onUpdateComponents={handleUpdateComponents}
-                            onDelete={handleDeleteItem}
-                            onVolumeUpdated={() => loadData(true)}
-                          />
-                        </section>
-                      );
-                    })}
-
-                    {ahspGroups.map((group) => {
-                      const groupTotal = group.items.reduce(
-                        (sum, item) => sum + Number(item.total_price || 0),
-                        0,
-                      );
-                      const sortedGroupItems = [...group.items]
-                        .sort((left, right) =>
-                          compareAhspCodes(String(left.code || ''), String(right.code || '')),
-                        )
-                        .map((item, index) => ({
-                          ...item,
-                          sort_order: index + 1,
-                        })) as RabTableItem[];
-
-                      return (
-                        <section
-                          key={group.key}
-                          className="overflow-hidden rounded-xl border border-slate-200 bg-white"
-                        >
-                          <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-                            <div className="min-w-0">
-                              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-700">
-                                {group.classification.fieldCode} · {group.classification.fieldLabel}
-                              </p>
-                              <h4 className="mt-1 text-sm font-bold text-slate-900">
-                                {group.classification.divisionCode ? `${group.classification.divisionCode} · ` : ''}
-                                {group.classification.divisionName}
-                              </h4>
-                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                                <span>
-                                  {group.classification.subdivisionCode ? `${group.classification.subdivisionCode} · ` : ''}
-                                  {group.classification.subdivisionName}
-                                </span>
-                                <span className="rounded-md bg-white px-2 py-0.5 font-mono text-[11px] text-slate-500 ring-1 ring-slate-200">
-                                  {group.prefix || 'Tanpa kode'}
-                                </span>
-                                {!group.classification.mapped && (
-                                  <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                                    Belum ada pemetaan kategori
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between gap-3 sm:justify-end">
-                              <span className="text-xs text-slate-500">{group.items.length} AHSP</span>
-                              <span className="text-sm font-bold tabular-nums text-slate-800">{formatRupiah(groupTotal)}</span>
-                            </div>
-                          </div>
-                          <RabTable
-                            items={sortedGroupItems}
-                            onUpdate={handleUpdateItem}
-                            onUpdateComponents={handleUpdateComponents}
-                            onDelete={handleDeleteItem}
-                            onVolumeUpdated={() => loadData(true)}
-                          />
-                        </section>
-                      );
-                    })}
-                  </div>
+                {orderedItems.length > 0 ? (
+                  <RabCategoryBoard
+                    groups={buildAhspItemGroups(orderedItems)}
+                    onUpdate={handleUpdateItem}
+                    onUpdateComponents={handleUpdateComponents}
+                    onDelete={handleDeleteItem}
+                    onVolumeUpdated={() => loadData(true)}
+                    onReorder={(orderedIds) => handleReorderItems(division.id, orderedIds)}
+                    canReorder={canManageRab}
+                    readOnly={!canEditRab}
+                  />
                 ) : (
                   <div className="px-5 py-8 text-center text-sm text-slate-400">
                     Belum ada item AHSP pada lokasi ini.
@@ -1899,6 +2055,75 @@ export default function ProjectWorkspacePage() {
         </div>
       )}
 
+      {divisionDeleteTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4">
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-division-title"
+            aria-describedby="delete-division-description"
+            className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6"
+          >
+            <div className="mb-4 flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 id="delete-division-title" className="text-lg font-bold text-slate-900">Hapus Lokasi Pekerjaan?</h2>
+                <p id="delete-division-description" className="mt-1 text-sm leading-5 text-slate-600">
+                  Anda akan menghapus lokasi <strong>{divisionDeleteTarget.name}</strong> beserta seluruh item RAB di dalamnya.
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Tutup"
+                disabled={deletingDivision}
+                onClick={() => setDivisionDeleteTarget(null)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 disabled:opacity-50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4">
+              <p className="text-sm font-semibold text-rose-900">Tindakan ini tidak dapat dibatalkan.</p>
+              <ul className="mt-2 space-y-1 text-xs leading-5 text-rose-800">
+                <li>• {divisionDeleteTarget.items?.length ?? 0} item AHSP akan ikut dihapus.</li>
+                <li>• Rincian analisa dan backup volume yang melekat pada item tersebut ikut terhapus sesuai relasi database.</li>
+                <li>• Total RAB proyek akan dihitung ulang setelah penghapusan.</li>
+              </ul>
+              <p className="mt-3 text-xs leading-5 text-rose-800">
+                Jika lokasi masih digunakan oleh laporan atau data transaksi, database dapat menolak penghapusan untuk melindungi riwayat tersebut.
+              </p>
+            </div>
+
+            {errorMessage && (
+              <p role="alert" className="mb-4 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{errorMessage}</p>
+            )}
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={deletingDivision}
+                onClick={() => setDivisionDeleteTarget(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={deletingDivision}
+                onClick={() => void handleDeleteDivision()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deletingDivision ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {deletingDivision ? 'Menghapus Lokasi...' : 'Ya, Hapus Lokasi'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       <AhspPickerModal
         open={pickerOpen}
         divisionId={activeDivisionId}
@@ -2122,6 +2347,19 @@ export default function ProjectWorkspacePage() {
           </div>
         </section>
 
+
+        <footer className="pdf-report-footer">
+          <p style={{ margin: 0, color: activePdfTheme.text, fontSize: '8pt', fontWeight: 700 }}>PENANDATANGAN DOKUMEN RAB</p>
+          <div className={`pdf-signature-grid signature-count-${pdfSignatureCount}`} style={{ gridTemplateColumns: `repeat(${pdfSignatureCount}, minmax(0, 1fr))` }}>
+            {pdfSigners.slice(0, pdfSignatureCount).map((signer, index) => (
+              <div className="pdf-signature-item" key={index}>
+                <span className="pdf-signature-role">{signer.role || `Penandatangan ${index + 1}`}</span>
+                <strong className="pdf-signature-name">{signer.name || ' '}</strong>
+                {signer.identifier.trim() && <small className="pdf-signature-id">{signer.identifier}</small>}
+              </div>
+            ))}
+          </div>
+        </footer>
       </div>
     </main>
   );

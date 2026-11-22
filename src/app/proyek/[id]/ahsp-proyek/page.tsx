@@ -23,12 +23,14 @@ import AhspPickerModal, {
 import RabTable, {
   type RabTableItem,
   type RabItemUpdate,
+  type RabComponentsUpdate,
 } from '@/components/rab/RabTable';
-import { fetchProjectDetail } from '@/lib/services/projectService';
+import { fetchProjectDetail, recalculateProjectTotal } from '@/lib/services/projectService';
 import { generateRABExcel } from '@/lib/excel-generator';
 import { formatRupiah } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { Project } from '@/types/rab';
+import { getMyAccess, hasPermission } from '@/lib/services/authService';
 
 type RABDivision = {
   id: string;
@@ -59,6 +61,7 @@ export default function ProjectWorkspacePage() {
   const projectId = params?.id;
 
   const [project, setProject] = useState<WorkspaceProject | null>(null);
+  const [canManageRabPermission, setCanManageRabPermission] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -84,8 +87,9 @@ export default function ProjectWorkspacePage() {
     setErrorMessage('');
 
     try {
-      const data = await fetchProjectDetail(projectId);
+      const [data, access] = await Promise.all([fetchProjectDetail(projectId), getMyAccess()]);
       setProject(data ? (data as unknown as WorkspaceProject) : null);
+      setCanManageRabPermission(hasPermission(access, 'rab.manage', projectId));
     } catch (error) {
       console.error('Gagal memuat detail proyek:', error);
       setProject(null);
@@ -101,6 +105,7 @@ export default function ProjectWorkspacePage() {
   }, [loadData]);
 
   const divisions = project?.divisions ?? [];
+  const canEditRab = canManageRabPermission && ['DRAFT', 'REVIEW'].includes(String(project?.status ?? 'DRAFT'));
 
   const divisionTotals = useMemo(
     () =>
@@ -133,6 +138,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleAddAhsp = async (batch: SelectedAhspBatchPayload) => {
+    if (!canEditRab) throw new Error('Penambahan AHSP hanya tersedia pada status DRAFT atau REVIEW dengan izin rab.manage.');
     if (!activeDivisionId || submitting) {
       throw new Error('Divisi tujuan belum dipilih.');
     }
@@ -240,6 +246,7 @@ export default function ProjectWorkspacePage() {
         .insert(insertRows);
 
       if (error) throw error;
+      if (projectId) await recalculateProjectTotal(projectId);
 
       await loadData(true);
 
@@ -256,6 +263,7 @@ export default function ProjectWorkspacePage() {
   };
 
   const handleUpdateItem = async (itemId: string, changes: RabItemUpdate) => {
+    if (!canEditRab) throw new Error('Perubahan item RAB hanya tersedia pada status DRAFT atau REVIEW dengan izin rab.manage.');
     try {
       const { error } = await supabase
         .from('rab_items')
@@ -265,15 +273,15 @@ export default function ProjectWorkspacePage() {
           // Kolom unit tidak disertakan: satuan RAB adalah snapshot terkunci
           // dari Master AHSP ketika item pertama kali dimasukkan.
           volume: changes.volume,
-          unit_price: changes.unit_price,
           total_price: changes.total_price,
         })
         .eq('id', itemId);
 
       if (error) throw error;
+      if (projectId) await recalculateProjectTotal(projectId);
 
       await loadData(true);
-      setSuccessMessage('Item RAB berhasil diperbarui. Snapshot AHSP lainnya tetap tidak berubah.');
+      setSuccessMessage('Item RAB berhasil diperbarui. Harga satuan tetap mengikuti analisa komponen.');
     } catch (error) {
       console.error('Gagal memperbarui item RAB:', error);
       setErrorMessage(`Gagal memperbarui item RAB: ${getErrorMessage(error)}`);
@@ -281,7 +289,33 @@ export default function ProjectWorkspacePage() {
     }
   };
 
+  const handleUpdateComponents = async (itemId: string, changes: RabComponentsUpdate) => {
+    if (!canEditRab) throw new Error('Perubahan komponen RAB hanya tersedia pada status DRAFT atau REVIEW dengan izin rab.manage.');
+    try {
+      // Menyimpan hanya snapshot milik item proyek ini; master tidak disentuh.
+      const { error } = await supabase
+        .from('rab_items')
+        .update({
+          components_snapshot: changes.components_snapshot,
+          subitems_snapshot: changes.subitems_snapshot,
+          unit_price: changes.unit_price,
+          total_price: changes.total_price,
+        })
+        .eq('id', itemId);
+
+      if (error) throw error;
+      if (projectId) await recalculateProjectTotal(projectId);
+      await loadData(true);
+      setSuccessMessage('Rincian nama, koefisien, harga komponen, dan komposisi AHSP berhasil disimpan pada snapshot proyek. Master tidak berubah.');
+    } catch (error) {
+      console.error('Gagal memperbarui snapshot komponen RAB:', error);
+      setErrorMessage('Gagal memperbarui komponen AHSP: ' + getErrorMessage(error));
+      throw error;
+    }
+  };
+
   const handleDeleteItem = async (item: RabTableItem) => {
+    if (!canEditRab) throw new Error('Penghapusan item RAB hanya tersedia pada status DRAFT atau REVIEW dengan izin rab.manage.');
     try {
       const { error } = await supabase
         .from('rab_items')
@@ -289,6 +323,7 @@ export default function ProjectWorkspacePage() {
         .eq('id', item.id);
 
       if (error) throw error;
+      if (projectId) await recalculateProjectTotal(projectId);
 
       await loadData(true);
       setSuccessMessage(`Item "${item.code}" berhasil dihapus dari RAB proyek.`);
@@ -522,21 +557,25 @@ export default function ProjectWorkspacePage() {
                     <span className="text-sm font-bold tabular-nums text-slate-900">
                       {formatRupiah(divisionTotal)}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => openAhspPicker(division.id, division.name)}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Tambah dari Master AHSP
-                    </button>
+                    {canEditRab && (
+                      <button
+                        type="button"
+                        onClick={() => openAhspPicker(division.id, division.name)}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Tambah dari Master AHSP
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 <RabTable
                   items={items}
                   onUpdate={handleUpdateItem}
+                  onUpdateComponents={handleUpdateComponents}
                   onDelete={handleDeleteItem}
+                  readOnly={!canEditRab}
                 />
               </article>
             );

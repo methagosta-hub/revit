@@ -31,6 +31,7 @@ export async function fetchProjectsForProcurement(): Promise<ProjectOption[]> {
   const { data, error } = await supabase
     .from('projects')
     .select('id, title, client')
+    .eq('status', 'DIKERJAKAN')
     .order('title', { ascending: true });
   if (error) throwDbError(error, 'Gagal memuat daftar proyek');
   return (data ?? []) as ProjectOption[];

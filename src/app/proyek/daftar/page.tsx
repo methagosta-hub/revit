@@ -23,7 +23,8 @@ type ProjectRow = {
   title: string;
   client: string;
   location: string;
-  status: 'Draft' | 'Review' | 'Final';
+  status: 'DRAFT' | 'REVIEW' | 'FINAL RAB' | 'DIKERJAKAN' | 'SELESAI';
+  project_category: 'REGULER' | 'PORTOFOLIO';
   total_value: number;
   updated_at: string;
   school_npsn?: string | null;
@@ -133,8 +134,8 @@ export default function DaftarProyekPage() {
           <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{loading ? '—' : formatRupiah(totalValue)}</p>
         </article>
         <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium text-slate-500">Proyek Final</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{loading ? '—' : projects.filter((p) => p.status === 'Final').length}</p>
+          <p className="text-xs font-medium text-slate-500">Sedang Dikerjakan</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{loading ? '—' : projects.filter((p) => p.status === 'DIKERJAKAN').length}</p>
         </article>
       </section>
 
@@ -167,9 +168,11 @@ export default function DaftarProyekPage() {
               aria-label="Filter status proyek"
             >
               <option value="ALL">Semua Status</option>
-              <option value="Draft">Draft</option>
-              <option value="Review">Review</option>
-              <option value="Final">Final</option>
+              <option value="DRAFT">DRAFT</option>
+              <option value="REVIEW">REVIEW</option>
+              <option value="FINAL RAB">FINAL RAB</option>
+              <option value="DIKERJAKAN">DIKERJAKAN</option>
+              <option value="SELESAI">SELESAI</option>
             </select>
           </div>
         </div>
@@ -191,16 +194,21 @@ export default function DaftarProyekPage() {
               {loading ? (
                 <tr><td colSpan={6} className="px-5 py-14 text-center text-slate-500"><RefreshCw className="mx-auto mb-2 h-5 w-5 animate-spin text-emerald-600" />Memuat proyek...</td></tr>
               ) : filtered.length ? filtered.map((project) => {
-                const statusClass = project.status === 'Final'
+                const statusClass = project.status === 'DIKERJAKAN'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  : project.status === 'Review'
+                  : project.status === 'FINAL RAB'
                     ? 'border-blue-200 bg-blue-50 text-blue-700'
-                    : 'border-amber-200 bg-amber-50 text-amber-700';
+                    : project.status === 'REVIEW'
+                      ? 'border-violet-200 bg-violet-50 text-violet-700'
+                      : project.status === 'SELESAI'
+                        ? 'border-slate-200 bg-slate-100 text-slate-600'
+                        : 'border-amber-200 bg-amber-50 text-amber-700';
                 return (
                   <tr key={project.id} className="hover:bg-slate-50/70">
                     <td className="px-5 py-4">
                       <p className="font-semibold text-slate-900">{project.title}</p>
                       <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500"><Building2 className="h-3.5 w-3.5" />{project.client || '-'}</p>
+                      <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${project.project_category === 'PORTOFOLIO' ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-600'}`}>{project.project_category || 'REGULER'}</span>
                       <p className="mt-1 text-[11px] text-slate-400">Diperbarui {formatDate(project.updated_at)}</p>
                     </td>
                     <td className="px-5 py-4">
@@ -208,7 +216,7 @@ export default function DaftarProyekPage() {
                       <p className="mt-1 text-xs text-slate-500">{project.principal_name || 'Nama kepala sekolah belum diisi'}</p>
                     </td>
                     <td className="px-5 py-4 text-slate-600"><span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-slate-400" />{project.location || '-'}</span></td>
-                    <td className="px-5 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass}`}>{project.status || 'Draft'}</span></td>
+                    <td className="px-5 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass}`}>{project.status || 'DRAFT'}</span></td>
                     <td className="px-5 py-4 text-right font-semibold tabular-nums text-slate-900">{formatRupiah(Number(project.total_value ?? 0))}</td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-2">

@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  background: #f5f7fb;
+  color: #172033;
+  font-family: var(--font-plus-jakarta-sans), "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: var(--font-plus-jakarta-sans), "Segoe UI", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
+}
+
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+::selection { background: #c7f0e4; color: #123b32; }
+
+/* Keep the hierarchy clear without the overly heavy 800–900 weights. */
+.font-black,
+.font-extrabold {
+  font-weight: 700 !important;
+  letter-spacing: -0.025em;
+}
+
+.font-bold { font-weight: 600 !important; }
+.font-semibold { font-weight: 600 !important; }
+.font-medium { font-weight: 500 !important; }
+
+/* Slightly enlarge the tiniest utility labels for better legibility on phones. */
+[class~="text-[9px]"] {
+  font-size: 10px !important;
+  line-height: 1.45 !important;
+}
+
+[class~="text-[10px]"] {
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+}

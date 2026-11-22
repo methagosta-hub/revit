@@ -23,6 +23,7 @@ export async function fetchFinanceProjects(): Promise<FinanceProject[]> {
   const { data, error } = await supabase
     .from('projects')
     .select('id, title, client, total_value')
+    .eq('status', 'DIKERJAKAN')
     .order('title', { ascending: true });
   if (error) fail(error, 'Gagal memuat proyek');
   return (data ?? []).map((row: any) => ({ ...row, total_value: Number(row.total_value ?? 0) }));
@@ -93,7 +94,8 @@ export async function fetchSupplierPayments(limit = 200): Promise<SupplierPaymen
 export async function fetchPayablePurchaseOrders(): Promise<PayablePurchaseOrder[]> {
   const { data, error } = await supabase
     .from('project_purchase_orders')
-    .select('id, project_id, po_number, status, order_date, subtotal, project:projects(title), supplier:suppliers(name)')
+    .select('id, project_id, po_number, status, order_date, subtotal, project:projects!inner(title,status,project_category), supplier:suppliers(name)')
+    .eq('project.status', 'DIKERJAKAN')
     .in('status', ['approved', 'ordered', 'partially_received', 'received'])
     .order('order_date', { ascending: false });
   if (error) fail(error, 'Gagal memuat PO untuk pembayaran');
@@ -158,15 +160,17 @@ export async function voidSupplierPayment(id: string, reason: string): Promise<v
 }
 
 export async function fetchProjectFinanceSummary(): Promise<ProjectFinanceSummary[]> {
-  const [projects, orders, payments, cash] = await Promise.all([
-    fetchFinanceProjects(),
+  const [projectsResult, orders, payments, cash] = await Promise.all([
+    supabase.from('projects').select('id, title, client, total_value, status').in('status', ['DIKERJAKAN', 'SELESAI']).order('title', { ascending: true }),
     supabase.from('project_purchase_orders').select('project_id, subtotal, status'),
     supabase.from('project_supplier_payments').select('project_id, amount, status'),
     supabase.from('company_cash_transactions').select('project_id, direction, amount, status'),
   ]);
+  if (projectsResult.error) fail(projectsResult.error, 'Gagal memuat proyek untuk ringkasan keuangan');
   if (orders.error) fail(orders.error, 'Gagal memuat komitmen PO');
   if (payments.error) fail(payments.error, 'Gagal memuat realisasi pembayaran');
   if (cash.error) fail(cash.error, 'Gagal memuat mutasi kas');
+  const projects = (projectsResult.data ?? []) as FinanceProject[];
   return projects.map((project) => {
     const projectOrders = (orders.data ?? []).filter((row: any) => row.project_id === project.id && !['draft', 'pending_approval', 'cancelled'].includes(row.status));
     const projectPayments = (payments.data ?? []).filter((row: any) => row.project_id === project.id && row.status === 'paid');
