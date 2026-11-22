@@ -264,12 +264,19 @@ begin
     raise exception 'Permintaan material tidak ditemukan.' using errcode = 'P0002';
   end if;
 
+  -- A retry after a successful transaction returns the same PO ID instead
+  -- of creating a duplicate or reporting a false failure to Purchasing.
+  if v_request.status = 'converted'
+     and v_request.converted_purchase_order_id is not null then
+    return v_request.converted_purchase_order_id;
+  end if;
+
   if v_request.status <> 'approved' then
     raise exception 'Hanya PR yang sudah disetujui yang dapat dibuat menjadi PO.' using errcode = '23514';
   end if;
 
   if v_request.converted_purchase_order_id is not null then
-    raise exception 'PR ini sudah pernah dikonversi menjadi PO.' using errcode = '23505';
+    raise exception 'PR memiliki tautan PO tetapi statusnya tidak konsisten. Hubungi administrator.' using errcode = '23514';
   end if;
 
   select count(*)::integer
