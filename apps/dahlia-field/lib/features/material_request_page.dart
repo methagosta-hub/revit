@@ -200,7 +200,7 @@ class _MaterialRequestPageState extends State<MaterialRequestPage> {
                       children: [
                         Expanded(
                           child: Text(
-                            'Material \${index + 1}',
+                            'Material ${index + 1}',
                             style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ),
@@ -305,5 +305,5 @@ class _MaterialLine {
 }
 
 String _formatDate(DateTime date) {
-  return '\${date.day.toString().padLeft(2, '0')}/\${date.month.toString().padLeft(2, '0')}/\${date.year}';
+  return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
 }

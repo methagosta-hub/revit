@@ -167,7 +167,7 @@ class _ProgressTabState extends State<_ProgressTab> {
                 );
               }
               if (snapshot.hasError) {
-                return _InfoCard(message: 'Item tidak dapat dimuat: \${snapshot.error}');
+                return _InfoCard(message: 'Item tidak dapat dimuat: ${snapshot.error}');
               }
               final items = snapshot.data ?? [];
               if (items.isEmpty) {
@@ -207,8 +207,8 @@ class _ProgressTabState extends State<_ProgressTab> {
                           (item) => item['segment_item_id'] == _segmentItemId,
                         );
                         return _InfoCard(
-                          message: 'Alokasi: \${selected['allocated_quantity']} '
-                              '\${selected['unit']} • \${selected['project_title']}',
+                          message: 'Alokasi: ${selected['allocated_quantity']} '
+                              '${selected['unit']} • ${selected['project_title']}',
                         );
                       },
                     ),
@@ -467,7 +467,7 @@ class _PaymentTabState extends State<_PaymentTab> {
                 );
               }
               if (snapshot.hasError) {
-                return _InfoCard(message: 'Dasar klaim tidak dapat dimuat: \${snapshot.error}');
+                return _InfoCard(message: 'Dasar klaim tidak dapat dimuat: ${snapshot.error}');
               }
               final rows = snapshot.data ?? [];
               if (rows.isEmpty) {
@@ -492,7 +492,7 @@ class _PaymentTabState extends State<_PaymentTab> {
                 return const LinearProgressIndicator();
               }
               if (snapshot.hasError) {
-                return _InfoCard(message: 'Riwayat tidak dapat dimuat: \${snapshot.error}');
+                return _InfoCard(message: 'Riwayat tidak dapat dimuat: ${snapshot.error}');
               }
               final requests = snapshot.data ?? [];
               if (requests.isEmpty) {
@@ -507,7 +507,7 @@ class _PaymentTabState extends State<_PaymentTab> {
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       subtitle: Text(
-                        '\${request['segment_title']} • \${request['status']}',
+                        '${request['segment_title']} • ${request['status']}',
                       ),
                       trailing: Text(
                         _currency(_asDouble(request['gross_amount'])),
@@ -570,8 +570,20 @@ class _PaymentTabState extends State<_PaymentTab> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Estimasi bruto: \${_currency(_calculatedGross(rows))}. Nilai final dihitung ulang server berdasarkan tarif kontrak dan volume tersedia.',
+            'Estimasi bruto: ${_currency(_calculatedGross(rows))}. Nilai final dihitung ulang server berdasarkan tarif kontrak dan volume tersedia.',
             style: const TextStyle(color: Color(0xFF61736C), fontSize: 12),
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: _isSubmitting ? null : () => _submit(rows),
+            icon: _isSubmitting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.send_rounded),
+            label: Text(_isSubmitting ? 'Mengirim...' : 'Ajukan permintaan pembayaran'),
           ),
         ],
       );
@@ -594,7 +606,7 @@ class _PaymentTabState extends State<_PaymentTab> {
             return DropdownMenuItem<String>(
               value: id,
               child: Text(
-                '$title • tersedia \${_currency(available)}',
+                '$title • tersedia ${_currency(available)}',
                 overflow: TextOverflow.ellipsis,
               ),
             );
@@ -609,8 +621,20 @@ class _PaymentTabState extends State<_PaymentTab> {
           decoration: InputDecoration(
             labelText: 'Nilai bruto klaim',
             prefixIcon: const Icon(Icons.payments_outlined),
-            helperText: 'Sisa termin: \${_currency(_availableTerm(rows))}',
+            helperText: 'Sisa termin: ${_currency(_availableTerm(rows))}',
           ),
+        ),
+        const SizedBox(height: 14),
+        FilledButton.icon(
+          onPressed: _isSubmitting ? null : () => _submit(rows),
+          icon: _isSubmitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.send_rounded),
+          label: Text(_isSubmitting ? 'Mengirim...' : 'Ajukan permintaan pembayaran'),
         ),
       ],
     );
@@ -689,5 +713,5 @@ String _currency(double value) {
     final start = index - 3 < 0 ? 0 : index - 3;
     parts.insert(0, text.substring(start, index));
   }
-  return 'Rp \${parts.join('.')}';
+  return 'Rp ${parts.join('.')}';
 }

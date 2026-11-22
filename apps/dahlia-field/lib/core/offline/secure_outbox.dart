@@ -38,7 +38,7 @@ class FieldPayloadCipher {
     final clearBytes = await _algorithm.decrypt(
       SecretBox(
         base64Decode(payload.cipherText),
-        nonce: Nonce(base64Decode(payload.nonce)),
+        nonce: base64Decode(payload.nonce),
         mac: Mac(base64Decode(payload.mac)),
       ),
       secretKey: key,

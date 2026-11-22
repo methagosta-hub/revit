@@ -150,7 +150,7 @@ class _AttendancePageState extends State<AttendancePage> {
                 }
                 if (snapshot.hasError) {
                   return _MessageCard(
-                    message: 'Daftar pekerja tidak dapat dimuat: \${snapshot.error}',
+                    message: 'Daftar pekerja tidak dapat dimuat: ${snapshot.error}',
                   );
                 }
                 final employees = snapshot.data ?? [];
@@ -229,7 +229,7 @@ class _DateCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateText =
-        '\${date.day.toString().padLeft(2, '0')}/\${date.month.toString().padLeft(2, '0')}/\${date.year}';
+        '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
     return Card(
       child: ListTile(
         leading: const Icon(Icons.calendar_today_outlined),
