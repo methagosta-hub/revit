@@ -256,12 +256,14 @@ function UserManagementContent() {
     setProfileIsDemoUser(selectedUser.is_demo_user === true);
   }, [selectedUser]);
 
+  const selectedUserId = selectedUser?.id;
   useEffect(() => {
     let active = true;
-    if (!selectedUser) {
+    if (!selectedUserId) {
       setFieldUserLink(null);
       setFieldEmployees([]);
       setFieldEmployeeId('');
+      setFieldLinkLoading(false);
       return () => { active = false; };
     }
 
@@ -272,7 +274,7 @@ function UserManagementContent() {
     setFieldEmployeeSearch('');
 
     void Promise.all([
-      supabase.rpc('dahlia_field_get_user_link', { p_user_id: selectedUser.id }),
+      supabase.rpc('dahlia_field_get_user_link', { p_user_id: selectedUserId }),
       supabase.rpc('dahlia_field_list_linkable_employees', { p_search: null }),
     ]).then(([linkResult, employeesResult]) => {
       if (linkResult.error) throw linkResult.error;
@@ -292,7 +294,7 @@ function UserManagementContent() {
     });
 
     return () => { active = false; };
-  }, [selectedUser?.id]);
+  }, [selectedUserId]);
 
   function notifyError(message: string) { setError(message); setNotice(''); }
   function notifySuccess(message: string) { setNotice(message); setError(''); }
