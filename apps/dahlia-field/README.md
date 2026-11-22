@@ -38,7 +38,7 @@ The repository CI creates the Android host in a temporary folder and copies its 
 
 Migrations `202611220001` through `202611220006` were applied to the Dahlia Management production Supabase project on 22 November 2026. Do not re-run, rewrite, or reset these applied migrations. Subsequent dashboard/mobile integration changes must use a new forward-only migration, reviewed and applied in sequence.
 
-Migration `202611220007_dahlia_field_dashboard_workflow.sql` adds the Dashboard account-link lookup APIs, a unique employee-to-Field-account mapping, and an atomic approved Field PR to official Purchase Order conversion. It is prepared on the integration feature branch and has **not** been applied to production. Apply it only after the matching Dashboard code is reviewed and ready to deploy.
+Migration `202611220007_dahlia_field_dashboard_workflow.sql` adds the Dashboard account-link lookup APIs, a unique employee-to-Field-account mapping, and an atomic approved Field PR to official Purchase Order conversion. It was applied to the production Supabase project on 22 November 2026. The matching Dashboard code is in the `feat/dahlia-field-dashboard-integration` preview branch and is not yet merged to the production application.
 
 A Field material request is a purchase requisition (PR), not an official Purchase Order. Mandor supplies project, material description, unit, quantity, need-by date, priority and notes. Purchasing reviews the PR, selects an active supplier, enters the unit prices from the supplier quotation, then converts the approved PR into a normal PO. The PO uses the existing approval and warehouse receiving lifecycle. Approving a PR alone never creates a PO.
 
