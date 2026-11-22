@@ -8,6 +8,7 @@ import 'attendance_page.dart';
 import 'material_request_page.dart';
 import 'daily_report_page.dart';
 import 'subcontractor_page.dart';
+import 'director_monitor_page.dart';
 
 class FieldHomePage extends StatefulWidget {
   const FieldHomePage({required this.outbox, super.key});
@@ -36,8 +37,11 @@ class _FieldHomePageState extends State<FieldHomePage>
 
   Future<_HomeData> _loadHome() async {
     final contextData = await _repository.getContext();
-    final projects = await _repository.listProjects();
+    final isDirector = contextData['field_role'] == 'director';
     final isSubcontractor = contextData['field_role'] == 'subcontractor';
+    final projects = isDirector
+        ? await _repository.listDirectorProjects()
+        : await _repository.listProjects();
     final segments = isSubcontractor
         ? await _repository.listMySegments()
         : <Map<String, dynamic>>[];
@@ -46,6 +50,12 @@ class _FieldHomePageState extends State<FieldHomePage>
       projects: projects,
       segments: segments,
     );
+  }
+
+  Future<void> _reloadHome() async {
+    final next = _loadHome();
+    setState(() => _homeFuture = next);
+    await next;
   }
 
   @override
@@ -75,10 +85,20 @@ class _FieldHomePageState extends State<FieldHomePage>
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Sinkronkan data',
-            onPressed: _sync.isSyncing ? null : _sync.syncPending,
-            icon: const Icon(Icons.sync_rounded),
+          FutureBuilder<_HomeData>(
+            future: _homeFuture,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const SizedBox.shrink();
+              final isDirector =
+                  snapshot.data!.contextData['field_role'] == 'director';
+              return IconButton(
+                tooltip: isDirector ? 'Perbarui pemantauan' : 'Sinkronkan data',
+                onPressed: isDirector
+                    ? _reloadHome
+                    : (_sync.isSyncing ? null : _sync.syncPending),
+                icon: Icon(isDirector ? Icons.refresh_rounded : Icons.sync_rounded),
+              );
+            },
           ),
           IconButton(
             tooltip: 'Keluar',
@@ -103,11 +123,21 @@ class _FieldHomePageState extends State<FieldHomePage>
           final data = snapshot.data!;
           final role = data.contextData['field_role'] as String? ?? 'internal';
           final isSubcontractor = role == 'subcontractor';
+          final isDirector = role == 'director';
           final name = data.contextData['full_name'] as String? ?? 'Pengguna';
+
+          if (isDirector) {
+            return DirectorMonitorPage(
+              repository: _repository,
+              projects: data.projects,
+              onRefresh: _reloadHome,
+            );
+          }
+
           return RefreshIndicator(
             onRefresh: () async {
               await _sync.syncPending();
-              if (mounted) setState(() {});
+              await _reloadHome();
             },
             child: ListView(
               padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),

@@ -29,6 +29,17 @@ class FieldRepository {
     return _rows('dahlia_field_list_projects');
   }
 
+  Future<List<Map<String, dynamic>>> listDirectorProjects() {
+    return _rows('dahlia_field_list_director_projects');
+  }
+
+  Future<List<Map<String, dynamic>>> listDirectorDailyReports(String projectId) {
+    return _rows(
+      'dahlia_field_list_director_daily_reports',
+      {'p_project_id': projectId},
+    );
+  }
+
   Future<List<Map<String, dynamic>>> listAttendanceRoster(
     String projectId,
     DateTime attendanceDate,

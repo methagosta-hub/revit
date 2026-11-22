@@ -16,8 +16,8 @@ A separate Android companion for Dahlia Management System. This app is built as 
 ## Security model
 
 - Sign-in uses Supabase Auth. The client only contains a Supabase publishable/anon key; never place a service_role key in the APK.
-- User mapping is stored in the non-exposed dahlia_private schema. Administrators link an internal user to an active employee or a subcontractor user to one active subcontractor using the dahlia_field_link_user RPC.
-- Internal access continues to use the existing user_role_assignments and permission checks. The Mandor role already has the project-scoped attendance, execution reporting and procurement request permissions.
+- User mapping is stored in the non-exposed dahlia_private schema. Administrators link an internal user to an active employee or a subcontractor user to one active subcontractor using the dahlia_field_link_user RPC. A company-level user with an active `director` role is recognized separately and does not need an employee link.
+- Internal access continues to use the existing user_role_assignments and permission checks. The Mandor role already has the project-scoped attendance, execution reporting and procurement request permissions. Director receives a separate read-only monitoring mode for all company projects and their daily-report history; no attendance, reporting, material-request, progress, or payment submission actions are exposed to that role in Dahlia Field.
 - Subcontractor reads and writes are filtered by the exact linked subcontractor_id; other subcontractors' contracts and claims are not returned.
 - New PR tables have RLS enabled and direct Data API grants revoked. The app can only use the validated RPC surface.
 - Existing PO, attendance, progress, contract and payment tables are not replaced. The payment RPC receives one additional, narrow authorization path for the exact mapped subcontractor; all existing financial calculation and claim validation remains in place.
@@ -29,7 +29,7 @@ A separate Android companion for Dahlia Management System. This app is built as 
 3. Create the Android host once: flutter create --project-name dahlia_field --org id.dahlia.management --platforms android --empty .
 4. Set the Supabase project URL and publishable key as Dart defines:
    --dart-define=DAHLIA_SUPABASE_URL=...
-   --dart-define=DAHLIA_SUPABASE_ANON_KEY=...
+   --dart-define=DAHLIA_SUPABASE_PUBLISHABLE_KEY=...
 5. Run flutter test, flutter analyze, then flutter run.
 
 The repository CI creates the Android host in a temporary folder and copies its generated android/ directory into this Flutter package, so native Android scaffolding does not need to be mixed with the existing web application's root.
@@ -54,7 +54,7 @@ GitHub Actions workflow: Dahlia Field Android CI. On a successful run, download 
 
 GitHub Actions repository variables used by the build:
 - DAHLIA_SUPABASE_URL
-- DAHLIA_SUPABASE_ANON_KEY (a publishable key or legacy anon key; never a service-role key)
+- DAHLIA_SUPABASE_PUBLISHABLE_KEY (or legacy anon key for compatibility; never a service-role key)
 
 If those variables are not configured, the APK still builds but displays a configuration warning and cannot sign in until the app is built with the correct public client values.
 
