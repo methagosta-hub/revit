@@ -126,7 +126,7 @@ function PurchasingContent() {
     setNotes([
       `Sumber permintaan lapangan: ${request.request_number}`,
       request.notes?.trim() ? `Catatan Mandor: ${request.notes.trim()}` : '',
-    ].filter(Boolean).join('\\n\\n'));
+    ].filter(Boolean).join('\n\n'));
     setLines(request.items.map((item) => ({
       material_code: '',
       material_name: item.item_name,
