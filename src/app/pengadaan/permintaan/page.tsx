@@ -123,7 +123,7 @@ function PermintaanContent() {
         : decision === 'approved'
           ? 'disetujui. Purchasing dapat menyiapkan PO secara terpisah'
           : 'ditolak';
-      setSuccess(\`PR \${request.request_number} \${label}.\`);
+      setSuccess(`PR ${request.request_number} ${label}.`);
       await load(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Status permintaan gagal diperbarui.');
@@ -155,7 +155,7 @@ function PermintaanContent() {
             disabled={refreshing}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
-            <RefreshCw className={\`h-4 w-4 \${refreshing ? 'animate-spin' : ''}\`} /> Muat ulang
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /> Muat ulang
           </button>
         </div>
       </div>
@@ -210,9 +210,9 @@ function PermintaanContent() {
             <button
               key={value}
               onClick={() => setStatusFilter(value)}
-              className={\`rounded-full px-3 py-1.5 text-xs font-semibold transition \${statusFilter === value
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${statusFilter === value
                 ? 'bg-emerald-700 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}\`}
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
             >
               {label}
             </button>
@@ -240,7 +240,7 @@ function PermintaanContent() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-bold text-slate-900">{request.request_number}</h3>
-                        <span className={\`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset \${statusStyle(request.status)}\`}>
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${statusStyle(request.status)}`}>
                           {statusLabel(request.status)}
                         </span>
                         {request.priority === 'urgent' && (
