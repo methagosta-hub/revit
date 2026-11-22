@@ -101,12 +101,12 @@ function PermintaanContent() {
     let rejectionReason: string | undefined;
     if (decision === 'rejected') {
       rejectionReason = window.prompt(
-        \`Alasan penolakan PR \${request.request_number}:\`,
+        'Alasan penolakan PR ' + request.request_number + ':',
       )?.trim();
       if (!rejectionReason) return;
     }
     if (decision === 'approved' && !window.confirm(
-      \`Setujui PR \${request.request_number} untuk ditindaklanjuti Purchasing? Persetujuan ini tidak membuat PO.\`,
+      'Setujui PR ' + request.request_number + ' untuk ditindaklanjuti Purchasing? Persetujuan ini tidak membuat PO.',
     )) return;
 
     setProcessingId(request.request_id);
