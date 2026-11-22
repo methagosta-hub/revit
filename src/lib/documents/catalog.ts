@@ -1,0 +1,165 @@
+import type { BusinessDocumentCatalogEntry, BusinessDocumentType } from '@/types/businessDocument';
+
+/**
+ * Central list of printable business records and their workflow meaning.
+ * A printed/exported file is evidence of a source status; it never changes
+ * that status or grants a new permission by possession alone.
+ */
+export const BUSINESS_DOCUMENT_CATALOG: Record<BusinessDocumentType, BusinessDocumentCatalogEntry> = {
+  rab: {
+    type: 'rab', domain: 'project', title: 'Rencana Anggaran Biaya', currentCode: 'Belum ada nomor RAB tunggal yang konsisten',
+    recommendedCode: 'RAB-{KODEPROYEK}-R{NN}', exportState: 'existing',
+    officialIssueCondition: 'RAB proyek ditetapkan/di-approve oleh pejabat yang berwenang.',
+    effectWhenIssued: 'Menjadi acuan anggaran dan volume pekerjaan sesuai versi yang tercetak.',
+    doesNotAuthorize: 'Tidak otomatis menyetujui PO, pembelian, tagihan subkontraktor, atau pembayaran.',
+    nextAuthority: 'Permintaan pengadaan dan komitmen biaya mengikuti anggaran serta approval tersendiri.', governingPermission: 'project.manage / execution.progress.review',
+  },
+  purchase_order: {
+    type: 'purchase_order', domain: 'procurement', title: 'Purchase Order', currentCode: 'PO-YYYYMMDD-8HEX (nomor dari database)',
+    recommendedCode: 'PO-YYYYMMDD-NNNNNN', exportState: 'existing',
+    officialIssueCondition: 'PO berstatus approved/ordered dan supplier, item, nilai, serta syaratnya sudah diperiksa.',
+    effectWhenIssued: 'Supplier dapat memenuhi pesanan sesuai item, kuantitas, harga, dan syarat pada PO yang disetujui.',
+    doesNotAuthorize: 'PO bukan bukti barang telah diterima dan tidak otomatis memerintahkan pencairan.',
+    nextAuthority: 'Penerimaan barang dicatat terpisah; kewajiban dibayar setelah syarat tagihan dan payment approval terpenuhi.', governingPermission: 'peran purchasing atau project.manage sesuai cakupan proyek',
+  },
+  goods_receipt: {
+    type: 'goods_receipt', domain: 'warehouse', title: 'Berita Acara Penerimaan Barang', currentCode: 'GR-YYYYMMDD-8HEX (nomor dari database)',
+    recommendedCode: 'GR-YYYYMMDD-NNNNNN', exportState: 'existing',
+    officialIssueCondition: 'Penerimaan berstatus confirmed; jumlah dan kondisi barang telah diperiksa.',
+    effectWhenIssued: 'Mencatat kuantitas yang diterima ke stok/proyek dan menjadi bukti serah terima.',
+    doesNotAuthorize: 'Tidak dengan sendirinya melunasi invoice supplier atau mengubah status PO menjadi paid.',
+    nextAuthority: 'Finance memeriksa invoice dan syarat PO, lalu membuat serta menyetujui pembayaran tersendiri.', governingPermission: 'warehouse / purchasing / project scope',
+  },
+  goods_issue: {
+    type: 'goods_issue', domain: 'warehouse', title: 'Bukti Pengeluaran / Serah Terima Material', currentCode: 'GI-YYYYMMDD-8HEX (nomor dari database)',
+    recommendedCode: 'GI-YYYYMMDD-NNNNNN', exportState: 'existing',
+    officialIssueCondition: 'Pengeluaran material tersimpan dan penerima/tujuan proyek telah dikonfirmasi.',
+    effectWhenIssued: 'Mencatat perpindahan stok dan tanggung jawab penerimaan material.',
+    doesNotAuthorize: 'Tidak menjadi bukti kehadiran, upah, atau tagihan material kepada perusahaan.',
+    nextAuthority: 'Pemakaian material dilaporkan pada pelaksanaan proyek; perhitungan biaya mengikuti pencatatan keuangan.', governingPermission: 'warehouse / project scope',
+  },
+  direct_purchase: {
+    type: 'direct_purchase', domain: 'finance', title: 'Bukti Pembelian Langsung', currentCode: 'DMP-YYYYMMDD-8HEX (nomor dari database)',
+    recommendedCode: 'BL-YYYYMMDD-NNNNNN', exportState: 'existing',
+    officialIssueCondition: 'Pembelian dan transaksi kas sudah tercatat dengan bukti serta status yang benar.',
+    effectWhenIssued: 'Menjadi bukti catatan pembelian dan referensi transaksi sumber.',
+    doesNotAuthorize: 'Cetakan draft tidak menyetujui pembelian baru atau menjadi bukti kas sudah dibayar.',
+    nextAuthority: 'Pembayaran sah mengikuti status confirmed/paid pada transaksi kas.', governingPermission: 'finance / purchasing',
+  },
+  daily_assignment: {
+    type: 'daily_assignment', domain: 'personnel', title: 'Surat Penugasan Harian', currentCode: 'HRT-NNNNNN (nomor dari database)',
+    recommendedCode: 'HRT-YYYYMMDD-NNNNNN', exportState: 'existing',
+    officialIssueCondition: 'Penugasan tersimpan dengan status direncanakan/berjalan dan pekerja, tanggal, serta lokasi sudah benar.',
+    effectWhenIssued: 'Pekerja dapat melaksanakan tugas yang dinyatakan dan dicatat hadir pada penugasan tersebut.',
+    doesNotAuthorize: 'Surat tugas saja tidak membuktikan pekerjaan selesai, jumlah hadir, atau upah telah disetujui.',
+    nextAuthority: 'Mandor mencatat kehadiran/hasil kerja; personalia memverifikasi sebelum payroll dihitung.', governingPermission: 'personnel.manage / attendance.manage',
+  },
+  attendance_register: {
+    type: 'attendance_register', domain: 'personnel', title: 'Rekap Kehadiran dan Jam Kerja', currentCode: 'ABS-NNNNNN (nomor dari database)',
+    recommendedCode: 'ABS-YYYYMM-NNNNNN', exportState: 'existing',
+    officialIssueCondition: 'Data kehadiran berstatus verified atau locked setelah pemeriksaan.',
+    effectWhenIssued: 'Menjadi dasar terverifikasi untuk penghitungan payroll pada periode tersebut.',
+    doesNotAuthorize: 'Tidak menetapkan tarif upah dan tidak membuktikan gaji telah dibayarkan.',
+    nextAuthority: 'Payroll dihitung dari kehadiran tervalidasi, tarif yang berlaku, dan komponen upah yang sah.', governingPermission: 'attendance.manage / payroll.manage',
+  },
+  payroll_register: {
+    type: 'payroll_register', domain: 'payroll', title: 'Daftar Penggajian', currentCode: 'PAYR-NNNNNN (nomor run dari database)',
+    recommendedCode: 'PAYR-YYYYMM-NNNNNN', exportState: 'existing',
+    officialIssueCondition: 'Payroll run berstatus approved; angka bersih dan daftar penerima sudah disetujui.',
+    effectWhenIssued: 'Mencatat kewajiban payroll yang telah disetujui dan dasar penerbitan slip gaji.',
+    doesNotAuthorize: 'Persetujuan daftar gaji bukan bukti dana telah diterima pekerja.',
+    nextAuthority: 'Pencairan baru terjadi saat transaksi pembayaran payroll dicatat dan dikonfirmasi.', governingPermission: 'payroll.approve / payroll.payment.manage',
+  },
+  payslip: {
+    type: 'payslip', domain: 'payroll', title: 'Slip Gaji Pekerja', currentCode: 'PIT-NNNNNN (nomor item dari database)',
+    recommendedCode: 'SLIP-{KODEPEKERJA}-{YYYYMM}-{NN}', exportState: 'existing',
+    officialIssueCondition: 'Payroll run yang mencakup slip berstatus approved.',
+    effectWhenIssued: 'Pekerja berhak menerima rincian upah bersih yang tercantum dan mengikuti proses pencairan payroll.',
+    doesNotAuthorize: 'Slip gaji tidak membuktikan uang telah diterima; jangan menandai lunas hanya karena slip tercetak.',
+    nextAuthority: 'Pembayaran dikonfirmasi melalui transaksi pembayaran dan bukti transfer/tanda terima.', governingPermission: 'payroll.read / payroll.approve',
+  },
+  employment_agreement: {
+    type: 'employment_agreement', domain: 'personnel', title: 'Perjanjian Kerja / Perubahan Upah', currentCode: 'PKJ-NNNNNN (nomor dari database)',
+    recommendedCode: 'PKJ-{KODEPEKERJA}-NNNNNN', exportState: 'existing',
+    officialIssueCondition: 'Perjanjian telah ditandatangani para pihak dan berstatus active.',
+    effectWhenIssued: 'Mengikat syarat kerja, periode, dan dasar upah sebagaimana perjanjian yang ditandatangani.',
+    doesNotAuthorize: 'Draft yang dicetak tidak mengaktifkan hubungan kerja atau perubahan tarif.',
+    nextAuthority: 'Penempatan, kehadiran, dan upah tetap mengikuti data aktif serta approval masing-masing.', governingPermission: 'payroll.manage / personnel.manage',
+  },
+  employee_placement: {
+    type: 'employee_placement', domain: 'personnel', title: 'Surat Penempatan Pekerja', currentCode: 'UTM-NNNNNN (nomor dari database)',
+    recommendedCode: 'UTM-{KODEPEKERJA}-YYYYMMDD', exportState: 'existing',
+    officialIssueCondition: 'Penempatan telah disahkan, mencantumkan proyek/lokasi dan tanggal berlaku.',
+    effectWhenIssued: 'Menetapkan lokasi dan masa penempatan pekerja sesuai data yang disahkan.',
+    doesNotAuthorize: 'Penempatan bukan bukti hadir atau persetujuan jumlah gaji.',
+    nextAuthority: 'Kehadiran divalidasi di lokasi kerja; pengupahan dihitung lewat payroll.', governingPermission: 'personnel.manage',
+  },
+  daily_report: {
+    type: 'daily_report', domain: 'execution', title: 'Laporan Harian Pelaksanaan Pekerjaan', currentCode: 'LHP-YYYYMMDD-NNNNN (nomor dari database)',
+    recommendedCode: 'LHP-YYYYMMDD-NNNNN', exportState: 'existing',
+    officialIssueCondition: 'Laporan telah direview/approved; data pekerjaan, tenaga, material, dan alat sesuai.',
+    effectWhenIssued: 'Menjadi rekaman kondisi, pekerjaan, hambatan, dan tenaga pada tanggal laporan.',
+    doesNotAuthorize: 'Laporan harian sendiri tidak menyetujui upah, perubahan kontrak, atau pencairan.',
+    nextAuthority: 'Progress dan kehadiran diverifikasi melalui alur approval masing-masing.', governingPermission: 'execution.report.create / execution.progress.review',
+  },
+  progress_certificate: {
+    type: 'progress_certificate', domain: 'execution', title: 'Berita Acara Pengukuran / Kemajuan Pekerjaan', currentCode: 'Belum ada nomor sertifikat kemajuan yang konsisten',
+    recommendedCode: 'PROG-YYYYMMDD-NNNNNN', exportState: 'planned',
+    officialIssueCondition: 'Volume dan periode kemajuan telah diverifikasi pejabat pengawas yang ditetapkan.',
+    effectWhenIssued: 'Menjadi dasar volume terukur untuk laporan progres atau klaim sesuai kontrak.',
+    doesNotAuthorize: 'Pengukuran belum merupakan persetujuan pembayaran tanpa pemeriksaan tagihan dan approval keuangan.',
+    nextAuthority: 'Kontraktor/subkon mengajukan klaim sesuai kontrak; perusahaan memeriksa dan menyetujui terpisah.', governingPermission: 'execution.progress.review / execution.payment.manage',
+  },
+  subcontract_contract: {
+    type: 'subcontract_contract', domain: 'execution', title: 'Kontrak Kerja Subkontraktor', currentCode: 'KON-SUB-NNNNNN (nomor dari database)',
+    recommendedCode: 'KON-SUB-NNNNNN', exportState: 'existing',
+    officialIssueCondition: 'Kontrak aktif dan ditandatangani, dengan nilai, lingkup, termin, serta retensi yang disepakati.',
+    effectWhenIssued: 'Subkon dapat melaksanakan lingkup kontrak dan mengajukan tagihan ketika milestone/termin terpenuhi.',
+    doesNotAuthorize: 'Kontrak aktif tidak membuat semua termin langsung cair dan tidak menggantikan pemeriksaan progress.',
+    nextAuthority: 'Klaim diajukan dengan progres terukur; setelah disetujui, kewajiban dibayar mengikuti otorisasi Finance.', governingPermission: 'project.manage / execution.payment.manage',
+  },
+  subcontract_claim: {
+    type: 'subcontract_claim', domain: 'execution', title: 'Permintaan Pembayaran Subkontraktor', currentCode: 'SPR-NNNNNN (nomor dari database)',
+    recommendedCode: 'SPR-YYYYMMDD-NNNNNN', exportState: 'existing',
+    officialIssueCondition: 'Klaim berstatus submitted setelah syarat kontrak/termin dan progres pendukung divalidasi; approval dicatat terpisah sebagai approved.',
+    effectWhenIssued: 'Klaim berstatus submitted memberi subkon dasar untuk meminta pencairan; klaim approved menjadi kewajiban sesuai nilai yang disetujui.',
+    doesNotAuthorize: 'PDF klaim berstatus draft/submitted tidak berarti klaim telah disetujui atau dana sudah cair.',
+    nextAuthority: 'Finance membayar kewajiban setelah approval, verifikasi saldo/retensi, dan transaksi kas dikonfirmasi.', governingPermission: 'execution.payment.manage / execution.payment.read',
+  },
+  payment_voucher: {
+    type: 'payment_voucher', domain: 'finance', title: 'Voucher / Bukti Pembayaran', currentCode: 'PMT-NNNNNN atau kode transaksi kas sumber',
+    recommendedCode: 'PMT-YYYYMMDD-NNNNNN', exportState: 'existing',
+    officialIssueCondition: 'Transaksi pembayaran sudah dicatat dan statusnya confirmed/paid dengan referensi penerima.',
+    effectWhenIssued: 'Menjadi bukti administratif bahwa pembayaran tercatat sesuai tanggal, jumlah, dan metode.',
+    doesNotAuthorize: 'Voucher draft atau instruksi pembayaran belum membuktikan transfer berhasil diterima.',
+    nextAuthority: 'Status paid/confirmed dan bukti transfer atau tanda terima menjadi bukti penyelesaian kewajiban.', governingPermission: 'payroll.payment.manage / finance',
+  },
+  finance_recap: {
+    type: 'finance_recap', domain: 'finance', title: 'Rekap Keuangan', currentCode: 'recap_number tersimpan pada finance_recap_documents',
+    recommendedCode: 'REK-YYYYMMDD-NNNNNN', exportState: 'existing',
+    officialIssueCondition: 'Snapshot rekap berhasil dibuat dari data transaksi dan diberi nomor resmi.',
+    effectWhenIssued: 'Membekukan ringkasan transaksi/cakupan/periode pada saat diterbitkan.',
+    doesNotAuthorize: 'Rekap adalah laporan; nilai komitmen PO atau saldo pada rekap bukan perintah pembayaran.',
+    nextAuthority: 'Perubahan dicatat pada transaksi sumber atau rekap pengganti, bukan dengan mengedit PDF lama.', governingPermission: 'finance read/manage',
+  },
+  external_report: {
+    type: 'external_report', domain: 'external', title: 'Laporan Eksternal / SPJ', currentCode: 'EXT-YYYYMMDD-NNNNNN (nomor dari database)',
+    recommendedCode: 'EXT-YYYYMMDD-NNNNNN', exportState: 'existing',
+    officialIssueCondition: 'Snapshot sumber telah dibekukan dan laporan berstatus issued.',
+    effectWhenIssued: 'Menjadi salinan resmi yang disiapkan untuk penerima dan cakupan yang disebutkan.',
+    doesNotAuthorize: 'Laporan tidak mengubah transaksi internal dan tidak otomatis meminta atau menyetujui pembayaran.',
+    nextAuthority: 'Koreksi diterbitkan sebagai dokumen pengganti dengan alasan serta hubungan ke nomor sebelumnya.', governingPermission: 'project.read / finance',
+  },
+  s_curve: {
+    type: 's_curve', domain: 'project', title: 'Kurva S Rencana dan Realisasi', currentCode: 'Belum ada nomor dokumen khusus',
+    recommendedCode: 'KURVA-{KODEPROYEK}-YYYYMMDD-RNN', exportState: 'existing',
+    officialIssueCondition: 'Baseline dan tanggal cut-off data realisasi telah diperiksa.',
+    effectWhenIssued: 'Menampilkan snapshot perbandingan rencana dan realisasi pada tanggal cetak.',
+    doesNotAuthorize: 'Kurva S tidak mengesahkan perubahan kontrak, progress tagihan, atau pencairan.',
+    nextAuthority: 'Perubahan lingkup/biaya dan pengakuan volume tetap mengikuti approval pelaksanaan.', governingPermission: 'project.read / execution.progress.review',
+  },
+};
+
+export function getBusinessDocumentDefinition(type: BusinessDocumentType): BusinessDocumentCatalogEntry {
+  return BUSINESS_DOCUMENT_CATALOG[type];
+}

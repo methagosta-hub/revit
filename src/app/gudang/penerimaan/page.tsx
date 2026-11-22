@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import RequireAuth from '@/components/auth/RequireAuth';
+import { BusinessDocumentPdfButton } from '@/components/documents/BusinessDocumentPdfButton';
 import {
   fetchPurchaseOrdersAwaitingReceipt,
   fetchRecentMaterialReceipts,
@@ -354,6 +355,31 @@ export default function WarehouseReceivingPage() {
               </div>
             )}
           </section>
+
+          {receipts.length > 0 ? (
+            <section className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
+              <div className="mb-3"><h2 className="font-bold text-slate-900">Cetak berita acara penerimaan</h2><p className="text-xs text-slate-600">PDF dibuat dari penerimaan terkonfirmasi yang tersimpan.</p></div>
+              <div className="grid gap-3 lg:grid-cols-2">{receipts.map((receipt) => (
+                <article key={receipt.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white bg-white p-3 shadow-sm">
+                  <div><p className="font-bold text-emerald-800">{receipt.receipt_number}</p><p className="text-xs text-slate-600">{receipt.project_name} · {receipt.supplier_name}</p></div>
+                  <BusinessDocumentPdfButton
+                    identity={{ type: 'goods_receipt', code: receipt.receipt_number, title: 'Berita Acara Penerimaan Barang', sourceStatus: 'confirmed', generatedAt: new Date().toISOString(), projectName: receipt.project_name, period: formatDateTime(receipt.received_at), classification: 'Dokumen gudang' }}
+                    sections={[
+                      { title: 'Identitas penerimaan', details: [
+                        { label: 'Nomor penerimaan', value: receipt.receipt_number }, { label: 'Nomor PO', value: receipt.po_number },
+                        { label: 'Proyek', value: receipt.project_name }, { label: 'Supplier', value: receipt.supplier_name },
+                        { label: 'Surat jalan', value: receipt.delivery_note_no ?? 'Tidak dicatat' }, { label: 'Waktu diterima', value: formatDateTime(receipt.received_at) },
+                      ] },
+                      { title: 'Rincian pemeriksaan barang', description: `${receipt.item_count} baris barang`, columns: ['Kode', 'Barang', 'Diterima', 'Rusak', 'Diterima baik', 'Satuan', 'Catatan'], rows: receipt.items.map((item) => [item.material_code ?? '—', item.material_name, formatNumber(item.quantity_received), formatNumber(item.quantity_damaged), formatNumber(item.quantity_accepted), item.unit, item.notes ?? '—']) },
+                      { title: 'Ringkasan dan catatan', details: [
+                        { label: 'Kuantitas diterima', value: formatNumber(receipt.quantity_received) }, { label: 'Kuantitas rusak', value: formatNumber(receipt.quantity_damaged) },
+                      ], paragraphs: [receipt.notes?.trim() || 'Tidak ada catatan tambahan pada penerimaan sumber.', 'Dokumen ini tidak melunasi invoice supplier.'] },
+                    ]}
+                  />
+                </article>
+              ))}</div>
+            </section>
+          ) : null}
 
           {selectedOrder ? (
             <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeReceiptForm(); }}>

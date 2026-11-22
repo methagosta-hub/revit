@@ -30,6 +30,7 @@ type RawReceipt = {
   receipt_number: string;
   received_at: string;
   delivery_note_no: string | null;
+  notes: string | null;
   project: { title: string } | { title: string }[] | null;
   purchase_order: {
     po_number: string;
@@ -41,6 +42,9 @@ type RawReceipt = {
   items: Array<{
     quantity_received: number | string;
     quantity_damaged: number | string;
+    quantity_accepted: number | string;
+    notes: string | null;
+    purchase_order_item: { material_code: string | null; material_name: string; unit: string } | { material_code: string | null; material_name: string; unit: string }[] | null;
   }> | null;
 };
 
@@ -147,12 +151,16 @@ export async function fetchRecentMaterialReceipts(limit = 10): Promise<RecentMat
       receipt_number,
       received_at,
       delivery_note_no,
+      notes,
       project:projects(title),
       purchase_order:project_purchase_orders(
         po_number,
         supplier:suppliers(name)
       ),
-      items:project_material_receipt_items(quantity_received, quantity_damaged)
+      items:project_material_receipt_items(
+        quantity_received, quantity_damaged, quantity_accepted, notes,
+        purchase_order_item:project_purchase_order_items(material_code, material_name, unit)
+      )
     `)
     .eq('status', 'confirmed')
     .order('received_at', { ascending: false })
@@ -170,12 +178,25 @@ export async function fetchRecentMaterialReceipts(limit = 10): Promise<RecentMat
       receipt_number: row.receipt_number,
       received_at: row.received_at,
       delivery_note_no: row.delivery_note_no,
+      notes: row.notes,
       project_name: project?.title ?? 'Proyek tidak ditemukan',
       po_number: po?.po_number ?? '-',
       supplier_name: supplier?.name ?? '-',
       item_count: items.length,
       quantity_received: items.reduce((sum, item) => sum + Number(item.quantity_received ?? 0), 0),
       quantity_damaged: items.reduce((sum, item) => sum + Number(item.quantity_damaged ?? 0), 0),
+      items: items.map((item) => {
+        const poItem = first(item.purchase_order_item);
+        return {
+          material_code: poItem?.material_code ?? null,
+          material_name: poItem?.material_name ?? 'Material tidak ditemukan',
+          unit: poItem?.unit ?? '—',
+          quantity_received: Number(item.quantity_received ?? 0),
+          quantity_damaged: Number(item.quantity_damaged ?? 0),
+          quantity_accepted: Number(item.quantity_accepted ?? 0),
+          notes: item.notes ?? null,
+        };
+      }),
     };
   });
 }

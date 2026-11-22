@@ -7,6 +7,7 @@ import {
   Pencil, Plus, RefreshCw, Search, Users, X,
 } from 'lucide-react';
 import RequireAuth from '@/components/auth/RequireAuth';
+import { BusinessDocumentPdfButton } from '@/components/documents/BusinessDocumentPdfButton';
 import PersonnelWorkflowWizard from '@/components/personalia/PersonnelWorkflowWizard';
 import { getMyAccess, hasPermission } from '@/lib/services/authService';
 import {
@@ -88,6 +89,9 @@ function MainPlacementContent() {
   const [draft, setDraft] = useState<Draft>(blankDraft());
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+  const [employeePage, setEmployeePage] = useState(0);
 
   const load = useCallback(async (refresh = false) => {
     refresh ? setRefreshing(true) : setLoading(true);
@@ -113,21 +117,38 @@ function MainPlacementContent() {
     });
   }, [rows, search, statusFilter]);
 
-  const openCreate = () => { setEditing(null); setDraft(blankDraft()); setError(''); setNotice(''); setModalOpen(true); };
-  const openEdit = (row: MainPlacement) => { setEditing(row); setDraft(draftFromRow(row)); setError(''); setNotice(''); setModalOpen(true); };
+  const openCreate = () => { setEditing(null); setSelectedEmployeeIds([]); setDraft(blankDraft()); setError(''); setNotice(''); setModalOpen(true); };
+  const openEdit = (row: MainPlacement) => { setEditing(row); setSelectedEmployeeIds([]); setDraft(draftFromRow(row)); setError(''); setNotice(''); setModalOpen(true); };
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (saving) return;
     setSaving(true); setError(''); setNotice('');
+    let created = 0;
+    const failures: string[] = [];
     try {
-      if (editing) await updateMainPlacement(editing.id, toInput(draft));
-      else await createMainPlacement(toInput(draft));
-      setModalOpen(false); setNotice(editing ? 'Penempatan utama berhasil diperbarui.' : 'Penempatan utama berhasil dibuat.');
+      if (editing) {
+        await updateMainPlacement(editing.id, toInput(draft));
+      } else {
+        const targetIds = selectedEmployeeIds.length ? selectedEmployeeIds : (draft.employee_id ? [draft.employee_id] : []);
+        if (!targetIds.length) throw new Error('Pilih minimal satu karyawan dari dashboard karyawan.');
+        for (const employeeId of targetIds) {
+          try {
+            await createMainPlacement({ ...toInput(draft), employee_id: employeeId });
+            created += 1;
+          } catch (cause) {
+            const employee = employees.find((item) => item.id === employeeId);
+            failures.push(`${employee?.full_name ?? employeeId}: ${errorMessage(cause)}`);
+          }
+        }
+      }
+      setModalOpen(false);
       await load(true);
+      setNotice(editing ? 'Penempatan utama berhasil diperbarui.' : `${created} penempatan utama berhasil dibuat${failures.length ? `; ${failures.length} gagal` : ''}.`);
+      if (failures.length) setError(failures.slice(0, 3).join(' | '));
+      setSelectedEmployeeIds([]);
     } catch (err) { setError(errorMessage(err)); }
     finally { setSaving(false); }
   };
-
   const finishPlacement = async (row: MainPlacement) => {
     if (!window.confirm(`Selesaikan penempatan ${row.placement_number} (${row.employee?.full_name ?? 'karyawan'}) per hari ini? Setelah itu Anda dapat membuat penempatan utama yang baru.`)) return;
     setError(''); setNotice('');
@@ -158,6 +179,19 @@ function MainPlacementContent() {
 
       <PersonnelWorkflowWizard currentStep={2} />
 
+      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div><p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">Employee workspace</p><h2 className="mt-1 text-lg font-bold text-slate-900">Pilih karyawan untuk penempatan utama</h2><p className="mt-1 text-xs text-slate-500">Cari nama atau nomor karyawan, lalu pilih beberapa sekaligus. Tidak perlu menelusuri dropdown panjang.</p></div>
+          <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">{selectedEmployeeIds.length} dipilih</span><button type="button" onClick={() => setSelectedEmployeeIds(eligibleEmployees.map((item) => item.id))} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600">Pilih semua yang tersedia</button><button type="button" onClick={() => setSelectedEmployeeIds([])} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600">Bersihkan</button><button type="button" disabled={!canManage || selectedEmployeeIds.length===0} onClick={() => { setEditing(null); setDraft(blankDraft()); setError(''); setNotice(''); setModalOpen(true); }} className="rounded-lg bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white disabled:opacity-40">Buat penempatan massal</button></div>
+        </div>
+        <div className="grid gap-3 p-4 sm:grid-cols-[minmax(220px,1fr)_auto]"><label className="relative block"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={employeeSearch} onChange={(e)=>{setEmployeeSearch(e.target.value);setEmployeePage(0);}} placeholder="Cari nama atau nomor karyawan..." className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-emerald-500"/></label><p className="self-center text-xs text-slate-500">{eligibleEmployees.filter((emp)=>`${emp.employee_number} ${emp.full_name}`.toLocaleLowerCase('id').includes(employeeSearch.trim().toLocaleLowerCase('id'))).length} karyawan tersedia</p></div>
+        <div className="grid gap-2 px-4 pb-4 sm:grid-cols-2 xl:grid-cols-3">
+          {eligibleEmployees.filter((emp)=>`${emp.employee_number} ${emp.full_name}`.toLocaleLowerCase('id').includes(employeeSearch.trim().toLocaleLowerCase('id'))).slice(employeePage*24,(employeePage+1)*24).map((emp)=><label key={emp.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${selectedEmployeeIds.includes(emp.id)?'border-emerald-300 bg-emerald-50':'border-slate-200 hover:border-emerald-200 hover:bg-slate-50'}`}><input type="checkbox" checked={selectedEmployeeIds.includes(emp.id)} onChange={(e)=>setSelectedEmployeeIds((current)=>e.target.checked?[...current,emp.id]:current.filter((id)=>id!==emp.id))} className="h-4 w-4 rounded border-slate-300 text-emerald-700"/><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-900">{emp.full_name}</span><span className="mt-0.5 block truncate text-[11px] text-slate-500">{emp.employee_number} · {emp.position_title ?? emp.department ?? 'Jabatan belum diisi'}</span></span></label>)}
+          {eligibleEmployees.filter((emp)=>`${emp.employee_number} ${emp.full_name}`.toLocaleLowerCase('id').includes(employeeSearch.trim().toLocaleLowerCase('id'))).length===0 && <p className="col-span-full rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">Tidak ada karyawan yang cocok dengan pencarian.</p>}
+        </div>
+        {eligibleEmployees.filter((emp)=>`${emp.employee_number} ${emp.full_name}`.toLocaleLowerCase('id').includes(employeeSearch.trim().toLocaleLowerCase('id'))).length>24 && <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3"><button type="button" disabled={employeePage===0} onClick={()=>setEmployeePage((n)=>Math.max(0,n-1))} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold disabled:opacity-30">Sebelumnya</button><span className="text-xs text-slate-500">Halaman {employeePage+1} dari {Math.ceil(eligibleEmployees.filter((emp)=>`${emp.employee_number} ${emp.full_name}`.toLocaleLowerCase('id').includes(employeeSearch.trim().toLocaleLowerCase('id'))).length/24)}</span><button type="button" disabled={(employeePage+1)*24>=eligibleEmployees.filter((emp)=>`${emp.employee_number} ${emp.full_name}`.toLocaleLowerCase('id').includes(employeeSearch.trim().toLocaleLowerCase('id'))).length} onClick={()=>setEmployeePage((n)=>n+1)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold disabled:opacity-30">Berikutnya</button></div>}
+      </section>
+
       {(error || notice) && <div role="status" className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${error ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
         {error ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0"/>}<p className="flex-1">{error || notice}</p><button onClick={() => { setError(''); setNotice(''); }} aria-label="Tutup"><X className="h-4 w-4"/></button>
       </div>}
@@ -168,6 +202,21 @@ function MainPlacementContent() {
           <div className="rounded-2xl border bg-white p-5"><div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500">Karyawan terpetakan <Users className="h-5 w-5 text-sky-700"/></div><p className="mt-3 text-3xl font-bold tabular-nums text-slate-900">{new Set(activeRows.map((row) => row.employee_id)).size}</p><p className="mt-1 text-xs text-slate-500">Karyawan dengan unit utama aktif</p></div>
           <div className="rounded-2xl border bg-white p-5"><div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500">Total riwayat <MapPin className="h-5 w-5 text-amber-700"/></div><p className="mt-3 text-3xl font-bold tabular-nums text-slate-900">{rows.length}</p><p className="mt-1 text-xs text-slate-500">Termasuk penempatan yang selesai</p></div>
         </section>
+
+        {filtered.length > 0 ? <section className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4"><div className="mb-3"><h2 className="font-bold text-slate-900">Cetak surat penempatan pekerja</h2><p className="text-xs text-slate-600">Pilih penempatan yang sudah tersimpan untuk mencetak salinan PDF.</p></div><div className="grid gap-3 lg:grid-cols-2">{filtered.map((placement) => (
+          <article key={`pdf-${placement.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white bg-white p-3 shadow-sm"><div><p className="font-bold text-emerald-800">{placement.placement_number}</p><p className="text-xs text-slate-600">{placement.employee?.full_name ?? 'Karyawan'} · {placement.unit_name}</p></div>
+            <BusinessDocumentPdfButton identity={{ type: 'employee_placement', code: placement.placement_number, title: 'Surat Penempatan Pekerja', sourceStatus: placement.status, generatedAt: new Date().toISOString(), period: `${dateLabel(placement.start_date)}${placement.end_date ? ` s.d. ${dateLabel(placement.end_date)}` : ''}`, classification: 'Dokumen personalia' }} sections={[
+              { title: 'Identitas penempatan', details: [
+                { label: 'Nomor penempatan', value: placement.placement_number }, { label: 'Nama pekerja', value: placement.employee?.full_name ?? '—' },
+                { label: 'Nomor pekerja', value: placement.employee?.employee_number ?? '—' }, { label: 'Jabatan', value: placement.employee?.position_title ?? placement.employee?.department ?? '—' },
+                { label: 'Unit / tim', value: placement.unit_name }, { label: 'Tipe unit', value: UNIT_LABELS[placement.unit_type] },
+                { label: 'Lokasi', value: placement.base_location ?? '—' }, { label: 'Mulai berlaku', value: dateLabel(placement.start_date) },
+                { label: 'Berakhir', value: placement.end_date ? dateLabel(placement.end_date) : 'Sampai ada pembaruan status' }, { label: 'Status', value: STATUS_LABELS[placement.status] },
+              ] },
+              { title: 'Catatan penempatan', paragraphs: [placement.notes?.trim() || 'Tidak ada catatan tambahan pada penempatan sumber.'] },
+            ]} />
+          </article>
+        ))}</div></section> : null}
 
         <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900">
           <strong>Aturan pengelolaan:</strong> satu karyawan hanya memiliki satu penempatan utama aktif. Untuk memindahkan unit, selesaikan penempatan lama terlebih dahulu, lalu buat penempatan baru. Perpindahan pekerjaan harian ke proyek lain dicatat di halaman Penugasan Harian.
@@ -189,7 +238,7 @@ function MainPlacementContent() {
 
       {modalOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-slate-950/55 p-3 sm:p-5"><section role="dialog" aria-modal="true" aria-labelledby="main-placement-title" className="my-auto w-full max-w-2xl rounded-2xl bg-white shadow-2xl"><div className="flex items-start justify-between border-b border-slate-100 p-5"><div><h2 id="main-placement-title" className="text-lg font-bold text-slate-900">{editing ? `Edit ${editing.placement_number}` : 'Tambah Penempatan Utama'}</h2><p className="mt-1 text-xs text-slate-500">Pilih unit utama karyawan. Ini bukan penugasan proyek harian.</p></div><button onClick={() => !saving && setModalOpen(false)} disabled={saving} aria-label="Tutup"><X className="h-5 w-5 text-slate-400"/></button></div>
         <form onSubmit={handleSave} className="space-y-4 p-5"><div className="grid gap-4 sm:grid-cols-2">
-          <label className={LABEL}>Karyawan<select required value={draft.employee_id} disabled={Boolean(editing)} onChange={(e) => setDraft((v) => ({ ...v, employee_id: e.target.value }))} className={INPUT}><option value="">Pilih karyawan</option>{(editing ? employees.filter((emp) => emp.id === draft.employee_id || (emp.status === 'active' && !activeEmployeeIds.has(emp.id))) : eligibleEmployees).map((emp) => <option key={emp.id} value={emp.id}>{emp.employee_number} — {emp.full_name}</option>)}</select></label>
+          {editing || selectedEmployeeIds.length===0 ? <label className={LABEL}>Karyawan<select required value={draft.employee_id} disabled={Boolean(editing)} onChange={(e) => setDraft((v) => ({ ...v, employee_id: e.target.value }))} className={INPUT}><option value="">Pilih karyawan</option>{(editing ? employees.filter((emp) => emp.id === draft.employee_id || (emp.status === 'active' && !activeEmployeeIds.has(emp.id))) : eligibleEmployees).map((emp) => <option key={emp.id} value={emp.id}>{emp.employee_number} — {emp.full_name}</option>)}</select></label> : <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 sm:col-span-2"><strong>{selectedEmployeeIds.length} karyawan dipilih.</strong> Pengaturan unit, lokasi, dan tanggal di bawah akan diterapkan ke semua karyawan yang dipilih.</div>}
           <label className={LABEL}>Jenis unit<select value={draft.unit_type} onChange={(e) => setDraft((v) => ({ ...v, unit_type: e.target.value as UnitType }))} className={INPUT}><option value="office">Kantor</option><option value="warehouse">Gudang</option><option value="workshop">Workshop</option><option value="field">Lapangan</option><option value="other">Lainnya</option></select></label>
           <label className={LABEL}>Nama unit / tim<input required maxLength={120} value={draft.unit_name} onChange={(e) => setDraft((v) => ({ ...v, unit_name: e.target.value }))} placeholder="Contoh: Tim Bang Udin, Tim Kusen" className={INPUT}/></label>
           <label className={LABEL}>Lokasi basis (opsional)<input maxLength={180} value={draft.base_location} onChange={(e) => setDraft((v) => ({ ...v, base_location: e.target.value }))} placeholder="Contoh: PAUD Tunas, TK Mawar" className={INPUT}/></label>

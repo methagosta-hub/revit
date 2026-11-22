@@ -47,6 +47,13 @@ export interface RecentWarehouseIssue {
   issued_at: string;
   recipient_name: string | null;
   status: 'confirmed' | 'void';
+  notes: string | null;
   item_count: number;
   allocations: string[];
+  items: Array<{
+    material_name: string;
+    unit: string;
+    quantity_issued: number;
+    division_name: string;
+  }>;
 }

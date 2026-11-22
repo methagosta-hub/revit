@@ -25,7 +25,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { formatRupiah } from '@/lib/format';
 
-type ProjectStatus = 'DRAFT' | 'REVIEW' | 'FINAL RAB' | 'DIKERJAKAN' | 'SELESAI';
+type ProjectStatus = 'DRAFT' | 'REVIEW' | 'FINAL RAB' | 'DIKERJAKAN' | 'SELESAI' | 'DIBATALKAN';
 
 type ProjectForm = {
   title: string;
@@ -209,11 +209,12 @@ export default function DetailEditProyekPage() {
 
   const allowedNextStatuses = useMemo<ProjectStatus[]>(() => {
     switch (form.status) {
-      case 'DRAFT': return ['DRAFT', 'REVIEW'];
-      case 'REVIEW': return ['REVIEW', 'DRAFT', 'FINAL RAB'];
-      case 'FINAL RAB': return ['FINAL RAB', 'REVIEW', 'DIKERJAKAN'];
-      case 'DIKERJAKAN': return ['DIKERJAKAN', 'SELESAI'];
+      case 'DRAFT': return ['DRAFT', 'REVIEW', 'DIBATALKAN'];
+      case 'REVIEW': return ['REVIEW', 'DRAFT', 'FINAL RAB', 'DIBATALKAN'];
+      case 'FINAL RAB': return ['FINAL RAB', 'REVIEW', 'DIKERJAKAN', 'DIBATALKAN'];
+      case 'DIKERJAKAN': return ['DIKERJAKAN', 'SELESAI', 'DIBATALKAN'];
       case 'SELESAI': return ['SELESAI'];
+      case 'DIBATALKAN': return ['DIBATALKAN', 'DRAFT'];
       default: return ['DRAFT'];
     }
   }, [form.status]);
@@ -248,6 +249,16 @@ export default function DetailEditProyekPage() {
 
   async function handleStatusTransition() {
     if (!projectId || changingStatus || nextStatus === form.status) return;
+    const cancelling = nextStatus === 'DIBATALKAN';
+    const restoring = form.status === 'DIBATALKAN' && nextStatus === 'DRAFT';
+    if ((cancelling || restoring) && !statusReason.trim()) {
+      setSaveError(cancelling
+        ? 'Alasan pembatalan wajib diisi agar tercatat di riwayat proyek.'
+        : 'Alasan pemulihan wajib diisi agar tercatat di riwayat proyek.');
+      return;
+    }
+    if (cancelling && !window.confirm('Batalkan proyek ini? Data tetap tersimpan, tetapi workspace dan aktivitas proyek akan dikunci.')) return;
+    if (restoring && !window.confirm('Pulihkan proyek ke status DRAFT? Akses kerja akan dibuka kembali.')) return;
     setChangingStatus(true);
     setSaveError('');
     setSuccess('');
@@ -274,6 +285,11 @@ export default function DetailEditProyekPage() {
     event.preventDefault();
     setSaveError('');
     setSuccess('');
+
+    if (form.status === 'DIBATALKAN') {
+      setSaveError('Proyek dibatalkan. Pulihkan status ke DRAFT sebelum mengubah informasi proyek.');
+      return;
+    }
 
     const npsn = form.school_npsn.trim();
     if (npsn && !/^\d{8}$/.test(npsn)) {
@@ -386,15 +402,17 @@ export default function DetailEditProyekPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => void loadData()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"><RefreshCw className="h-4 w-4" />Muat Ulang</button>
-          <Link href={`/proyek/${projectId}`} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-700"><ExternalLink className="h-4 w-4" />Buka Workspace RAB</Link>
+          {form.status !== 'DIBATALKAN' && <Link href={`/proyek/${projectId}`} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-700"><ExternalLink className="h-4 w-4" />Buka Workspace RAB</Link>}
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {form.status === 'DIBATALKAN' && <div role="status" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">Proyek ini dibatalkan. Workspace RAB dan perubahan informasi dikunci. Untuk mengaktifkannya kembali, pilih <strong>DRAFT</strong> pada alur status dan isi alasan pemulihan.</div>}
+
+      {form.status !== 'DIBATALKAN' && <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Total Nilai RAB</p><p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatRupiah(projectTotal || divisionTotal)}</p></article>
         <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Jumlah Lokasi Pekerjaan</p><p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{divisions.length} lokasi</p></article>
         <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Status Proyek</p><p className="mt-1 text-xl font-bold text-slate-900">{form.status}</p><p className="mt-1 text-xs text-slate-500">Perubahan status dicatat di riwayat proyek.</p></article>
-      </section>
+      </section>}
 
       {(saveError || success) && (
         <div role="status" aria-live="polite" className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${saveError ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
@@ -407,7 +425,7 @@ export default function DetailEditProyekPage() {
         <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm sm:p-6">
           <div className="mb-4">
             <h2 className="font-bold text-slate-900">Alur Status Proyek</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Status hanya dapat diubah melalui perpindahan yang sah dan tercatat di riwayat proyek.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Status hanya dapat diubah melalui perpindahan yang sah dan tercatat di riwayat proyek. Proyek yang dibatalkan hanya dapat dipulihkan kembali ke DRAFT.</p>
           </div>
           <div className="grid gap-3 md:grid-cols-[1fr_1fr]">
             <label className="block">
@@ -417,15 +435,15 @@ export default function DetailEditProyekPage() {
               </select>
             </label>
             <label className="block">
-              <span className={labelClass}>Alasan / catatan perubahan (opsional)</span>
-              <input className={inputClass} value={statusReason} onChange={(event) => setStatusReason(event.target.value)} placeholder="Contoh: RAB telah disetujui pemilik proyek" maxLength={500} />
+              <span className={labelClass}>Alasan / catatan perubahan{nextStatus === 'DIBATALKAN' || form.status === 'DIBATALKAN' ? ' (wajib)' : ' (opsional)'}</span>
+              <input className={inputClass} value={statusReason} onChange={(event) => setStatusReason(event.target.value)} placeholder={nextStatus === 'DIBATALKAN' ? 'Alasan pembatalan proyek' : form.status === 'DIBATALKAN' ? 'Alasan pemulihan proyek' : 'Contoh: RAB telah disetujui pemilik proyek'} maxLength={500} />
             </label>
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-slate-500">Saat status menjadi DIKERJAKAN, proyek mulai tersedia untuk transaksi dan aktivitas pelaksanaan sesuai hak akses.</p>
+            <p className="text-xs text-slate-500">{form.status === 'DIBATALKAN' ? 'Pulihkan proyek ke DRAFT untuk membuka kembali akses kerja.' : 'Saat status menjadi DIKERJAKAN, proyek mulai tersedia untuk transaksi dan aktivitas pelaksanaan sesuai hak akses.'}</p>
             <button type="button" onClick={() => void handleStatusTransition()} disabled={changingStatus || nextStatus === form.status} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
               {changingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-              {changingStatus ? 'Mengubah status...' : 'Simpan Perubahan Status'}
+              {changingStatus ? 'Mengubah status...' : form.status === 'DIBATALKAN' ? 'Pulihkan Proyek' : nextStatus === 'DIBATALKAN' ? 'Batalkan Proyek' : 'Simpan Perubahan Status'}
             </button>
           </div>
           <div className="mt-5 border-t border-emerald-100 pt-4">
@@ -455,6 +473,7 @@ export default function DetailEditProyekPage() {
           </div>
         </section>
 
+        {form.status !== 'DIBATALKAN' && <>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="mb-5 flex items-start gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><FileText className="h-5 w-5" /></div>
@@ -524,13 +543,15 @@ export default function DetailEditProyekPage() {
           <div className="border-t border-slate-100 bg-slate-50/80 px-5 py-3 text-xs text-slate-500 sm:px-6">Tidak ada aksi penghapusan. Lokasi yang sudah tersimpan dan memiliki rincian RAB tetap dipertahankan.</div>
         </section>
 
-        <div className="flex flex-col-reverse justify-between gap-3 sm:flex-row sm:items-center">
+        </>}
+
+        {form.status !== 'DIBATALKAN' && <div className="flex flex-col-reverse justify-between gap-3 sm:flex-row sm:items-center">
           <div className="text-[11px] text-slate-400">Dibuat: {formatDate(createdAt)} <span className="mx-1">·</span> Terakhir diperbarui: {formatDate(updatedAt)}</div>
           <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saving ? 'Menyimpan Perubahan...' : 'Simpan Seluruh Perubahan'}
           </button>
-        </div>
+        </div>}
       </form>
     </main>
   );

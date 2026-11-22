@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatRupiah } from '@/lib/format';
+import { useAppAccess } from '@/hooks/useAppAccess';
 
 type MaterialItem = {
   id: string;
@@ -220,6 +221,9 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function MasterBahanPage() {
+  const { loading: accessLoading, hasCompanyPermission } = useAppAccess();
+  const canManageMaster = !accessLoading && hasCompanyPermission('rab.manage');
+
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -356,6 +360,7 @@ const loadMaterials = useCallback(async (showRefreshState = false) => {
   };
 
   const openCreateModal = () => {
+    if (!canManageMaster) return;
     setFormMode('create');
     setEditingItem(null);
     setForm(DEFAULT_FORM);
@@ -365,6 +370,7 @@ const loadMaterials = useCallback(async (showRefreshState = false) => {
   };
 
   const openEditModal = (item: MaterialItem) => {
+    if (!canManageMaster) return;
     codeRequestRef.current += 1;
     setCodeGenerating(false);
     setFormMode('edit');
@@ -381,6 +387,7 @@ const loadMaterials = useCallback(async (showRefreshState = false) => {
   };
 
   const openCopyModal = (item: MaterialItem) => {
+    if (!canManageMaster) return;
     const category = item.category || DEFAULT_CATEGORY;
     setFormMode('copy');
     setEditingItem(null);
@@ -406,6 +413,10 @@ const loadMaterials = useCallback(async (showRefreshState = false) => {
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canManageMaster) {
+      setErrorMessage('Hanya Direktur/Administrator perusahaan yang dapat mengubah Master Bahan.');
+      return;
+    }
     if (submitting || codeGenerating) return;
 
     const cleanName = form.name.trim();
@@ -497,6 +508,7 @@ const loadMaterials = useCallback(async (showRefreshState = false) => {
   };
 
   const handleDelete = async (item: MaterialItem) => {
+    if (!canManageMaster) return;
     const confirmed = window.confirm(
       `Hapus bahan "${item.name}" (${item.code}) dari database?\n\nTindakan ini tidak dapat dibatalkan.`,
     );
@@ -570,16 +582,24 @@ const loadMaterials = useCallback(async (showRefreshState = false) => {
             />
             Segarkan
           </button>
-          <button
-            type="button"
-            onClick={openCreateModal}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Tambah Bahan
-          </button>
+          {canManageMaster && (
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Tambah Bahan
+            </button>
+          )}
         </div>
       </header>
+
+      {!canManageMaster && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-medium text-slate-600">
+          Mode lihat saja. Perubahan Master Bahan hanya tersedia untuk Direktur/Administrator perusahaan.
+        </div>
+      )}
 
       {(errorMessage || successMessage) && (
         <div
@@ -715,6 +735,7 @@ const loadMaterials = useCallback(async (showRefreshState = false) => {
                       {formatRupiah(Number(item.unit_price ?? 0))}
                     </td>
                     <td className="px-5 py-4">
+                      {canManageMaster ? (
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
@@ -749,6 +770,7 @@ const loadMaterials = useCallback(async (showRefreshState = false) => {
                           )}
                         </button>
                       </div>
+                      ) : <span className="block text-center text-xs text-slate-400">Lihat saja</span>}
                     </td>
                   </tr>
                 ))
@@ -766,7 +788,7 @@ const loadMaterials = useCallback(async (showRefreshState = false) => {
                         ? 'Tambahkan material pertama untuk mulai membangun database harga.'
                         : 'Coba ubah kata kunci atau kategori pencarian.'}
                     </p>
-                    {materials.length === 0 ? (
+                    {materials.length === 0 && canManageMaster ? (
                       <button
                         type="button"
                         onClick={openCreateModal}
@@ -792,7 +814,7 @@ const loadMaterials = useCallback(async (showRefreshState = false) => {
         </div>
       </section>
 
-      {isModalOpen && (
+      {isModalOpen && canManageMaster && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/55 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {

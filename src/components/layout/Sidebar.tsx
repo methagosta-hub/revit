@@ -56,7 +56,7 @@ const navGroups: NavigationGroup[] = [
     items: [
       { name: 'Dashboard Perusahaan', href: '/dashboard', icon: Home },
       { name: 'Daftar Proyek', href: '/proyek/daftar', icon: FolderKanban },
-      { name: 'Buat Proyek', href: '/proyek/baru', icon: PlusCircle },
+      { name: 'Buat Proyek', href: '/proyek/baru', icon: PlusCircle, permission: 'project.manage' },
     ],
   },
   {

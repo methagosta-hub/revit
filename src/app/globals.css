@@ -53,6 +53,19 @@ body {
   display: none;
 }
 
+/* Shared A4 print-document components; popup exports reuse the same tokens. */
+.dahlia-doc-content > * + * {
+  margin-top: 0.9rem;
+}
+
+.dahlia-doc-content p {
+  color: #52635e;
+}
+
+.dahlia-doc-content .dahlia-doc-table-wrap {
+  overflow-x: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

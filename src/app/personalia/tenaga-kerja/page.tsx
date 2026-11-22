@@ -160,6 +160,15 @@ function WorkAssignmentContent() {
   const [draft, setDraft] = useState<Draft>({ ...EMPTY_DRAFT });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [employeePage, setEmployeePage] = useState(0);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkProjectId, setBulkProjectId] = useState('');
+  const [bulkTitle, setBulkTitle] = useState('Tenaga kerja proyek');
+  const [bulkStartDate, setBulkStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [bulkEndDate, setBulkEndDate] = useState('');
+  const [draggingEmployeeId, setDraggingEmployeeId] = useState<string | null>(null);
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true);
@@ -207,6 +216,34 @@ function WorkAssignmentContent() {
   const assignedEmployeeCount = new Set(activeAssignments.map((row) => row.employee_id)).size;
   const activeProjectCount = new Set(activeAssignments.map((row) => row.project_id)).size;
   const visibleDivisions = divisions.filter((division) => division.project_id === draft.project_id);
+  const filteredEmployees = employees.filter((employee) => `${employee.employee_number} ${employee.full_name} ${employee.position_title ?? ''}`.toLocaleLowerCase('id').includes(employeeSearch.trim().toLocaleLowerCase('id')));
+  const openBulkAssign = (projectId: string, ids = selectedEmployeeIds) => {
+    if (!ids.length) { setError('Pilih atau seret minimal satu karyawan ke proyek tujuan.'); return; }
+    setBulkProjectId(projectId); setSelectedEmployeeIds(ids); setBulkModalOpen(true); setError('');
+  };
+  const saveBulkAssignments = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (saving || !bulkProjectId || !selectedEmployeeIds.length || !bulkTitle.trim() || !bulkStartDate) return;
+    setSaving(true); setError(''); setSuccess('');
+    let created = 0; let skipped = 0; const failures: string[] = [];
+    try {
+      for (const employeeId of selectedEmployeeIds) {
+        const duplicate = assignments.some((row) => row.employee_id === employeeId && row.project_id === bulkProjectId && row.status === 'active');
+        if (duplicate) { skipped += 1; continue; }
+        try {
+          await createWorkAssignment({ employee_id: employeeId, project_id: bulkProjectId, division_id: null, assignment_title: bulkTitle.trim(), start_date: bulkStartDate, end_date: bulkEndDate || null, status: 'active', notes: null });
+          created += 1;
+        } catch (cause) {
+          const employee = employees.find((item) => item.id === employeeId);
+          failures.push(`${employee?.full_name ?? employeeId}: ${errorText(cause)}`);
+        }
+      }
+      const projectName = projects.find((item) => item.id === bulkProjectId)?.title ?? 'proyek';
+      setSuccess(`${created} karyawan ditempatkan ke ${projectName}. ${skipped} dilewati karena sudah memiliki penempatan aktif${failures.length ? `; ${failures.length} gagal` : ''}.`);
+      setSelectedEmployeeIds([]); setBulkModalOpen(false); await load(true);
+      if (failures.length) setError(failures.slice(0, 3).join(' | '));
+    } finally { setSaving(false); }
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -318,8 +355,17 @@ function WorkAssignmentContent() {
           <strong>Penempatan belum dapat dibuat.</strong> {employees.length === 0 ? 'Belum ada karyawan berstatus aktif di Master Karyawan. ' : ''}{projects.length === 0 ? 'Belum ada proyek yang dapat dipilih.' : ''} Lengkapi data tersebut terlebih dahulu.
         </div>}
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
+      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">Drag & drop assignment board</p><h2 className="mt-1 text-lg font-bold text-slate-900">Seret karyawan ke proyek tujuan</h2><p className="mt-1 text-xs text-slate-500">Centang beberapa kartu atau seret satu kartu. Lepaskan pada proyek untuk membuka konfirmasi penempatan massal. Divisi tidak wajib diisi.</p></div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">{selectedEmployeeIds.length} dipilih</span><button type="button" onClick={()=>setSelectedEmployeeIds(filteredEmployees.map((item)=>item.id))} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold">Pilih hasil pencarian</button><button type="button" onClick={()=>setSelectedEmployeeIds([])} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold">Bersihkan</button></div></div>
+        <div className="grid gap-4 p-4 xl:grid-cols-[1.2fr_0.8fr]">
+          <div><label className="relative block"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={employeeSearch} onChange={(e)=>{setEmployeeSearch(e.target.value);setEmployeePage(0);}} placeholder="Ketik nama atau nomor pekerja untuk menemukan cepat..." className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-emerald-500"/></label><div className="mt-3 grid gap-2 sm:grid-cols-2">{filteredEmployees.slice(employeePage*48,(employeePage+1)*48).map((employee)=><label key={employee.id} draggable onDragStart={(event)=>{setDraggingEmployeeId(employee.id);event.dataTransfer.setData('text/plain',employee.id);event.dataTransfer.effectAllowed='copy';}} onDragEnd={()=>setDraggingEmployeeId(null)} className={`flex cursor-grab items-center gap-3 rounded-xl border p-3 transition active:cursor-grabbing ${selectedEmployeeIds.includes(employee.id)?'border-emerald-300 bg-emerald-50':'border-slate-200 hover:border-emerald-200 hover:bg-slate-50'}`}><input type="checkbox" checked={selectedEmployeeIds.includes(employee.id)} onChange={(event)=>setSelectedEmployeeIds((current)=>event.target.checked?[...current,employee.id]:current.filter((id)=>id!==employee.id))} className="h-4 w-4 rounded border-slate-300 text-emerald-700"/><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-900">{employee.full_name}</span><span className="mt-0.5 block truncate text-[11px] text-slate-500">{employee.employee_number} · {employee.position_title ?? EMPLOYMENT_LABELS[employee.employment_type] ?? 'Karyawan'}</span></span><span className="text-slate-300">⠿</span></label>)}{filteredEmployees.length===0&&<p className="col-span-full rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">Tidak ada karyawan yang cocok.</p>}</div><p className="mt-2 text-[11px] text-slate-400">Menampilkan 48 hasil per halaman. Gunakan pencarian untuk mempersempit daftar. Jika akun hanya memiliki hak baca, tindakan drag dan penempatan tetap dinonaktifkan.</p></div>
+          {filteredEmployees.length>48 && <div className="mt-3 flex items-center justify-between"><button type="button" disabled={employeePage===0} onClick={()=>setEmployeePage((n)=>Math.max(0,n-1))} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold disabled:opacity-30">Sebelumnya</button><span className="text-xs text-slate-500">Halaman {employeePage+1} dari {Math.ceil(filteredEmployees.length/48)}</span><button type="button" disabled={(employeePage+1)*48>=filteredEmployees.length} onClick={()=>setEmployeePage((n)=>n+1)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold disabled:opacity-30">Berikutnya</button></div>}
+          <div><h3 className="mb-2 text-sm font-bold text-slate-800">Proyek tujuan</h3><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">{projects.map((project)=>{const count=activeAssignments.filter((row)=>row.project_id===project.id).length;return <div key={project.id} onDragOver={(event)=>{if(canManage){event.preventDefault();event.dataTransfer.dropEffect='copy';}}} onDrop={(event)=>{event.preventDefault();if(!canManage)return;const droppedId=event.dataTransfer.getData('text/plain')||draggingEmployeeId;const ids: string[] = droppedId ? (selectedEmployeeIds.includes(droppedId) ? selectedEmployeeIds : [droppedId]) : selectedEmployeeIds;openBulkAssign(project.id,ids);}} className="rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/50 p-4 transition hover:border-emerald-500 hover:bg-emerald-50"><div className="flex items-start justify-between gap-2"><div><p className="font-bold text-slate-900">{project.title}</p><p className="mt-1 text-xs text-slate-500">{project.client ?? 'Proyek'} · {count} pekerja aktif</p></div><Building2 className="h-5 w-5 text-emerald-700"/></div><button type="button" disabled={!canManage||selectedEmployeeIds.length===0} onClick={()=>openBulkAssign(project.id)} className="mt-3 w-full rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Tempatkan {selectedEmployeeIds.length||''} pekerja di sini</button></div>;})}</div></div>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div><h2 className="font-bold text-slate-900">Daftar Penempatan</h2><p className="mt-0.5 text-xs text-slate-500">{filtered.length} dari {assignments.length} catatan penempatan</p></div>
             <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[680px]">
               <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama, nomor, proyek..." className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-emerald-500"/></label>
@@ -348,6 +394,7 @@ function WorkAssignmentContent() {
           <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-between"><p className="text-[11px] leading-5 text-slate-400">Nomor penempatan dibuat otomatis setelah data disimpan.</p><div className="flex gap-2"><button type="button" onClick={() => setModalOpen(false)} disabled={saving} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Batal</button><button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">{saving ? <LoaderCircle className="h-4 w-4 animate-spin"/> : <CheckCircle2 className="h-4 w-4"/>}{saving ? 'Menyimpan...' : editing ? 'Simpan Perubahan' : 'Simpan Penempatan'}</button></div></div>
         </form>
       </section></div>}
+      {bulkModalOpen && <div className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-3 sm:p-6"><section role="dialog" aria-modal="true" aria-labelledby="bulk-work-assignment-title" className="my-auto w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl"><header className="flex items-start justify-between border-b border-slate-100 p-5"><div><p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">Penempatan massal</p><h2 id="bulk-work-assignment-title" className="mt-1 text-lg font-bold text-slate-900">Konfirmasi penempatan proyek</h2><p className="mt-1 text-xs text-slate-500">{selectedEmployeeIds.length} karyawan akan ditempatkan ke {projects.find((item)=>item.id===bulkProjectId)?.title ?? 'proyek tujuan'}.</p></div><button type="button" onClick={()=>!saving&&setBulkModalOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4"/></button></header><form onSubmit={saveBulkAssignments} className="space-y-4 p-5"><label className={LABEL_CLASS}>Proyek tujuan<select required value={bulkProjectId} onChange={(e)=>setBulkProjectId(e.target.value)} className={INPUT_CLASS}><option value="">Pilih proyek</option>{projects.map((project)=><option key={project.id} value={project.id}>{project.title}</option>)}</select></label><label className={LABEL_CLASS}>Peran / jabatan pada proyek<input required maxLength={120} value={bulkTitle} onChange={(e)=>setBulkTitle(e.target.value)} className={INPUT_CLASS} placeholder="Contoh: Tim lapangan, Tukang, Mandor"/></label><div className="grid gap-3 sm:grid-cols-2"><label className={LABEL_CLASS}>Tanggal mulai<input required type="date" value={bulkStartDate} onChange={(e)=>setBulkStartDate(e.target.value)} className={INPUT_CLASS}/></label><label className={LABEL_CLASS}>Tanggal selesai (opsional)<input type="date" min={bulkStartDate} value={bulkEndDate} onChange={(e)=>setBulkEndDate(e.target.value)} className={INPUT_CLASS}/></label></div><div className="rounded-xl bg-emerald-50 p-3 text-xs leading-5 text-emerald-900">Penempatan dibuat sebagai penugasan umum proyek (tanpa divisi RAB). Riwayat penempatan lama tetap disimpan. Karyawan yang sudah aktif pada proyek yang sama akan dilewati untuk mencegah duplikasi.</div>{error&&<p role="alert" className="rounded-lg bg-rose-50 p-3 text-xs text-rose-700">{error}</p>}<div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={()=>setBulkModalOpen(false)} disabled={saving} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold">Batal</button><button type="submit" disabled={saving||!selectedEmployeeIds.length||!bulkProjectId} className="rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{saving?'Memproses...':`Tempatkan ${selectedEmployeeIds.length} karyawan`}</button></div></form></section></div>}
     </main>
   );
 }

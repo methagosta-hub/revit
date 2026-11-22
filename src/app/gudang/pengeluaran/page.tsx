@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import RequireAuth from '@/components/auth/RequireAuth';
+import { BusinessDocumentPdfButton } from '@/components/documents/BusinessDocumentPdfButton';
 import { fetchWarehouseIssuePageData, recordWarehouseMaterialIssue } from '@/lib/services/materialIssueService';
 import type { WarehouseStockRow } from '@/types/warehouse';
 import type {
@@ -378,6 +379,23 @@ export default function WarehouseIssuePage() {
               <div><h2 className="font-bold text-slate-900">Riwayat pengeluaran material</h2><p className="mt-1 text-xs text-slate-500">Menampilkan hingga 20 transaksi terakhir.</p></div>
               <button type="button" onClick={() => downloadCsv(filteredRecentIssues)} disabled={filteredRecentIssues.length === 0} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"><ArrowDownToLine className="h-4 w-4" /> Ekspor CSV</button>
             </div>
+            {filteredRecentIssues.length > 0 ? <div className="mb-4 grid gap-3 lg:grid-cols-2">{filteredRecentIssues.map((issue) => (
+              <article key={`pdf-${issue.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+                <div><p className="font-bold text-emerald-800">{issue.issue_number}</p><p className="text-xs text-slate-600">{issue.project_title} · {formatDate(issue.issued_at)}</p></div>
+                <BusinessDocumentPdfButton
+                  identity={{ type: 'goods_issue', code: issue.issue_number, title: 'Bukti Pengeluaran Material', sourceStatus: issue.status, generatedAt: new Date().toISOString(), projectName: issue.project_title, period: formatDate(issue.issued_at), classification: 'Dokumen gudang' }}
+                  sections={[
+                    { title: 'Identitas pengeluaran', details: [
+                      { label: 'Nomor pengeluaran', value: issue.issue_number }, { label: 'Proyek', value: issue.project_title },
+                      { label: 'Tanggal', value: formatDate(issue.issued_at) }, { label: 'Penerima', value: issue.recipient_name ?? 'Tidak dicatat' },
+                      { label: 'Status transaksi', value: issue.status === 'confirmed' ? 'Terkonfirmasi' : 'Dibatalkan' }, { label: 'Jumlah baris material', value: issue.item_count },
+                    ] },
+                    { title: 'Rincian material yang diserahkan', columns: ['Nama material', 'Kuantitas', 'Satuan', 'Divisi / lokasi'], rows: issue.items.map((item) => [item.material_name, formatNumber(item.quantity_issued), item.unit, item.division_name]) },
+                    { title: 'Catatan pengeluaran', paragraphs: [issue.notes?.trim() || 'Tidak ada catatan tambahan pada pengeluaran sumber.', 'Cetakan ini tidak menjadi bukti kehadiran atau persetujuan upah.'] },
+                  ]}
+                />
+              </article>
+            ))}</div> : null}
             <div className="mt-4 space-y-3">
               {loading ? <p className="py-8 text-center text-sm text-slate-500">Memuat riwayat pengeluaran...</p>
                 : filteredRecentIssues.length === 0 ? <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center"><ClipboardList className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-sm font-semibold text-slate-700">Belum ada transaksi pengeluaran</p><p className="mt-1 text-xs text-slate-500">Transaksi pengeluaran yang sudah disimpan akan tampil di sini.</p></div>

@@ -7,14 +7,15 @@ import {
   LoaderCircle, MapPin, Pencil, Plus, RefreshCw, Search, Users, X,
 } from 'lucide-react';
 import RequireAuth from '@/components/auth/RequireAuth';
+import { BusinessDocumentPdfButton } from '@/components/documents/BusinessDocumentPdfButton';
 import PersonnelWorkflowWizard from '@/components/personalia/PersonnelWorkflowWizard';
 import { getMyAccess, hasPermission } from '@/lib/services/authService';
 import {
-  createDailyAssignment, fetchDailyAssignmentPageData, updateDailyAssignment,
+  createDailyAssignment, fetchDailyAssignmentPageData, fetchMainPlacementPageData, updateDailyAssignment,
 } from '@/lib/services/personnelOperationsService';
 import type {
   DailyAssignment, DailyAssignmentInput, DailyAssignmentStatus, DailyAssignmentType,
-  DivisionOption, EmployeeOption, ProjectOption,
+  DivisionOption, EmployeeOption, ProjectOption, MainPlacement,
 } from '@/types/personnelOperations';
 
 const TYPE_LABELS: Record<DailyAssignmentType, string> = {
@@ -95,13 +96,18 @@ function DailyAssignmentContent() {
   const [draft, setDraft] = useState<Draft>(blankDraft());
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+  const [profileEmployeeId, setProfileEmployeeId] = useState<string | null>(null);
+  const [mainPlacements, setMainPlacements] = useState<MainPlacement[]>([]);
+  const [employeePage, setEmployeePage] = useState(0);
 
   const load = useCallback(async (refresh = false) => {
     refresh ? setRefreshing(true) : setLoading(true);
     setError('');
     try {
-      const [data, access] = await Promise.all([fetchDailyAssignmentPageData(), getMyAccess()]);
-      setRows(data.assignments); setEmployees(data.employees); setProjects(data.projects); setDivisions(data.divisions);
+      const [data, access, mainData] = await Promise.all([fetchDailyAssignmentPageData(), getMyAccess(), fetchMainPlacementPageData()]);
+      setRows(data.assignments); setEmployees(data.employees); setProjects(data.projects); setDivisions(data.divisions); setMainPlacements(mainData.placements);
       setCanManage(hasPermission(access, 'personnel.manage'));
     } catch (err) { setError(errorMessage(err)); }
     finally { setLoading(false); setRefreshing(false); }
@@ -122,22 +128,39 @@ function DailyAssignmentContent() {
 
   const visibleDivisions = divisions.filter((item: DivisionOption) => item.project_id === draft.project_id);
   const selectedEmployee = employees.find((employee: EmployeeOption) => employee.id === draft.employee_id);
-  const openCreate = () => { setEditing(null); setDraft(blankDraft()); setError(''); setNotice(''); setModalOpen(true); };
-  const openEdit = (row: DailyAssignment) => { setEditing(row); setDraft(draftFromRow(row)); setError(''); setNotice(''); setModalOpen(true); };
+  const openCreate = () => { setEditing(null); setSelectedEmployeeIds([]); setDraft(blankDraft()); setError(''); setNotice(''); setModalOpen(true); };
+  const openEdit = (row: DailyAssignment) => { setEditing(row); setSelectedEmployeeIds([]); setDraft(draftFromRow(row)); setError(''); setNotice(''); setModalOpen(true); };
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (saving) return;
     setSaving(true); setError(''); setNotice('');
+    let created = 0;
+    const failures: string[] = [];
     try {
-      if (editing) await updateDailyAssignment(editing.id, toInput(draft));
-      else await createDailyAssignment(toInput(draft));
-      setModalOpen(false);
-      setNotice(editing ? `Penugasan ${editing.assignment_number} berhasil diperbarui.` : 'Penugasan harian berhasil dicatat.');
+      if (editing) {
+        await updateDailyAssignment(editing.id, toInput(draft));
+      } else if (selectedEmployeeIds.length) {
+        for (const employeeId of selectedEmployeeIds) {
+          try {
+            await createDailyAssignment({ ...toInput(draft), employee_id: employeeId });
+            created += 1;
+          } catch (cause) {
+            const employee = employees.find((item) => item.id === employeeId);
+            failures.push(`${employee?.full_name ?? employeeId}: ${errorMessage(cause)}`);
+          }
+        }
+      } else {
+        await createDailyAssignment(toInput(draft));
+        created = 1;
+      }
       await load(true);
+      setNotice(editing ? `Penugasan ${editing.assignment_number} berhasil diperbarui.` : `${created} penugasan harian berhasil dibuat${failures.length ? `; ${failures.length} gagal` : ''}.`);
+      if (failures.length) setError(failures.slice(0, 3).join(' | '));
+      setSelectedEmployeeIds([]);
+      setModalOpen(false);
     } catch (err) { setError(errorMessage(err)); }
     finally { setSaving(false); }
   };
-
   const completeTask = async (row: DailyAssignment) => {
     if (!window.confirm(`Tandai pekerjaan ${row.assignment_number} sebagai selesai?`)) return;
     setError(''); setNotice('');
@@ -151,6 +174,10 @@ function DailyAssignmentContent() {
 
   const activeEmployees = employees.filter((employee) => employee.status === 'active'
     || (editing && employee.id === editing.employee_id));
+  const filteredEmployees = useMemo(() => employees.filter((employee) => `${employee.employee_number} ${employee.full_name} ${employee.position_title ?? ''} ${employee.department ?? ''}`.toLocaleLowerCase('id').includes(employeeSearch.trim().toLocaleLowerCase('id'))).sort((a,b)=>a.full_name.localeCompare(b.full_name,'id')), [employees, employeeSearch]);
+  const profileEmployee = employees.find((employee)=>employee.id===profileEmployeeId) ?? null;
+  const profileMainPlacement = mainPlacements.filter((item)=>item.employee_id===profileEmployeeId && item.status==='active').sort((a,b)=>b.start_date.localeCompare(a.start_date))[0] ?? null;
+  const profileDailyTasks = rows.filter((item)=>item.employee_id===profileEmployeeId && item.status!=='cancelled').sort((a,b)=>b.assignment_date.localeCompare(a.assignment_date));
   const todayCount = rows.filter((row) => row.assignment_date === localDate() && row.status !== 'cancelled').length;
   const projectTaskCount = rows.filter((row) => row.assignment_date === (dateFilter === 'all' ? localDate() : dateFilter) && row.assignment_type === 'project' && row.status !== 'cancelled').length;
 
@@ -182,6 +209,28 @@ function DailyAssignmentContent() {
           <div className="rounded-2xl border bg-white p-5"><div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500">Karyawan ditugaskan <Users className="h-5 w-5 text-amber-700"/></div><p className="mt-3 text-3xl font-bold tabular-nums text-slate-900">{new Set(filtered.map((row) => row.employee_id)).size}</p><p className="mt-1 text-xs text-slate-500">Sesuai filter yang sedang aktif</p></div>
         </section>
 
+        {filtered.length > 0 ? <section className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4"><div className="mb-3"><h2 className="font-bold text-slate-900">Cetak surat penugasan</h2><p className="text-xs text-slate-600">Menggunakan nomor penugasan dan data pekerja yang tersimpan.</p></div><div className="grid gap-3 lg:grid-cols-2">{filtered.map((assignment) => (
+          <article key={`pdf-${assignment.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white bg-white p-3 shadow-sm"><div><p className="font-bold text-emerald-800">{assignment.assignment_number}</p><p className="text-xs text-slate-600">{assignment.employee?.full_name ?? 'Karyawan'} · {assignment.task_title}</p></div>
+            <BusinessDocumentPdfButton identity={{ type: 'daily_assignment', code: assignment.assignment_number, title: 'Surat Penugasan Harian', sourceStatus: assignment.status, generatedAt: new Date().toISOString(), projectName: assignment.project?.title ?? null, period: dateLabel(assignment.assignment_date), classification: 'Dokumen personalia' }} sections={[
+              { title: 'Identitas penugasan', details: [
+                { label: 'Nomor penugasan', value: assignment.assignment_number }, { label: 'Nama pekerja', value: assignment.employee?.full_name ?? '—' },
+                { label: 'Nomor pekerja', value: assignment.employee?.employee_number ?? '—' }, { label: 'Jenis penugasan', value: assignment.assignment_type },
+                { label: 'Tanggal', value: dateLabel(assignment.assignment_date) }, { label: 'Jam kerja', value: `${assignment.start_time ?? '—'} – ${assignment.end_time ?? '—'}` },
+                { label: 'Proyek', value: assignment.project?.title ?? '—' }, { label: 'Lokasi / divisi', value: assignment.division?.name ?? assignment.location_name ?? '—' },
+                { label: 'Pekerjaan', value: assignment.task_title }, { label: 'Status', value: assignment.status },
+              ] },
+              { title: 'Instruksi dan catatan', paragraphs: [assignment.notes?.trim() || 'Tidak ada catatan tambahan pada penugasan sumber.'] },
+            ]} />
+          </article>
+        ))}</div></section> : null}
+
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[0.14em] text-violet-700">Employee directory</p><h2 className="mt-1 text-lg font-bold text-slate-900">Dashboard seluruh karyawan</h2><p className="mt-1 text-xs text-slate-500">Klik kartu untuk melihat identitas, penempatan utama, dan seluruh penugasan harian. Centang beberapa pekerja untuk membuat tugas dengan rincian yang sama.</p></div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-800">{selectedEmployeeIds.length} dipilih</span><button type="button" onClick={()=>setSelectedEmployeeIds(filteredEmployees.filter((item)=>item.status==='active').map((item)=>item.id))} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold">Pilih hasil</button><button type="button" onClick={()=>setSelectedEmployeeIds([])} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold">Bersihkan</button><button type="button" disabled={!canManage||!selectedEmployeeIds.length} onClick={()=>{setEditing(null);setDraft({...blankDraft(),assignment_date:dateFilter==='all'?localDate():dateFilter});setError('');setNotice('');setModalOpen(true);}} className="rounded-lg bg-violet-700 px-3.5 py-2 text-xs font-bold text-white disabled:opacity-40">Buat tugas untuk pilihan</button></div></div>
+          <div className="grid gap-3 p-4 sm:grid-cols-[minmax(220px,1fr)_auto]"><label className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={employeeSearch} onChange={(e)=>{setEmployeeSearch(e.target.value);setEmployeePage(0);}} placeholder="Cari nama, nomor, jabatan, departemen..." className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-violet-500"/></label><p className="self-center text-xs text-slate-500">{filteredEmployees.length} karyawan ditemukan</p></div>
+          <div className="grid gap-2 px-4 pb-4 sm:grid-cols-2 xl:grid-cols-3">{filteredEmployees.slice(employeePage*24,(employeePage+1)*24).map((employee)=>{const taskCount=rows.filter((item)=>item.employee_id===employee.id&&item.assignment_date===(dateFilter==='all'?localDate():dateFilter)&&item.status!=='cancelled').length;const main=mainPlacements.find((item)=>item.employee_id===employee.id&&item.status==='active');return <div key={employee.id} className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 hover:border-violet-200 hover:bg-violet-50/30"><input type="checkbox" checked={selectedEmployeeIds.includes(employee.id)} disabled={employee.status!=='active'} onChange={(e)=>setSelectedEmployeeIds((current)=>e.target.checked?[...current,employee.id]:current.filter((id)=>id!==employee.id))} className="h-4 w-4 rounded border-slate-300 text-violet-700 disabled:opacity-30"/><button type="button" onClick={()=>setProfileEmployeeId(employee.id)} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-semibold text-slate-900">{employee.full_name}</span><span className="mt-0.5 block truncate text-[11px] text-slate-500">{employee.employee_number} · {employee.position_title??employee.department??'Jabatan belum diisi'}</span><span className="mt-1 block truncate text-[10px] text-violet-700">{main?.unit_name??'Belum ada penempatan utama'} · {taskCount} tugas pada tanggal filter</span></button><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${employee.status==='active'?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-500'}`}>{employee.status==='active'?'Aktif':'Nonaktif'}</span></div>;})}{filteredEmployees.length===0&&<p className="col-span-full rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">Karyawan tidak ditemukan.</p>}</div>
+          {filteredEmployees.length>24&&<div className="flex items-center justify-between border-t border-slate-100 px-4 py-3"><button type="button" disabled={employeePage===0} onClick={()=>setEmployeePage((n)=>Math.max(0,n-1))} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold disabled:opacity-30">Sebelumnya</button><span className="text-xs text-slate-500">Halaman {employeePage+1} / {Math.ceil(filteredEmployees.length/24)}</span><button type="button" disabled={(employeePage+1)*24>=filteredEmployees.length} onClick={()=>setEmployeePage((n)=>n+1)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold disabled:opacity-30">Berikutnya</button></div>}
+        </section>
+
         <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900"><strong>Pemisahan data:</strong> penugasan harian mencatat pekerjaan aktual, bukan absensi. Satu karyawan tetap memiliki satu data induk; beberapa tugas dalam satu tanggal diperbolehkan. Jika jam mulai dan selesai diisi, sistem menolak waktu yang tumpang tindih.</div>
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -201,9 +250,11 @@ function DailyAssignmentContent() {
         </section>
       </>}
 
+      {profileEmployee && <div className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-3 sm:p-6"><section role="dialog" aria-modal="true" aria-labelledby="employee-profile-title" className="my-auto w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl"><header className="flex items-start justify-between border-b border-slate-100 p-5"><div><p className="text-[10px] font-bold uppercase tracking-widest text-violet-700">Profil karyawan</p><h2 id="employee-profile-title" className="mt-1 text-xl font-bold text-slate-900">{profileEmployee.full_name}</h2><p className="mt-1 text-xs text-slate-500">{profileEmployee.employee_number} · {profileEmployee.position_title??profileEmployee.department??'Jabatan belum diisi'} · {profileEmployee.employment_type}</p></div><button type="button" onClick={()=>setProfileEmployeeId(null)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4"/></button></header><div className="grid gap-4 p-5 md:grid-cols-2"><section className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4"><h3 className="font-bold text-slate-900">Penempatan utama</h3>{profileMainPlacement?<><p className="mt-2 text-sm font-semibold text-emerald-900">{profileMainPlacement.unit_name}</p><p className="mt-1 text-xs text-slate-600">{profileMainPlacement.base_location??profileMainPlacement.unit_type} · sejak {dateLabel(profileMainPlacement.start_date)}</p></>:<p className="mt-2 text-sm text-slate-500">Belum ada penempatan utama aktif.</p>}</section><section className="rounded-2xl border border-violet-100 bg-violet-50/50 p-4"><h3 className="font-bold text-slate-900">Ringkasan penugasan harian</h3><p className="mt-2 text-2xl font-extrabold text-violet-900">{profileDailyTasks.length}</p><p className="text-xs text-slate-500">Catatan penugasan yang tidak dibatalkan</p></section></div><section className="px-5 pb-5"><h3 className="mb-3 font-bold text-slate-900">Riwayat / penugasan harian</h3><div className="space-y-2">{profileDailyTasks.slice(0,12).map((task)=><div key={task.id} className="flex flex-col justify-between gap-2 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center"><div><p className="text-sm font-semibold text-slate-900">{task.task_title}</p><p className="mt-1 text-xs text-slate-500">{dateLabel(task.assignment_date)} · {task.assignment_type==='project'?task.project?.title??'Proyek':task.location_name??TYPE_LABELS[task.assignment_type]} · {task.start_time?.slice(0,5)??'Jam fleksibel'}</p></div><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600">{STATUS_LABELS[task.status]}</span></div>)}{profileDailyTasks.length===0&&<p className="rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-500">Belum ada penugasan harian.</p>}</div></section><footer className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50 p-4"><button type="button" onClick={()=>{setProfileEmployeeId(null);setSelectedEmployeeIds([]);setDraft({...blankDraft(),employee_id:profileEmployee.id});setEditing(null);setModalOpen(true);}} disabled={!canManage||profileEmployee.status!=='active'} className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40">Tambah tugas untuk karyawan ini</button><button type="button" onClick={()=>setProfileEmployeeId(null)} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Tutup</button></footer></section></div>}
+
       {modalOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-slate-950/55 p-3 sm:p-5"><section role="dialog" aria-modal="true" aria-labelledby="daily-assignment-title" className="my-auto w-full max-w-3xl rounded-2xl bg-white shadow-2xl"><div className="flex items-start justify-between border-b border-slate-100 p-5"><div><h2 id="daily-assignment-title" className="text-lg font-bold text-slate-900">{editing ? `Edit ${editing.assignment_number}` : 'Tambah Penugasan Harian'}</h2><p className="mt-1 text-xs text-slate-500">Catat satu pekerjaan aktual. Untuk pekerjaan berbeda pada hari yang sama, buat catatan terpisah.</p></div><button onClick={() => !saving && setModalOpen(false)} disabled={saving} aria-label="Tutup"><X className="h-5 w-5 text-slate-400"/></button></div>
         <form onSubmit={handleSave} className="space-y-4 p-5"><div className="grid gap-4 sm:grid-cols-2">
-          <label className={LABEL}>Karyawan<select required value={draft.employee_id} onChange={(e) => setDraft((v) => ({ ...v, employee_id: e.target.value }))} className={INPUT}><option value="">Pilih karyawan aktif</option>{activeEmployees.map((employee: EmployeeOption) => <option key={employee.id} value={employee.id}>{employee.employee_number} — {employee.full_name}{employee.status !== 'active' ? ' (nonaktif - riwayat)' : ''}</option>)}</select>{selectedEmployee && <span className="mt-1 block text-[11px] font-normal text-slate-400">{selectedEmployee.position_title ?? selectedEmployee.department ?? 'Tanpa jabatan'} · {selectedEmployee.employment_type}</span>}</label>
+          {selectedEmployeeIds.length>0 && !editing ? <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 text-sm text-violet-900 sm:col-span-2"><strong>{selectedEmployeeIds.length} karyawan dipilih.</strong> Penugasan berikut akan dibuat untuk masing-masing karyawan menggunakan tanggal dan rincian yang sama.</div> : <label className={LABEL}>Karyawan<select required value={draft.employee_id} onChange={(e) => setDraft((v) => ({ ...v, employee_id: e.target.value }))} className={INPUT}><option value="">Pilih karyawan aktif</option>{activeEmployees.map((employee: EmployeeOption) => <option key={employee.id} value={employee.id}>{employee.employee_number} — {employee.full_name}{employee.status !== 'active' ? ' (nonaktif - riwayat)' : ''}</option>)}</select>{selectedEmployee && <span className="mt-1 block text-[11px] font-normal text-slate-400">{selectedEmployee.position_title ?? selectedEmployee.department ?? 'Tanpa jabatan'} · {selectedEmployee.employment_type}</span>}</label>}
           <label className={LABEL}>Tanggal penugasan<input required type="date" value={draft.assignment_date} onChange={(e) => setDraft((v) => ({ ...v, assignment_date: e.target.value }))} className={INPUT}/></label>
           <label className={LABEL}>Jenis penugasan<select value={draft.assignment_type} onChange={(e) => setDraft((v) => ({ ...v, assignment_type: e.target.value as DailyAssignmentType, project_id: '', division_id: '', location_name: '' }))} className={INPUT}><option value="project">Proyek</option><option value="office">Kantor</option><option value="warehouse">Gudang</option><option value="workshop">Workshop</option><option value="other">Lainnya</option></select></label>
           {draft.assignment_type === 'project' ? <>

@@ -22,6 +22,13 @@ function explain(error: DbError, context: string): Error {
   return new Error(`${context}: ${message}`);
 }
 
+function isValidDateOnly(value: string): boolean {
+  const match = /^(\d{4})-\d{2}-\d{2}$/.exec(value);
+  if (!match || Number(match[1]) < 1) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 const AGREEMENT_SELECT = `id, agreement_number, employee_id, agreement_type, agreement_title, signed_date, start_date, end_date, status, document_reference, work_description, notes, employee:employees(employee_number, full_name)`;
 const PROFILE_SELECT = `id, employee_id, agreement_id, payroll_scheme_id, base_rate, currency_code, effective_from, effective_to, notes, employee:employees(employee_number, full_name), scheme:payroll_schemes(scheme_name, pay_basis), agreement:employee_work_agreements(agreement_number, agreement_title)`;
 const EMPLOYEE_COMPONENT_SELECT = `id, employee_id, component_id, amount, percentage, effective_from, effective_to, notes, employee:employees(employee_number, full_name), component:payroll_components(component_name, component_type, calculation_method)`;
@@ -94,9 +101,24 @@ export async function createCompensationProfile(input: CompensationInput): Promi
 }
 
 export async function closeCompensationProfile(id: string, effective_to: string): Promise<void> {
-  if (!effective_to) throw new Error('Tanggal akhir tarif wajib diisi.');
-  const { error } = await supabase.from('employee_compensation_profiles').update({ effective_to }).eq('id', id);
+  if (!id) throw new Error('Tarif karyawan tidak ditemukan.');
+  if (!isValidDateOnly(effective_to)) {
+    throw new Error('Tanggal akhir tarif harus menggunakan tanggal yang valid dengan format YYYY-MM-DD.');
+  }
+
+  const current = await supabase.from('employee_compensation_profiles')
+    .select('effective_from, effective_to').eq('id', id).maybeSingle();
+  if (current.error) throw explain(current.error, 'Gagal memeriksa periode tarif');
+  if (!current.data) throw new Error('Tarif karyawan tidak ditemukan atau tidak dapat diakses.');
+  if (current.data.effective_to) throw new Error('Periode tarif ini sudah berakhir.');
+  if (effective_to < current.data.effective_from) {
+    throw new Error(`Tanggal akhir tarif tidak boleh sebelum tanggal mulai berlaku (${current.data.effective_from}).`);
+  }
+
+  const { data, error } = await supabase.from('employee_compensation_profiles')
+    .update({ effective_to }).eq('id', id).is('effective_to', null).select('id').maybeSingle();
   if (error) throw explain(error, 'Gagal mengakhiri periode tarif');
+  if (!data) throw new Error('Periode tarif berubah saat diproses. Muat ulang halaman lalu coba lagi.');
 }
 
 export async function createPayrollComponent(input: ComponentInput): Promise<void> {

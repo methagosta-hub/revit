@@ -188,6 +188,10 @@ export default function ProjectCreatePage() {
         setErrorMessage(
           'Struktur tabel projects belum diperbarui. Jalankan file SQL migrasi kolom data sekolah dan tim proyek di Supabase SQL Editor, lalu coba simpan kembali.',
         );
+      } else if (normalizedMessage.includes('row-level security') && normalizedMessage.includes('projects')) {
+        setErrorMessage(
+          'Akun ini belum memiliki izin membuat proyek. Minta administrator memberi permission project.manage pada tingkat perusahaan. Jika izin itu sudah aktif, kebijakan INSERT tabel projects di Supabase perlu diperbarui.',
+        );
       } else {
         setErrorMessage(`Proyek belum berhasil disimpan: ${message}`);
       }

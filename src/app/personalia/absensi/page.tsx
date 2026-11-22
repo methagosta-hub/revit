@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import RequireAuth from '@/components/auth/RequireAuth';
+import { BusinessDocumentPdfButton } from '@/components/documents/BusinessDocumentPdfButton';
 import PersonnelWorkflowWizard from '@/components/personalia/PersonnelWorkflowWizard';
 import { supabase } from '@/lib/supabase';
 import {
@@ -256,6 +257,8 @@ function AttendanceContent() {
   const [movementDraft, setMovementDraft] = useState<MovementDraft>({ ...EMPTY_MOVEMENT });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [selectedAttendanceIds, setSelectedAttendanceIds] = useState<string[]>([]);
+  const [bulkAttendanceStatus, setBulkAttendanceStatus] = useState<AttendanceStatus>('present');
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true);
@@ -274,7 +277,7 @@ function AttendanceContent() {
 
   useEffect(() => { void load(); }, [load]);
 
-  // Realtime stream + polling fallback. The stream covers both attendance input and field movements.
+  // Realtime stream refreshes data without replacing the page or discarding form state. Manual refresh remains available if Realtime is unavailable.
   useEffect(() => {
     const channel = supabase
       .channel(`dahlia-attendance-${selectedDate}`)
@@ -289,9 +292,7 @@ function AttendanceContent() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => { void load(true); })
       .subscribe((status) => setRealtimeConnected(status === 'SUBSCRIBED'));
 
-    const timer = window.setInterval(() => { void load(true); }, 30000);
     return () => {
-      window.clearInterval(timer);
       setRealtimeConnected(false);
       void supabase.removeChannel(channel);
     };
@@ -417,6 +418,43 @@ function AttendanceContent() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleBulkAttendance = async () => {
+    if (saving || !selectedAttendanceIds.length) return;
+    const targets = selectedAttendanceIds.filter((id) => visibleEmployees.some((employee) => employee.id === id && employee.status === 'active') && !recordsByEmployee.has(id));
+    if (!targets.length) { setError('Semua karyawan terpilih sudah memiliki catatan absensi. Gunakan tombol Edit pada baris terkait untuk koreksi.'); return; }
+    if (!window.confirm(`Catat absensi ${targets.length} karyawan dengan status ${STATUS_LABELS[bulkAttendanceStatus]} untuk ${dateLabel(selectedDate)}? Jam masuk dan pulang akan dibiarkan kosong untuk dilengkapi kemudian.`)) return;
+    setSaving(true); setError(''); setSuccess('');
+    let saved = 0; const failures: string[] = [];
+    try {
+      for (const employeeId of targets) {
+        const employee = data.employees.find((item) => item.id === employeeId);
+        try {
+          const schedule = getEmployeeSchedule(employeeId, data);
+          const location = currentAssignmentLabel(employeeId, data);
+          await saveAttendance({
+            employee_id: employeeId,
+            attendance_date: selectedDate,
+            employee_schedule_id: schedule?.id ?? null,
+            attendance_status: bulkAttendanceStatus,
+            approval_status: 'submitted',
+            check_in_at: null,
+            check_out_at: null,
+            break_minutes: Math.max(0, Number(schedule?.schedule?.break_minutes ?? 0)),
+            record_origin_project_id: location.projectIds[0] ?? null,
+            record_source: 'web',
+            notes: 'Pencatatan massal melalui dashboard absensi.',
+            correction_reason: null,
+          });
+          saved += 1;
+        } catch (cause) { failures.push(`${employee?.full_name ?? employeeId}: ${errorText(cause)}`); }
+      }
+      await load(true);
+      setSelectedAttendanceIds([]);
+      setSuccess(`${saved} absensi berhasil dicatat dan diajukan untuk verifikasi${failures.length ? `; ${failures.length} perlu diperiksa` : ''}.`);
+      if (failures.length) setError(failures.slice(0, 3).join(' | '));
+    } finally { setSaving(false); }
   };
 
   const handleSaveMovement = async (event: FormEvent<HTMLFormElement>) => {
@@ -557,7 +595,7 @@ function AttendanceContent() {
         <div className="flex flex-wrap items-center gap-2">
           <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold ${realtimeConnected ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
             <span className={`h-2 w-2 rounded-full ${realtimeConnected ? 'animate-pulse bg-emerald-500' : 'bg-amber-500'}`} />
-            {realtimeConnected ? 'Realtime terhubung' : 'Auto-refresh 30 detik'}
+            {realtimeConnected ? 'Realtime terhubung' : 'Pembaruan manual'}
           </div>
           <button type="button" onClick={() => void load(true)} disabled={refreshing} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /> Segarkan
@@ -645,6 +683,24 @@ function AttendanceContent() {
             </div>
           )}
 
+          {data.records.length > 0 ? <section className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4"><div className="mb-3"><h2 className="font-bold text-slate-900">Cetak bukti kehadiran</h2><p className="text-xs text-slate-600">Pilih data absensi pada {dateLabel(selectedDate)}. Status belum terverifikasi akan dicetak sebagai draft/pending.</p></div><div className="grid gap-3 lg:grid-cols-2">{data.records.map((record) => {
+            const employee = data.employees.find((row) => row.id === record.employee_id);
+            const project = data.projects.find((row) => row.id === record.record_origin_project_id);
+            return <article key={`pdf-${record.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white bg-white p-3 shadow-sm"><div><p className="font-bold text-emerald-800">{record.attendance_number}</p><p className="text-xs text-slate-600">{employee?.full_name ?? 'Karyawan'} · {dateLabel(record.attendance_date)}</p></div>
+              <BusinessDocumentPdfButton identity={{ type: 'attendance_register', code: record.attendance_number, title: 'Bukti Kehadiran Pekerja', sourceStatus: record.approval_status, generatedAt: new Date().toISOString(), projectName: project?.title ?? null, period: dateLabel(record.attendance_date), classification: 'Dokumen personalia terbatas' }} sections={[
+                { title: 'Identitas kehadiran', details: [
+                  { label: 'Nomor absensi', value: record.attendance_number }, { label: 'Tanggal', value: dateLabel(record.attendance_date) },
+                  { label: 'Nama pekerja', value: employee?.full_name ?? '—' }, { label: 'Nomor pekerja', value: employee?.employee_number ?? '—' },
+                  { label: 'Status kehadiran', value: STATUS_LABELS[record.attendance_status] }, { label: 'Verifikasi', value: APPROVAL_LABELS[record.approval_status] },
+                  { label: 'Jam masuk', value: record.check_in_at ? new Date(record.check_in_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—' },
+                  { label: 'Jam pulang', value: record.check_out_at ? new Date(record.check_out_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—' },
+                  { label: 'Proyek asal', value: project?.title ?? '—' }, { label: 'Sumber catatan', value: record.record_source },
+                ] },
+                { title: 'Catatan', paragraphs: [record.notes?.trim() || 'Tidak ada catatan tambahan pada data absensi sumber.'] },
+              ]} />
+            </article>;
+          })}</div></section> : null}
+
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-col gap-3 border-b border-slate-100 p-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
@@ -676,6 +732,7 @@ function AttendanceContent() {
               </div>
             </div>
 
+            <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/70 p-4 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-sm font-bold text-slate-900">Input massal absensi</p><p className="mt-1 text-xs text-slate-500">Pilih pekerja yang belum diinput, tentukan status umum, lalu catat sekaligus. Jam masuk/pulang dapat dilengkapi nanti per orang.</p></div><div className="flex flex-wrap items-center gap-2"><select value={bulkAttendanceStatus} onChange={(e)=>setBulkAttendanceStatus(e.target.value as AttendanceStatus)} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">{Object.entries(STATUS_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select><button type="button" onClick={()=>setSelectedAttendanceIds(visibleEmployees.filter((employee)=>!recordsByEmployee.has(employee.id)).map((employee)=>employee.id))} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700">Pilih belum diinput</button><button type="button" onClick={()=>setSelectedAttendanceIds([])} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700">Bersihkan</button><button type="button" onClick={()=>void handleBulkAttendance()} disabled={saving||selectedAttendanceIds.length===0} className="rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-40">{saving?'Menyimpan...':`Catat ${selectedAttendanceIds.length} pekerja`}</button></div></div>
             {visibleEmployees.length === 0 ? (
               <div className="p-12 text-center">
                 <Users className="mx-auto h-10 w-10 text-slate-300" />
@@ -684,9 +741,10 @@ function AttendanceContent() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1180px] text-left text-sm">
+                <table className="w-full min-w-[1220px] text-left text-sm">
                   <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
                     <tr>
+                      <th className="px-3 py-3"><span className="sr-only">Pilih</span></th>
                       <th className="px-4 py-3">Karyawan</th>
                       <th className="px-4 py-3">Penempatan / aktivitas saat ini</th>
                       <th className="px-4 py-3">Kehadiran</th>
@@ -703,6 +761,7 @@ function AttendanceContent() {
                       const tasks = data.dailyAssignments.filter((assignment) => assignment.employee_id === employee.id && assignment.status !== 'cancelled');
                       return (
                         <tr key={employee.id} className="align-top hover:bg-slate-50/60">
+                          <td className="px-3 py-3.5"><input aria-label={`Pilih ${employee.full_name}`} type="checkbox" checked={selectedAttendanceIds.includes(employee.id)} disabled={Boolean(record)||employee.status!=='active'} onChange={(event)=>setSelectedAttendanceIds((current)=>event.target.checked?[...current,employee.id]:current.filter((id)=>id!==employee.id))} className="h-4 w-4 rounded border-slate-300 text-emerald-700 disabled:opacity-25"/></td>
                           <td className="px-4 py-3.5">
                             <p className="font-bold text-slate-900">{employee.full_name}</p>
                             <p className="mt-0.5 font-mono text-[11px] text-emerald-700">{employee.employee_number}</p>

@@ -7,6 +7,7 @@ import {
   Layers3, LoaderCircle, RefreshCw, Save, ShieldCheck, Wallet,
 } from 'lucide-react';
 import RequireAuth from '@/components/auth/RequireAuth';
+import { buildBusinessDocumentFilename } from '@/lib/documents/filename';
 import {
   assignFinanceDivision,
   createFinanceRecap,
@@ -72,7 +73,7 @@ function filenamePart(value: unknown, maxLength = 48): string {
   return clean || 'TANPA-KETERANGAN';
 }
 
-function buildPdfFilename(document: FinanceRecapDocument, generatedAt = new Date()): string {
+function buildPdfFilename(document: FinanceRecapDocument): string {
   const report = document.snapshot;
   let scopePart = 'GLOBAL-PERUSAHAAN';
   if (document.scope_type === 'consolidated') {
@@ -83,15 +84,11 @@ function buildPdfFilename(document: FinanceRecapDocument, generatedAt = new Date
     scopePart = `DIVISI-${filenamePart(report.project_title || 'PROYEK', 34)}-${filenamePart(report.division_name || report.scope_label, 34)}`;
   }
 
-  const dateParts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
-  }).formatToParts(generatedAt);
-  const part = (type: string) => dateParts.find((item) => item.type === type)?.value ?? '00';
-  const dateStamp = `${part('year')}${part('month')}${part('day')}`;
-  const timeStamp = `${part('hour')}${part('minute')}${part('second')}`;
-  const recapCode = filenamePart(document.recap_number, 40);
-  return `DAHLIA-AUTO-${recapCode}-${scopePart}-${dateStamp}-${timeStamp}`;
+  return buildBusinessDocumentFilename({
+    code: document.recap_number,
+    title: `${scopePart}-${report.report_title}`,
+    revision: 1,
+  });
 }
 
 function renderPdfHtml(document: FinanceRecapDocument, suggestedFilename: string): string {
@@ -129,6 +126,7 @@ function renderPdfHtml(document: FinanceRecapDocument, suggestedFilename: string
     ...(document.scope_type === 'division' ? ['Rekap divisi hanya memuat transaksi yang telah ditetapkan ke divisi atau lokasi pekerjaan yang dipilih. Dokumen yang belum mendapat pembagian ditampilkan secara terpisah.'] : []),
     ...(unallocatedCount > 0 ? [`Terdapat ${unallocatedCount} dokumen proyek yang belum ditetapkan ke divisi pekerjaan. Dokumen tersebut tidak dimasukkan ke jumlah divisi terpilih agar tidak salah pembebanan.`] : []),
     `Laporan ini menggambarkan catatan yang tersedia saat diterbitkan pada ${dateTime(document.created_at)}. Perubahan atau transaksi yang dicatat setelah waktu tersebut tidak mengubah dokumen ini.`,
+    'Cetakan rekap ini tidak memberikan permission baru dan bukan instruksi pencairan. Otorisasi tetap mengikuti status transaksi sumber dan persetujuan pengguna yang berwenang.',
     ...(document.replaces_recap_id ? [`Dokumen ini merupakan rekap pengganti dari ${document.previous_recap_number ?? document.replaces_recap_id}. Alasan penerbitan: ${document.replacement_reason ?? 'Tidak dicantumkan'}.`] : []),
   ];
   const noteRows = accountingNotes.map((note) => `<li>${escapeHtml(note)}</li>`).join('');
@@ -160,7 +158,7 @@ function renderPdfHtml(document: FinanceRecapDocument, suggestedFilename: string
     @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.section{break-inside:auto}thead{display:table-header-group}}
   </style></head><body>
   <div class="topline"></div>
-  <header class="brand"><div class="monogram">KHZ</div><div><div class="brandname">DAHLIA MANAGEMENT SYSTEM</div><div class="brandline">PROJECT · PROCUREMENT · FINANCIAL CONTROL</div></div><div class="confidential">DOKUMEN INTERNAL<br>FINANCIAL REPORT</div></header>
+  <header class="brand"><div class="monogram">D</div><div><div class="brandname">DAHLIA MANAGEMENT SYSTEM</div><div class="brandline">PROJECT · PROCUREMENT · FINANCIAL CONTROL</div></div><div class="confidential">DOKUMEN INTERNAL<br>FINANCIAL REPORT</div></header>
   <div class="hero"><div><div class="eyebrow">Laporan keuangan terverifikasi</div><h1>${escapeHtml(report.report_title)}</h1><div class="subtitle">Rekap transaksi dan komitmen keuangan berdasarkan cakupan dan periode yang dipilih.</div></div><div class="numberbox"><span>Nomor rekap resmi</span><strong>${escapeHtml(document.recap_number)}</strong><span style="margin-top:5px">${document.status === 'active' ? 'DOKUMEN AKTIF' : 'DIBATALKAN'}</span></div></div>
   <div class="meta"><div><label>Cakupan laporan</label><strong>${escapeHtml(report.scope_label)}</strong></div><div><label>Periode laporan</label><strong>${escapeHtml(dateOnly(report.period_start))} — ${escapeHtml(dateOnly(report.period_end))}</strong></div><div><label>Klien / pemilik</label><strong>${escapeHtml(report.client ?? 'Laporan perusahaan')}</strong></div><div><label>Dibuat pada</label><strong>${escapeHtml(dateTime(document.created_at))}</strong></div></div>
   <div class="metrics"><div class="metric in"><label>Kas masuk aktif</label><strong>${escapeHtml(amount(s.cash_in))}</strong></div><div class="metric out"><label>Kas keluar aktif</label><strong>${escapeHtml(amount(s.cash_out))}</strong></div><div class="metric"><label>Arus kas bersih</label><strong>${escapeHtml(amount(s.net_cash))}</strong></div><div class="metric"><label>Komitmen PO</label><strong>${escapeHtml(amount(s.po_commitment))}</strong></div></div>

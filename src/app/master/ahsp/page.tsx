@@ -16,9 +16,11 @@ import {
   Loader2,
   ChevronRight,
   GripVertical,
+  Lock,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatRupiah } from '@/lib/format';
+import { useAppAccess } from '@/hooks/useAppAccess';
 
 type ComponentType = 'material' | 'labor' | 'equipment';
 type FormMode = 'create' | 'edit' | 'duplicate';
@@ -702,6 +704,9 @@ function getItemComponents(item: MasterAhspItem): AhspComponent[] {
 }
 
 export default function MasterAhspPage() {
+  const { loading: accessLoading, hasCompanyPermission } = useAppAccess();
+  const canManageMaster = !accessLoading && hasCompanyPermission('rab.manage');
+
   const [items, setItems] = useState<MasterAhspItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -1221,6 +1226,7 @@ export default function MasterAhspPage() {
   };
 
   const openCreateModal = () => {
+    if (!canManageMaster) return;
     setFormMode('create');
     setEditingItem(null);
     setDirtyMaterialPrices({});
@@ -1249,6 +1255,7 @@ export default function MasterAhspPage() {
   };
 
   const openEditModal = (item: MasterAhspItem) => {
+    if (!canManageMaster) return;
     const classification = classifyExistingItem(item.category || '', item.name || '');
     const validDepth = getHierarchicalCodeDepth(item.code || '', classification.fieldCode);
     const depth = validDepth ?? DEFAULT_WBS_DEPTH;
@@ -1290,6 +1297,7 @@ export default function MasterAhspPage() {
   };
 
   const openDuplicateModal = (item: MasterAhspItem) => {
+    if (!canManageMaster) return;
     const classification = classifyExistingItem(item.category || '', item.name || '');
     const validDepth = getHierarchicalCodeDepth(item.code || '', classification.fieldCode);
     const depth = validDepth ?? DEFAULT_WBS_DEPTH;
@@ -1664,6 +1672,10 @@ export default function MasterAhspPage() {
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canManageMaster) {
+      setFormError('Hanya Direktur/Administrator perusahaan yang dapat mengubah Master AHSP.');
+      return;
+    }
     if (submitting) return;
 
     const cleanName = name.trim();
@@ -2109,6 +2121,7 @@ export default function MasterAhspPage() {
   };
 
   const handleDelete = async (item: MasterAhspItem) => {
+    if (!canManageMaster) return;
     const confirmed = window.confirm(
       `Hapus AHSP "${item.code} - ${item.name}" dari database master? Tindakan ini tidak dapat dibatalkan.`,
     );
@@ -2532,16 +2545,25 @@ export default function MasterAhspPage() {
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Segarkan
           </button>
-          <button
-            type="button"
-            onClick={openCreateModal}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
-          >
-            <Plus className="h-4 w-4" />
-            Buat AHSP Baru
-          </button>
+          {canManageMaster && (
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
+            >
+              <Plus className="h-4 w-4" />
+              Buat AHSP Baru
+            </button>
+          )}
         </div>
       </header>
+
+      {!canManageMaster && (
+        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-medium text-slate-600">
+          <Lock className="h-4 w-4 shrink-0" />
+          Mode lihat saja. Pengubahan Master AHSP hanya tersedia untuk Direktur/Administrator perusahaan.
+        </div>
+      )}
 
       {loadError && (
         <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
@@ -2647,16 +2669,20 @@ export default function MasterAhspPage() {
                           {item.code}
                         </td>
                         <td className="px-5 py-3.5">
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(item)}
-                            className="group block max-w-full text-left font-semibold leading-5 text-slate-900 transition hover:text-emerald-700 focus:outline-none focus:underline"
-                            title="Klik untuk membuka rincian dan mengedit analisa AHSP"
-                          >
-                            <span className="border-b border-dashed border-transparent group-hover:border-emerald-500">
-                              {item.name}
-                            </span>
-                          </button>
+                          {canManageMaster ? (
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(item)}
+                              className="group block max-w-full text-left font-semibold leading-5 text-slate-900 transition hover:text-emerald-700 focus:outline-none focus:underline"
+                              title="Klik untuk membuka rincian dan mengedit analisa AHSP"
+                            >
+                              <span className="border-b border-dashed border-transparent group-hover:border-emerald-500">
+                                {item.name}
+                              </span>
+                            </button>
+                          ) : (
+                            <span className="block max-w-full font-semibold leading-5 text-slate-900">{item.name}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3.5 text-center align-top text-xs font-semibold text-slate-600">
                           {item.unit?.trim() || 'Kelompok'}
@@ -2679,35 +2705,39 @@ export default function MasterAhspPage() {
                           )}
                         </td>
                         <td className="px-5 py-3.5 text-center align-top">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => openDuplicateModal(item)}
-                              title="Duplikasi AHSP"
-                              aria-label={`Duplikasi ${item.name}`}
-                              className="rounded-lg p-2 text-emerald-700 transition hover:bg-emerald-50"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openEditModal(item)}
-                              title="Edit rincian AHSP"
-                              aria-label={`Edit ${item.name}`}
-                              className="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDelete(item)}
-                              title="Hapus Master AHSP"
-                              aria-label={`Hapus ${item.name}`}
-                              className="rounded-lg p-2 text-rose-600 transition hover:bg-rose-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
+                          {canManageMaster ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => openDuplicateModal(item)}
+                                title="Duplikasi AHSP"
+                                aria-label={`Duplikasi ${item.name}`}
+                                className="rounded-lg p-2 text-emerald-700 transition hover:bg-emerald-50"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(item)}
+                                title="Edit rincian AHSP"
+                                aria-label={`Edit ${item.name}`}
+                                className="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleDelete(item)}
+                                title="Hapus Master AHSP"
+                                aria-label={`Hapus ${item.name}`}
+                                className="rounded-lg p-2 text-rose-600 transition hover:bg-rose-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">Lihat saja</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -2733,7 +2763,7 @@ export default function MasterAhspPage() {
         </div>
       </section>
 
-      {isModalOpen && (
+      {isModalOpen && canManageMaster && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-2 backdrop-blur-sm sm:p-4"
           onMouseDown={(event) => {

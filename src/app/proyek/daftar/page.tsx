@@ -23,7 +23,7 @@ type ProjectRow = {
   title: string;
   client: string;
   location: string;
-  status: 'DRAFT' | 'REVIEW' | 'FINAL RAB' | 'DIKERJAKAN' | 'SELESAI';
+  status: 'DRAFT' | 'REVIEW' | 'FINAL RAB' | 'DIKERJAKAN' | 'SELESAI' | 'DIBATALKAN';
   project_category: 'REGULER' | 'PORTOFOLIO';
   total_value: number;
   updated_at: string;
@@ -59,7 +59,7 @@ export default function DaftarProyekPage() {
     else setLoading(true);
     setError('');
     try {
-      const data = await fetchProjects();
+      const data = await fetchProjects(true);
       setProjects((data ?? []) as ProjectRow[]);
     } catch (err) {
       console.error('Gagal memuat daftar proyek:', err);
@@ -173,6 +173,7 @@ export default function DaftarProyekPage() {
               <option value="FINAL RAB">FINAL RAB</option>
               <option value="DIKERJAKAN">DIKERJAKAN</option>
               <option value="SELESAI">SELESAI</option>
+              <option value="DIBATALKAN">DIBATALKAN</option>
             </select>
           </div>
         </div>
@@ -202,6 +203,8 @@ export default function DaftarProyekPage() {
                       ? 'border-violet-200 bg-violet-50 text-violet-700'
                       : project.status === 'SELESAI'
                         ? 'border-slate-200 bg-slate-100 text-slate-600'
+                        : project.status === 'DIBATALKAN'
+                          ? 'border-rose-200 bg-rose-50 text-rose-700'
                         : 'border-amber-200 bg-amber-50 text-amber-700';
                 return (
                   <tr key={project.id} className="hover:bg-slate-50/70">
@@ -221,11 +224,11 @@ export default function DaftarProyekPage() {
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-2">
                         <Link href={`/proyek/${project.id}/kelola`} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100">
-                          <PencilLine className="h-3.5 w-3.5" /> Detail & Edit
+                          <PencilLine className="h-3.5 w-3.5" /> {project.status === 'DIBATALKAN' ? 'Pulihkan Status' : 'Detail & Edit'}
                         </Link>
-                        <Link href={`/proyek/${project.id}`} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700">
+                        {project.status !== 'DIBATALKAN' && <Link href={`/proyek/${project.id}`} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700">
                           <FileText className="h-3.5 w-3.5" /> Buka RAB <ArrowUpRight className="h-3.5 w-3.5" />
-                        </Link>
+                        </Link>}
                       </div>
                     </td>
                   </tr>

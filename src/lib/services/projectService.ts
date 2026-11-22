@@ -69,9 +69,9 @@ export async function recalculateProjectTotalFromRabItem(rabItemId: string): Pro
   return recalculateProjectTotal(division.project_id);
 }
 
-// Ambil semua daftar proyek. Nilai diturunkan dari item RAB agar dashboard
-// tidak menampilkan projects.total_value yang tertinggal dari perubahan RAB.
-export async function fetchProjects() {
+// Proyek dibatalkan disembunyikan dari daftar operasional secara default.
+// Layar manajemen dapat meminta semuanya agar owner dapat memulihkan status.
+export async function fetchProjects(includeCancelled = false) {
   const { data: projects, error: projectError } = await supabase
     .from('projects')
     .select('*')
@@ -82,7 +82,11 @@ export async function fetchProjects() {
     return [];
   }
 
-  if (!projects?.length) return [];
+  const visibleProjects = (projects ?? []).filter(
+    (project) => includeCancelled || project.status !== 'DIBATALKAN',
+  );
+
+  if (!visibleProjects.length) return [];
 
   const { data: divisions, error: divisionError } = await supabase
     .from('rab_divisions')
@@ -90,11 +94,11 @@ export async function fetchProjects() {
 
   if (divisionError) {
     console.error('Gagal menghitung nilai RAB proyek:', divisionError.message);
-    return projects;
+    return visibleProjects;
   }
 
   const totals = sumDivisionItems((divisions ?? []) as DivisionTotalRow[]);
-  const normalizedProjects = projects.map((project) => ({
+  const normalizedProjects = visibleProjects.map((project) => ({
     ...project,
     total_value: Number((totals.get(project.id) ?? 0).toFixed(2)),
   }));
@@ -102,7 +106,8 @@ export async function fetchProjects() {
   // Sinkronkan kolom ringkasan agar juga benar saat dibaca halaman lain.
   await Promise.all(
     normalizedProjects
-      .filter((project) => Math.abs(Number(project.total_value ?? 0) - Number(projects.find((p) => p.id === project.id)?.total_value ?? 0)) >= 0.005)
+      .filter((project) => project.status !== 'DIBATALKAN')
+      .filter((project) => Math.abs(Number(project.total_value ?? 0) - Number(visibleProjects.find((p) => p.id === project.id)?.total_value ?? 0)) >= 0.005)
       .map(async (project) => {
         const { error } = await supabase
           .from('projects')
@@ -127,6 +132,8 @@ export async function fetchProjectDetail(projectId: string) {
     console.error('Proyek tidak ditemukan:', projError.message);
     return null;
   }
+
+  if (project.status === 'DIBATALKAN') return null;
 
   const { data: divisions, error: divError } = await supabase
     .from('rab_divisions')

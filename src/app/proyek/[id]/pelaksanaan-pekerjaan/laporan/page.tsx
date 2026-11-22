@@ -69,6 +69,7 @@ import {
 } from 'lucide-react';
 
 import { getMyAccess, hasPermission } from '@/lib/services/authService';
+import { buildBusinessDocumentFilename } from '@/lib/documents/filename';
 import {
   fetchDailyReportDetails,
   fetchDailyReportPrintData,
@@ -1308,12 +1309,17 @@ export default function ProjectDailyReportPage() {
       ]);
 
       const createdAt = new Date().toISOString();
+      const suggestedFilename = buildBusinessDocumentFilename({
+        code: report.report_number,
+        title: `Laporan Harian-${projectInfo?.title ?? 'Proyek'}`,
+        revision: 1,
+      });
       const html = `<!doctype html>
         <html lang="id">
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <title>${escapeHtml(report.report_number)} - Laporan Harian</title>
+          <title>${escapeHtml(suggestedFilename.replace(/\.pdf$/i, ''))}</title>
           <style>
             @page { size: A4; margin: 14mm; }
             * { box-sizing: border-box; }
@@ -1330,6 +1336,7 @@ export default function ProjectDailyReportPage() {
             h2 { margin: 18px 0 7px; padding-bottom: 5px; border-bottom: 1px solid #b7d8cd; color: #087a5b; font-size: 11px; }
             p { margin: 4px 0; white-space: pre-wrap; }
             .note { margin: 7px 0; padding: 9px 11px; border-left: 3px solid #0b8060; background: #f8fafc; }
+            .authority-note { margin: 12px 0; padding: 9px 11px; border-left: 3px solid #0b8060; background: #f1f8f4; color: #344a42; }
             table { width: 100%; border-collapse: collapse; margin: 7px 0 12px; page-break-inside: auto; }
             thead { display: table-header-group; }
             tr { page-break-inside: avoid; }
@@ -1366,6 +1373,7 @@ export default function ProjectDailyReportPage() {
             <div><b>Status</b><span>${escapeHtml(STATUS_CONFIG[report.status as DailyReportStatus]?.label ?? report.status)}</span></div>
             <div><b>Diajukan pada</b><span>${escapeHtml(formatDateTime(report.submitted_at))} WIB</span></div>
           </section>
+          <div class="authority-note"><b>Ketentuan penggunaan:</b> Laporan ini merekam pelaksanaan dan kehadiran pada status yang tercantum. Cetakan tidak otomatis menyetujui upah, progress tagihan, perubahan kontrak, atau pencairan; hak tersebut mengikuti approval dan transaksi sumber di aplikasi.</div>
           <h2>1. Kondisi dan Ringkasan Lapangan</h2>
           <p><b>Kondisi lapangan:</b> ${escapeHtml(report.field_condition || '—')}</p>
           <div class="note"><b>Ringkasan pekerjaan:</b><p>${escapeHtml(report.work_summary || '—')}</p></div>

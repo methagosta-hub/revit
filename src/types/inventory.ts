@@ -57,6 +57,16 @@ export interface RecentMaterialReceipt {
   item_count: number;
   quantity_received: number;
   quantity_damaged: number;
+  notes: string | null;
+  items: Array<{
+    material_code: string | null;
+    material_name: string;
+    unit: string;
+    quantity_received: number;
+    quantity_damaged: number;
+    quantity_accepted: number;
+    notes: string | null;
+  }>;
 }
 
 export type StockMovementType = 'receipt' | 'issue' | 'return' | 'adjustment';

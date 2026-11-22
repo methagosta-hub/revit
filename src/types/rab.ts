@@ -1,4 +1,4 @@
-export type ProjectStatus = 'DRAFT' | 'REVIEW' | 'FINAL RAB' | 'DIKERJAKAN' | 'SELESAI';
+export type ProjectStatus = 'DRAFT' | 'REVIEW' | 'FINAL RAB' | 'DIKERJAKAN' | 'SELESAI' | 'DIBATALKAN';
 export type ProjectCategory = 'REGULER' | 'PORTOFOLIO';
 
 export type CalcMode = 'standard' | 'trapezoid' | 'rebar' | 'custom_formula';

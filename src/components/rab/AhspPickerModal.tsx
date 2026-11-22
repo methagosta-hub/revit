@@ -104,6 +104,8 @@ type Props = {
   divisionName: string;
   onClose: () => void;
   onAdd: (payload: SelectedAhspBatchPayload) => Promise<void>;
+  /** This modal creates RAB items, so it must be explicitly authorized. */
+  canAdd?: boolean;
 };
 
 const INPUT_CLASS =
@@ -200,6 +202,7 @@ export default function AhspPickerModal({
   divisionName,
   onClose,
   onAdd,
+  canAdd = false,
 }: Props) {
   const [records, setRecords] = useState<MasterAhspRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -464,6 +467,10 @@ export default function AhspPickerModal({
       : 0;
 
   const handleAddToQueue = () => {
+    if (!canAdd) {
+      setActionError('Akun Anda hanya memiliki akses baca RAB. Penambahan AHSP tidak diizinkan.');
+      return;
+    }
     if (!selectedItem || !divisionId) {
       setActionError('Pilih AHSP terlebih dahulu.');
       return;
@@ -545,6 +552,10 @@ export default function AhspPickerModal({
   };
 
   const handleSaveBatch = async () => {
+    if (!canAdd) {
+      setActionError('Akun Anda tidak memiliki izin rab.manage pada proyek ini.');
+      return;
+    }
     if (queuedItems.length === 0) {
       setActionError('Pilih dan masukkan minimal satu AHSP ke daftar item pekerjaan.');
       return;
@@ -580,7 +591,7 @@ export default function AhspPickerModal({
     }
   };
 
-  if (!open) return null;
+  if (!open || !canAdd) return null;
 
   return (
     <div

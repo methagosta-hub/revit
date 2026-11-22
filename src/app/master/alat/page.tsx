@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Layers, Wrench, Search, Plus, Trash2, Pencil, Copy, Check, X, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatRupiah } from '@/lib/format';
+import { useAppAccess } from '@/hooks/useAppAccess';
 
 type MasterAlat = {
   id: string;
@@ -42,6 +43,8 @@ function uniqueCopyCode(code: string, rows: MasterAlat[]): string {
 }
 
 export default function MasterAlatPage() {
+  const { loading: accessLoading, hasCompanyPermission } = useAppAccess();
+  const canManageMaster = !accessLoading && hasCompanyPermission('rab.manage');
   const [rows, setRows] = useState<MasterAlat[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -89,6 +92,7 @@ export default function MasterAlatPage() {
   }, [rows, search]);
 
   function openCreate() {
+    if (!canManageMaster) return;
     setMode('create');
     setEditing(null);
     setCode(nextCode(rows));
@@ -100,6 +104,7 @@ export default function MasterAlatPage() {
   }
 
   function openEdit(row: MasterAlat) {
+    if (!canManageMaster) return;
     setMode('edit');
     setEditing(row);
     setCode(row.code);
@@ -111,6 +116,7 @@ export default function MasterAlatPage() {
   }
 
   function openCopy(row: MasterAlat) {
+    if (!canManageMaster) return;
     setMode('copy');
     setEditing(null);
     setCode(uniqueCopyCode(row.code, rows));
@@ -123,6 +129,7 @@ export default function MasterAlatPage() {
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canManageMaster) { setFormError('Hanya Direktur/Administrator perusahaan yang dapat mengubah Master Alat.'); return; }
     if (saving) return;
     const cleanCode = code.trim();
     const cleanName = name.trim();
@@ -186,6 +193,7 @@ export default function MasterAlatPage() {
   }
 
   async function handleDelete(row: MasterAlat) {
+    if (!canManageMaster) return;
     if (!window.confirm(`Hapus alat “${row.code} - ${row.name}” dari public.master_alat?`)) return;
     setPageError('');
     try {
@@ -221,11 +229,15 @@ export default function MasterAlatPage() {
           <button type="button" onClick={() => void loadRows()} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Segarkan
           </button>
-          <button type="button" onClick={openCreate} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">
-            <Plus className="h-4 w-4" /> Tambah Alat
-          </button>
+          {canManageMaster && (
+            <button type="button" onClick={openCreate} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">
+              <Plus className="h-4 w-4" /> Tambah Alat
+            </button>
+          )}
         </div>
       </header>
+
+      {!canManageMaster && <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-medium text-slate-600">Mode lihat saja. Perubahan Master Alat hanya tersedia untuk Direktur/Administrator perusahaan.</div>}
 
       {pageError && <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{pageError}</div>}
 
@@ -239,14 +251,14 @@ export default function MasterAlatPage() {
             <thead><tr className="border-b border-slate-100 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500"><th className="px-5 py-3">Kode</th><th className="px-5 py-3">Nama Alat / Mesin</th><th className="px-4 py-3 text-center">Satuan</th><th className="px-5 py-3 text-right">Harga Satuan</th><th className="px-5 py-3 text-center">Aksi</th></tr></thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? <tr><td colSpan={5} className="py-12 text-center text-slate-500"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Memuat public.master_alat...</td></tr> : filteredRows.length ? filteredRows.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50"><td className="whitespace-nowrap px-5 py-3.5 font-mono text-xs font-semibold text-slate-600">{row.code}</td><td className="px-5 py-3.5"><div className="flex items-center gap-2 font-medium text-slate-900"><Wrench className="h-4 w-4 shrink-0 text-emerald-600" />{row.name}</div></td><td className="px-4 py-3.5 text-center text-xs text-slate-500">{row.unit}</td><td className="whitespace-nowrap px-5 py-3.5 text-right font-bold tabular-nums text-slate-900">{formatRupiah(Number(row.unit_price || 0))}</td><td className="px-5 py-3.5"><div className="flex justify-center gap-1"><button type="button" onClick={() => openCopy(row)} title="Duplikasi" className="rounded-lg p-2 text-emerald-700 hover:bg-emerald-50"><Copy className="h-4 w-4" /></button><button type="button" onClick={() => openEdit(row)} title="Edit" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"><Pencil className="h-4 w-4" /></button><button type="button" onClick={() => void handleDelete(row)} title="Hapus" className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button></div></td></tr>
+                <tr key={row.id} className="hover:bg-slate-50"><td className="whitespace-nowrap px-5 py-3.5 font-mono text-xs font-semibold text-slate-600">{row.code}</td><td className="px-5 py-3.5"><div className="flex items-center gap-2 font-medium text-slate-900"><Wrench className="h-4 w-4 shrink-0 text-emerald-600" />{row.name}</div></td><td className="px-4 py-3.5 text-center text-xs text-slate-500">{row.unit}</td><td className="whitespace-nowrap px-5 py-3.5 text-right font-bold tabular-nums text-slate-900">{formatRupiah(Number(row.unit_price || 0))}</td><td className="px-5 py-3.5">{canManageMaster ? <div className="flex justify-center gap-1"><button type="button" onClick={() => openCopy(row)} title="Duplikasi" className="rounded-lg p-2 text-emerald-700 hover:bg-emerald-50"><Copy className="h-4 w-4" /></button><button type="button" onClick={() => openEdit(row)} title="Edit" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"><Pencil className="h-4 w-4" /></button><button type="button" onClick={() => void handleDelete(row)} title="Hapus" className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button></div> : <span className="block text-center text-xs text-slate-400">Lihat saja</span>}</td></tr>
               )) : <tr><td colSpan={5} className="py-12 text-center text-sm text-slate-500">Belum ada data pada public.master_alat. Tambahkan data alat melalui tombol di atas.</td></tr>}
             </tbody>
           </table>
         </div>
       </section>
 
-      {modalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) setModalOpen(false); }}>
+      {modalOpen && canManageMaster && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) setModalOpen(false); }}>
         <section role="dialog" aria-modal="true" aria-labelledby="alat-modal-title" className="my-auto w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
           <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-4"><div><h2 id="alat-modal-title" className="font-bold text-slate-900">{modalTitle}</h2><p className="mt-0.5 text-xs text-slate-500">Tujuan penyimpanan: public.master_alat</p></div><button type="button" disabled={saving} onClick={() => setModalOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-200 disabled:opacity-40"><X className="h-5 w-5" /></button></div>
           <form onSubmit={handleSave} className="space-y-4 p-5">

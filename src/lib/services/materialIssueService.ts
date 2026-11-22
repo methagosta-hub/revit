@@ -59,6 +59,7 @@ export async function fetchWarehouseIssuePageData(): Promise<WarehouseIssuePageD
         project_id,
         issued_at,
         recipient_name,
+        notes,
         status,
         project:projects(title),
         items:project_material_issue_items(
@@ -133,6 +134,7 @@ export async function fetchWarehouseIssuePageData(): Promise<WarehouseIssuePageD
     project_id: string;
     issued_at: string;
     recipient_name: string | null;
+      notes: string | null;
     status: 'confirmed' | 'void';
     project: Related<{ title: string }>;
     items: Array<{
@@ -151,6 +153,7 @@ export async function fetchWarehouseIssuePageData(): Promise<WarehouseIssuePageD
       project_title: project?.title ?? projectMap.get(row.project_id)?.title ?? 'Proyek tidak ditemukan',
       issued_at: row.issued_at,
       recipient_name: row.recipient_name,
+      notes: row.notes,
       status: row.status,
       item_count: items.length,
       allocations: items.map((item) => {
@@ -158,6 +161,12 @@ export async function fetchWarehouseIssuePageData(): Promise<WarehouseIssuePageD
         const quantity = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 3 }).format(Number(item.quantity_issued ?? 0));
         return `${item.material_name}: ${quantity} ${item.unit} → ${division?.name ?? 'Divisi tidak diketahui'}`;
       }),
+      items: items.map((item) => ({
+        material_name: item.material_name,
+        unit: item.unit,
+        quantity_issued: Number(item.quantity_issued ?? 0),
+        division_name: first(item.division)?.name ?? 'Divisi tidak diketahui',
+      })),
     };
   });
 

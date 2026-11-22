@@ -31,6 +31,9 @@ export interface AppRole {
   name: string;
   scope: RoleScope;
   project_id: string | null;
+  assignment_id?: string;
+  valid_from?: string;
+  valid_until?: string | null;
 }
 
 export interface UserRoleAssignment {
@@ -40,6 +43,11 @@ export interface UserRoleAssignment {
   project_id: string | null;
   assigned_by?: string | null;
   assigned_at?: string;
+  valid_from?: string;
+  valid_until?: string | null;
+  revoked_at?: string | null;
+  revoked_by?: string | null;
+  revocation_reason?: string | null;
 }
 
 export interface EffectivePermission {
