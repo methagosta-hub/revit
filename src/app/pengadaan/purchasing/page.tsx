@@ -184,17 +184,10 @@ function PurchasingContent() {
           orderDate,
           expectedDate: expectedDate || null,
           notes,
-          itemPrices: sourceRequest.items.map((item) => {
-            const line = lines.find((candidate) =>
-              candidate.material_name === item.item_name
-              && candidate.unit === item.unit
-              && Number(candidate.quantity_ordered) === Number(item.quantity),
-            );
-            return {
-              item_id: item.id,
-              unit_price: Number(line?.unit_price),
-            };
-          }),
+          itemPrices: sourceRequest.items.map((item, index) => ({
+            item_id: item.id,
+            unit_price: Number(lines[index]?.unit_price),
+          })),
         });
       } else {
         await createPurchaseOrder({
