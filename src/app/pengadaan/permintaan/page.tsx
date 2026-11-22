@@ -30,7 +30,7 @@ function statusLabel(status: FieldMaterialRequestStatus) {
     under_review: 'Sedang ditinjau',
     approved: 'Disetujui',
     rejected: 'Ditolak',
-    converted: 'Sudah ditindaklanjuti',
+    converted: 'Dikonversi menjadi PO',
     cancelled: 'Dibatalkan',
   };
   return labels[status] ?? status;
