@@ -36,7 +36,7 @@ The repository CI creates the Android host in a temporary folder and copies its 
 
 ## Database migration and staging
 
-The 20261122000*_dahlia_field_mobile_*.sql files are additive migrations. They have been committed for review only; they have not been run against production. Apply migrations 001–005 in order to an isolated Supabase staging project after checking the exact migration diff. Validate with separate Mandor and subcontractor test users before considering a production migration.
+The 20261122000*_dahlia_field_mobile_*.sql files are additive migrations. They have been committed for review only; they have not been run against production. Apply migrations 001–006 in order to an isolated Supabase staging project after checking the exact migration diff. Validate with separate Mandor and subcontractor test users before considering a production migration.
 
 ### Account linking
 

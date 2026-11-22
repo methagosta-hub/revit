@@ -9,7 +9,6 @@ security definer
 set search_path = pg_catalog, public, dahlia_private, auth, pg_temp
 as $function$
   select auth.uid() is not null
-     and public.dahlia_has_company_permission('project.read')
      and exists (
        select 1
        from public.user_role_assignments ura
@@ -171,6 +170,9 @@ begin
   end if;
 
   if dahlia_private.field_user_is_director() then
+    if not public.dahlia_has_company_permission('project.read') then
+      raise exception 'Akun Director belum memiliki izin membaca proyek.' using errcode = '42501';
+    end if;
     return query
       select p.id, p.title::text, p.client::text, p.location::text, 'director'::text
       from public.projects p
@@ -230,8 +232,10 @@ security definer
 set search_path = pg_catalog, public, dahlia_private, auth, pg_temp
 as $function$
 begin
-  if auth.uid() is null or not dahlia_private.field_user_is_director() then
-    raise exception 'Pemantauan seluruh proyek hanya tersedia untuk akun Director.' using errcode = '42501';
+  if auth.uid() is null
+     or not dahlia_private.field_user_is_director()
+     or not public.dahlia_has_company_permission('project.read') then
+    raise exception 'Pemantauan seluruh proyek hanya tersedia untuk akun Director dengan izin membaca proyek.' using errcode = '42501';
   end if;
 
   return query
@@ -287,8 +291,10 @@ security definer
 set search_path = pg_catalog, public, dahlia_private, auth, pg_temp
 as $function$
 begin
-  if auth.uid() is null or not dahlia_private.field_user_is_director() then
-    raise exception 'Riwayat laporan proyek hanya tersedia untuk akun Director.' using errcode = '42501';
+  if auth.uid() is null
+     or not dahlia_private.field_user_is_director()
+     or not public.dahlia_has_company_permission('project.read') then
+    raise exception 'Riwayat laporan proyek hanya tersedia untuk akun Director dengan izin membaca proyek.' using errcode = '42501';
   end if;
 
   if p_project_id is null or not exists (
