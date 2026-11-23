@@ -27,6 +27,8 @@ type NotificationRow = {
   read_at: string | null;
   created_at: string;
   priority: 'normal' | 'high' | 'critical';
+  source_table: string | null;
+  source_id: string | null;
   metadata: Record<string, unknown> | null;
 };
 
@@ -110,7 +112,7 @@ export default function OperationsLiveHub() {
       const [notificationResult, activityResult] = await Promise.all([
         supabase
           .from('notifications')
-          .select('id, title, message, category, target_url, read_at, created_at, priority, metadata')
+          .select('id, title, message, category, target_url, read_at, created_at, priority, source_table, source_id, metadata')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(30),
@@ -154,7 +156,7 @@ export default function OperationsLiveHub() {
           setNotifications((current) => [incoming, ...current.filter((item) => item.id !== incoming.id)].slice(0, 30));
           // Operational events with a source are announced once through the shared activity stream.
           // Personal-only notices remain announced directly to their intended recipient.
-          if (incoming.metadata?.source_table || incoming.metadata?.source_id) return;
+          if (incoming.source_table || incoming.source_id) return;
           setToast(incoming);
           const voiceText = String(incoming.metadata?.voice_text ?? incoming.message ?? '');
           if (soundEnabled && voiceText) speak(voiceText);
