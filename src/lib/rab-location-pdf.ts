@@ -68,11 +68,17 @@ export function buildLocationRabPdfHtml(input: Input): string {
   const {project,division,accent,soft,border,text,font,bold,signers,date}=input;
   const items=[...(division.items||[])].sort((a:any,b:any)=>Number(a.sort_order||0)-Number(b.sort_order||0));
   const locTotal=items.reduce((s:number,r:any)=>s+Number(r.total_price||0),0);
+  const categoryKey=(item:any)=>{
+    const code=String(item.code||'').trim().toUpperCase();
+    const prefix=code.split('.').filter(Boolean).slice(0,3).join('.');
+    return prefix || String(item.categoryName||item.category_name||item.work_group_name||'TANPA-KATEGORI');
+  };
   const categories=new Map<string,{name:string,total:number}>();
   for(const item of items){
+    const key=categoryKey(item);
     const name=String(item.categoryName||item.category_name||item.work_group_name||'Pekerjaan Lainnya');
-    const current=categories.get(name)||{name,total:0};
-    current.total+=Number(item.total_price||0); categories.set(name,current);
+    const current=categories.get(key)||{name,total:0};
+    current.total+=Number(item.total_price||0); categories.set(key,current);
   }
   const recapRows=Array.from(categories.values()).map((c,i)=>'<tr><td class="center">'+(i+1)+'</td><td>'+e(c.name)+'</td><td class="right">'+money(c.total)+'</td></tr>').join('');
   const cover='<section class="page cover"><div class="brand">DAHLIA MANAGEMENT SYSTEM <span>DOKUMEN TEKNIS · RAB</span></div><div class="mark">D</div><small>PAKET DOKUMEN PER LOKASI</small><h1>'+e(division.name)+'</h1><h2>'+e(project.title)+'</h2><div class="rule"></div><div class="meta"><div><small>PEMILIK / INSTANSI</small><b>'+e(project.client||'-')+'</b></div><div><small>LOKASI PROYEK</small><b>'+e(project.location||project.kabupaten_kota||'-')+'</b></div><div><small>KODE LOKASI</small><b>'+e(division.code||'-')+'</b></div><div><small>TANGGAL</small><b>'+e(date)+'</b></div></div><footer>REKAPITULASI PEKERJAAN LOKASI · RINCIAN RAB · AHSP · BACKUP VOLUME</footer></section>';
@@ -83,7 +89,15 @@ export function buildLocationRabPdfHtml(input: Input): string {
     const current=itemGroups.get(category)||[]; current.push(row); itemGroups.set(category,current);
   }
   let rabNumber=0;
-  const rabRows=Array.from(itemGroups.entries()).map(([category,rows])=>'<tr class="category"><td colspan="7">'+e(category)+'</td></tr>'+rows.map((r:any)=>
+  const rabGroupMap=new Map<string,{category:string;rows:any[]}>();
+  for(const row of items){
+    const key=categoryKey(row);
+    const category=String(row.categoryName||row.category_name||row.work_group_name||'Pekerjaan Lainnya');
+    const existing=rabGroupMap.get(key);
+    if(existing) existing.rows.push(row);
+    else rabGroupMap.set(key,{category,rows:[row]});
+  }
+  const rabRows=Array.from(rabGroupMap.values()).map(({category,rows})=>'<tr class="category"><td colspan="7">'+e(category)+'</td></tr>'+rows.map((r:any)=>
     '<tr><td class="center">'+(++rabNumber)+'</td><td>'+e(r.code)+'</td><td>'+e(r.name)+'</td><td class="center">'+e(r.unit)+'</td><td class="right">'+num(r.volume,2)+'</td><td class="right">'+money(r.unit_price)+'</td><td class="right">'+money(r.total_price)+'</td></tr>'
   ).join('')).join('');
   const rab='<section class="page"><div class="body">'+heading('02 · RINCIAN BIAYA','RINCIAN RENCANA ANGGARAN BIAYA',division,accent)+'<table class="rab"><colgroup><col style="width:4%"><col style="width:10%"><col style="width:37%"><col style="width:7%"><col style="width:8%"><col style="width:17%"><col style="width:17%"></colgroup><thead><tr><th class="center">No</th><th>Kode</th><th>Uraian Pekerjaan</th><th class="center">Satuan</th><th class="right">Vol.</th><th class="right">Harga Satuan</th><th class="right">Jumlah Harga</th></tr></thead><tbody>'+(rabRows||'<tr><td colspan="7" class="center">Belum ada item RAB.</td></tr>')+'<tr class="total"><td colspan="6">JUMLAH TOTAL</td><td class="right">'+money(locTotal)+'</td></tr></tbody></table>'+signatures(signers)+'</div></section>';
