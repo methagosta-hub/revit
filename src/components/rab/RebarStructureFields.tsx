@@ -109,7 +109,7 @@ export default function RebarStructureFields({ value, onChange }: Props) {
             <p className="text-[11px] font-bold text-slate-700">Sengkang / cincin</p>
             <div className="grid gap-3 sm:grid-cols-4">
               {field('tie_width_mm', 'Lebar penampang beton (b)', 'mm')}
-              {field('tie_depth_mm', structure === 'column' || structure === 'pedestal' ? 'Kedalaman penampang beton (h)', 'mm' : 'Tinggi penampang beton (h)', 'mm')}
+              {field('tie_depth_mm', structure === 'column' || structure === 'pedestal' ? 'Kedalaman penampang beton (h)' : 'Tinggi penampang beton (h)', 'mm')}
               {field('tie_spacing_mm', 'Jarak sengkang zona lapangan', 'mm')}
               {field('tie_support_zone_m', 'Panjang zona tumpuan tiap ujung', 'm', 'Kosongkan bila seluruh elemen memakai jarak seragam')}
               {field('tie_support_spacing_mm', 'Jarak sengkang zona tumpuan', 'mm', 'Diisi bersama panjang zona tumpuan bila jarak di ujung lebih rapat')}
