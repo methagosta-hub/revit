@@ -517,7 +517,7 @@ function FinanceDashboardContent() {
               <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Alur kerja</p>
               <h2 className="mt-1 text-lg font-bold text-slate-950">Langkah kerja staf keuangan</h2>
               <div className="mt-4 space-y-3">
-                <WorkflowStep number="01" title="Periksa komitmen dan kewajiban" description="Cek PO, nominal tersisa, dan tanggal jatuh tempo sebelum menjadwalkan pembayaran." href="/keuangan/rekap" linkLabel="Buka rekap" />
+                <WorkflowStep number="01" title="Periksa komitmen dan kewajiban" description="Cek PO, nominal tersisa, dan tanggal jatuh tempo sebelum menjadwalkan pembayaran." href="/keuangan/pembayaran" linkLabel="Lihat PO yang harus dibayar" />
                 <WorkflowStep number="02" title="Catat pembayaran aktual" description="Pilih kewajiban, masukkan tanggal, metode, nominal, dan referensi bukti pembayaran." href="#pemberitahuan" linkLabel="Lihat tugas di atas" />
                 <WorkflowStep number="03" title="Pastikan kas dan rekap sesuai" description="Setelah pembayaran tercatat, periksa mutasi kas dan ringkasan realisasi proyek." href="/keuangan/kas" linkLabel="Buka kas & operasional" />
               </div>
