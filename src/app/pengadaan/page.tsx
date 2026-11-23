@@ -168,7 +168,7 @@ function ProcurementContent() {
 
     try {
       const tasks: Promise<unknown>[] = [
-        supabase
+        Promise.resolve(supabase
           .from('activity_feed')
           .select('id, event_type, actor_name, project_name, title, summary, target_url, created_at')
           .order('created_at', { ascending: false })
@@ -176,8 +176,8 @@ function ProcurementContent() {
           .then(({ data: rows, error: queryError }) => {
             if (queryError) throw queryError;
             return rows ?? [];
-          }),
-        supabase
+          })),
+        Promise.resolve(supabase
           .from('project_purchase_orders')
           .select(`
             id, po_number, status, order_date, expected_date, subtotal, created_at,
@@ -189,7 +189,7 @@ function ProcurementContent() {
           .then(({ data: rows, error: queryError }) => {
             if (queryError) throw queryError;
             return rows ?? [];
-          }),
+          })),
         canReviewRequests ? fetchFieldMaterialRequestsForReview() : Promise.resolve([]),
       ];
 
