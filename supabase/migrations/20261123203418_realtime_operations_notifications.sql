@@ -803,22 +803,22 @@ END;
 $function$;
 
 DROP TRIGGER IF EXISTS trg_field_material_request_created_ops ON public.field_material_requests;
-CREATE CONSTRAINT TRIGGER trg_field_material_request_created_ops AFTER INSERT ON field_material_requests DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION dahlia_private.notify_field_material_request_created();
+CREATE CONSTRAINT TRIGGER trg_field_material_request_created_ops AFTER INSERT ON public.field_material_requests DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION dahlia_private.notify_field_material_request_created();
 
 DROP TRIGGER IF EXISTS trg_field_material_request_status_ops ON public.field_material_requests;
-CREATE CONSTRAINT TRIGGER trg_field_material_request_status_ops AFTER UPDATE ON field_material_requests DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (old.status IS DISTINCT FROM new.status) EXECUTE FUNCTION dahlia_private.notify_field_material_request_status();
+CREATE CONSTRAINT TRIGGER trg_field_material_request_status_ops AFTER UPDATE ON public.field_material_requests DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (old.status IS DISTINCT FROM new.status) EXECUTE FUNCTION dahlia_private.notify_field_material_request_status();
 
 DROP TRIGGER IF EXISTS trg_subcontract_payment_request_created_ops ON public.subcontract_payment_requests;
-CREATE CONSTRAINT TRIGGER trg_subcontract_payment_request_created_ops AFTER INSERT ON subcontract_payment_requests DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION dahlia_private.notify_subcontract_payment_request_created();
+CREATE CONSTRAINT TRIGGER trg_subcontract_payment_request_created_ops AFTER INSERT ON public.subcontract_payment_requests DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION dahlia_private.notify_subcontract_payment_request_created();
 
 DROP TRIGGER IF EXISTS trg_subcontract_payment_request_status_ops ON public.subcontract_payment_requests;
-CREATE CONSTRAINT TRIGGER trg_subcontract_payment_request_status_ops AFTER UPDATE ON subcontract_payment_requests DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (old.status::text IS DISTINCT FROM new.status::text) EXECUTE FUNCTION dahlia_private.notify_subcontract_payment_request_status();
+CREATE CONSTRAINT TRIGGER trg_subcontract_payment_request_status_ops AFTER UPDATE ON public.subcontract_payment_requests DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (old.status::text IS DISTINCT FROM new.status::text) EXECUTE FUNCTION dahlia_private.notify_subcontract_payment_request_status();
 
 DROP TRIGGER IF EXISTS trg_warehouse_issue_created_ops ON public.project_material_issues;
-CREATE CONSTRAINT TRIGGER trg_warehouse_issue_created_ops AFTER INSERT ON project_material_issues DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION dahlia_private.notify_warehouse_issue_created();
+CREATE CONSTRAINT TRIGGER trg_warehouse_issue_created_ops AFTER INSERT ON public.project_material_issues DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION dahlia_private.notify_warehouse_issue_created();
 
-REVOKE ALL ON FUNCTION dahlia_private.ops_notify_permission_recipients(p_permission_codes text[], p_project_id uuid, p_actor_id uuid, p_event_key text, p_title text, p_message text, p_category text, p_target_url text, p_priority text, p_metadata jsonb, p_voice_text text, p_exclude_actor boolean) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION dahlia_private.ops_notify_one_user(p_user_id uuid, p_actor_id uuid, p_event_key text, p_title text, p_message text, p_category text, p_target_url text, p_project_id uuid, p_source_table text, p_source_id uuid, p_priority text, p_metadata jsonb, p_voice_text text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION dahlia_private.ops_notify_permission_recipients(text[], uuid, uuid, text, text, text, text, text, text, jsonb, text, boolean) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION dahlia_private.ops_notify_one_user(uuid, uuid, text, text, text, text, text, uuid, text, uuid, text, jsonb, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION dahlia_private.notify_field_material_request_created() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION dahlia_private.notify_field_material_request_status() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION dahlia_private.notify_warehouse_issue_created() FROM PUBLIC, anon, authenticated;
