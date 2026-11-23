@@ -10,6 +10,7 @@ type Props = {
 
 const INPUT = 'mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10';
 const LABEL = 'block text-[11px] font-semibold text-slate-600';
+const HELP = 'mt-1 block text-[9px] font-normal leading-4 text-slate-400';
 const STRUCTURES: Array<{ value: RebarStructureKind; label: string }> = [
   { value: 'footplat', label: 'Footplat' },
   { value: 'pedestal', label: 'Pedestal' },
@@ -62,9 +63,9 @@ export default function RebarStructureFields({ value, onChange }: Props) {
       {isLinear && (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
-            {field('member_length_m', lengthLabel, 'm')}
-            {field('member_count', 'Jumlah elemen', 'unit')}
-            {field('cover_mm', 'Selimut beton elemen', 'mm')}
+            {field('member_length_m', lengthLabel, 'm', 'Masukkan panjang balok, tinggi kolom, atau kedalaman pedestal untuk acuan tulangan yang mengikuti elemen.')}
+            {field('member_count', 'Jumlah elemen', 'unit', 'Jumlah balok, kolom, atau pedestal dengan detail pembesian yang sama.')}
+            {field('cover_mm', 'Selimut beton elemen', 'mm', 'Jarak dari permukaan beton ke tulangan memanjang; dipakai saat panjang mengikuti elemen. Isi sesuai gambar struktur.')}
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-emerald-100 pt-3">
             <div>
@@ -77,28 +78,35 @@ export default function RebarStructureFields({ value, onChange }: Props) {
             <div key={String(group.id || index)} className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-6">
               <label className={LABEL + ' sm:col-span-2'}>Nama set tulangan
                 <input value={String(group.label ?? '')} onChange={(event) => updateGroup(index, 'label', event.target.value)} className={INPUT} placeholder="Utama / tumpuan / lapangan" />
+                <span className={HELP}>Nama fungsi kelompok besi, misalnya pokok menerus, tambahan tumpuan, atau tambahan lapangan.</span>
               </label>
               <label className={LABEL}>Diameter (mm)
-                <input type="number" min="0" step="1" value={String(group.diameter_mm ?? '')} onChange={(event) => updateGroup(index, 'diameter_mm', event.target.value)} className={INPUT} />
+                <input type="number" min="0" step="1" value={String(group.diameter_mm ?? '')} onChange={(event) => updateGroup(index, 'diameter_mm', event.target.value)} className={INPUT} placeholder="13" />
+                <span className={HELP}>Diameter nominal besi dalam mm. Contoh: isi 13 untuk tulangan D13.</span>
               </label>
-              <label className={LABEL}>Batang per penampang
-                <input type="number" min="0" step="1" value={String(group.bars_per_member ?? '')} onChange={(event) => updateGroup(index, 'bars_per_member', event.target.value)} className={INPUT} />
+              <label className={LABEL}>Jumlah batang / penampang
+                <input type="number" min="0" step="1" value={String(group.bars_per_member ?? '')} onChange={(event) => updateGroup(index, 'bars_per_member', event.target.value)} className={INPUT} placeholder="6" />
+                <span className={HELP}>Jumlah batang dalam satu irisan penampang. Contoh kolom 6D13: isi 6, bukan pada kolom posisi.</span>
               </label>
-              <label className={LABEL}>Posisi / segmen
-                <input type="number" min="1" step="1" value={String(group.positions_per_member ?? '1')} onChange={(event) => updateGroup(index, 'positions_per_member', event.target.value)} className={INPUT} />
+              <label className={LABEL}>Jumlah posisi / segmen
+                <input type="number" min="1" step="1" value={String(group.positions_per_member ?? '1')} onChange={(event) => updateGroup(index, 'positions_per_member', event.target.value)} className={INPUT} placeholder="1" />
+                <span className={HELP}>Pengali banyaknya posisi kelompok dalam satu elemen. Umumnya 1; tulangan ekstra di kedua ujung balok dapat diisi 2.</span>
               </label>
               <label className={LABEL}>Model panjang
                 <select value={String(group.length_mode ?? 'member')} onChange={(event) => updateGroup(index, 'length_mode', event.target.value)} className={INPUT}>
-                  <option value="member">Sepanjang elemen</option><option value="fixed">Panjang potongan manual</option>
+                  <option value="member">Sepanjang elemen</option><option value="fixed">Potongan manual</option>
                 </select>
+                <span className={HELP}>{String(group.length_mode ?? 'member') === 'fixed' ? 'Panjang setiap potong ditentukan sendiri pada kolom panjang potongan.' : 'Panjang otomatis mengikuti panjang/tinggi elemen, lalu dikurangi dua kali selimut beton.'}</span>
               </label>
               {String(group.length_mode) === 'fixed' ? (
                 <label className={LABEL}>Panjang potongan (m)
-                  <input type="number" min="0" step="any" value={String(group.fixed_length_m ?? '')} onChange={(event) => updateGroup(index, 'fixed_length_m', event.target.value)} className={INPUT} />
+                  <input type="number" min="0" step="any" value={String(group.fixed_length_m ?? '')} onChange={(event) => updateGroup(index, 'fixed_length_m', event.target.value)} className={INPUT} placeholder="1,20" />
+                  <span className={HELP}>Panjang satu potong sebelum tambahan panjang. Dipakai saat memilih model potongan manual.</span>
                 </label>
               ) : null}
               <label className={LABEL}>Tambahan panjang per batang (m)
-                <input type="number" min="0" step="any" value={String(group.extra_length_m ?? '')} onChange={(event) => updateGroup(index, 'extra_length_m', event.target.value)} className={INPUT} placeholder="Lap / penyaluran" />
+                <input type="number" min="0" step="any" value={String(group.extra_length_m ?? '')} onChange={(event) => updateGroup(index, 'extra_length_m', event.target.value)} className={INPUT} placeholder="0,30" />
+                <span className={HELP}>Allowance yang ditambahkan ke setiap potong, misalnya untuk sambungan atau penyaluran. Isi 0 bila tidak ada; ikuti detail gambar.</span>
               </label>
               <div className="flex items-end justify-end sm:col-span-1">
                 <button type="button" onClick={() => removeGroup(index)} disabled={groups.length <= 1} className="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-[10px] font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-30"><Trash2 className="h-3.5 w-3.5" /> Hapus</button>
@@ -108,15 +116,15 @@ export default function RebarStructureFields({ value, onChange }: Props) {
           <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
             <p className="text-[11px] font-bold text-slate-700">Sengkang / cincin</p>
             <div className="grid gap-3 sm:grid-cols-4">
-              {field('tie_width_mm', 'Lebar penampang beton (b)', 'mm')}
-              {field('tie_depth_mm', structure === 'column' || structure === 'pedestal' ? 'Kedalaman penampang beton (h)' : 'Tinggi penampang beton (h)', 'mm')}
-              {field('tie_spacing_mm', 'Jarak sengkang zona lapangan', 'mm')}
+              {field('tie_width_mm', 'Lebar penampang beton (b)', 'mm', 'Ukuran sisi pertama penampang kolom/balok, bukan panjang elemen.')}
+              {field('tie_depth_mm', structure === 'column' || structure === 'pedestal' ? 'Sisi kedua penampang beton (h)' : 'Tinggi penampang beton (h)', 'mm', 'Ukuran sisi kedua penampang beton, bukan tinggi kolom atau panjang balok.')}
+              {field('tie_spacing_mm', 'Jarak sengkang zona lapangan', 'mm', 'Jarak antar-sengkang pada bagian tengah/lapangan elemen.')}
               {field('tie_support_zone_m', 'Panjang zona tumpuan tiap ujung', 'm', 'Kosongkan bila seluruh elemen memakai jarak seragam')}
               {field('tie_support_spacing_mm', 'Jarak sengkang zona tumpuan', 'mm', 'Diisi bersama panjang zona tumpuan bila jarak di ujung lebih rapat')}
-              {field('tie_diameter_mm', 'Diameter sengkang', 'mm')}
-              {field('tie_cover_mm', 'Selimut beton ke sisi luar sengkang', 'mm')}
-              {field('tie_hook_mm', 'Panjang kait tiap ujung', 'mm')}
-              {field('tie_end_offset_mm', 'Jarak sengkang dari ujung', 'mm')}
+              {field('tie_diameter_mm', 'Diameter sengkang', 'mm', 'Diameter besi untuk cincin/sengkang, misalnya 8 untuk Ø8.')}
+              {field('tie_cover_mm', 'Selimut beton ke sisi luar sengkang', 'mm', 'Jarak permukaan beton ke sisi terluar sengkang.')}
+              {field('tie_hook_mm', 'Panjang kait tiap ujung', 'mm', 'Panjang satu kait; nilai ini ditambahkan dua kali untuk setiap sengkang.')}
+              {field('tie_end_offset_mm', 'Jarak sengkang dari ujung', 'mm', 'Jarak sengkang pertama dari masing-masing ujung elemen; isi 0 bila tidak ada offset.')}
             </div>
             <p className="text-[9px] leading-4 text-slate-500">Dimensi yang dimasukkan adalah ukuran penampang beton. Panjang potong dihitung pada garis tengah sengkang setelah dikurangi selimut beton dan diameter sengkang, lalu ditambah panjang dua kait. Bila zona tumpuan diisi, jarak rapat di kedua ujung dihitung terpisah dari jarak zona lapangan.</p>
           </div>
