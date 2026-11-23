@@ -1,6 +1,7 @@
 'use client';
 
 import { Plus, Trash2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import {
   describeCustomBuilder,
   calculateCustomBuilder,
@@ -52,7 +53,7 @@ export default function CustomFormulaBuilder({ value, onChange }: Props) {
   const appendNode = (path: number[], node: CustomFormulaNode) =>
     updateNode(path, (current) => ({ ...current, children: [...(current.children || []), node] }));
 
-  const renderNode = (node: CustomFormulaNode, path: number[], depth: number, index: number): React.ReactNode => {
+  const renderNode = (node: CustomFormulaNode, path: number[], depth: number, index: number): ReactNode => {
     const group = node.kind === 'group';
     return (
       <div key={node.id} className={depth === 0 ? 'rounded-xl border border-violet-200 bg-white p-3' : 'rounded-lg border border-slate-200 bg-slate-50 p-2'}>
