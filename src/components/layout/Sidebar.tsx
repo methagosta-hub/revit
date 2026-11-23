@@ -12,6 +12,7 @@ import {
   Calculator,
   ChevronDown,
   ClipboardCheck,
+  ClipboardList,
   Database,
   FileText,
   FolderKanban,
@@ -63,6 +64,7 @@ const navGroups: NavigationGroup[] = [
     title: 'Operasional Perusahaan',
     items: [
       { name: 'Pengadaan', href: '/pengadaan', icon: ShoppingCart },
+      { name: 'Permintaan Material', href: '/pengadaan/permintaan', icon: ClipboardList, permission: 'procurement.request.review' },
       { name: 'Personalia', href: '/personalia', icon: Users },
       { name: 'Gudang & Persediaan', href: '/gudang', icon: Warehouse },
       { name: 'Keuangan', href: '/keuangan', icon: Wallet },
