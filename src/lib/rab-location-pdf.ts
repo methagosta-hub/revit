@@ -37,7 +37,7 @@ function subitems(rows: any[]): string {
   return (rows||[]).map(r=>'<div class="sub"><b>'+e(r.code)+' · '+e(r.name)+'</b><span>'+e(r.unit)+' | Koef. '+num(r.coefficient,2)+' | '+money(r.line_total)+'</span>'+componentTable(r.components||[])+subitems(r.subitems||[])+'</div>').join('');
 }
 function backup(item: any, rows: any[], index: number) {
-  const body=rows.length?rows.map((r)=>'<tr><td class="center">'+index+'</td><td><b>'+e(r.description||item.name)+'</b><p>'+calc(r)+' × faktor '+num(r.multiplier,2)+'</p></td><td class="right">'+num(r.subtotal,2)+'</td><td class="center">'+e(item.unit)+'</td></tr>').join(''):
+  const body=rows.length?rows.map((r)=>'<tr><td class="center">'+(i+1)+'</td><td><b>'+e(r.description||item.name)+'</b><p>'+calc(r)+' × faktor '+num(r.multiplier,2)+'</p></td><td class="right">'+num(r.subtotal,2)+'</td><td class="center">'+e(item.unit)+'</td></tr>').join(''):
     '<tr><td class="center">'+index+'</td><td><b>'+e(item.name)+'</b><p class="muted">Belum ada rincian perhitungan backup volume.</p></td><td class="right"></td><td class="center">'+e(item.unit)+'</td></tr>';
   return '<div class="item"><h3>'+index+'. '+e(item.code)+' · '+e(item.name)+'</h3><small>Volume RAB: '+num(item.volume,2)+' '+e(item.unit)+'</small><table class="backup"><colgroup><col style="width:5%"><col style="width:65%"><col style="width:18%"><col style="width:12%"></colgroup><thead><tr><th class="center">No</th><th>Perhitungan</th><th class="right">Volume</th><th class="center">Satuan</th></tr></thead><tbody>'+body+'</tbody></table></div>';
 }
