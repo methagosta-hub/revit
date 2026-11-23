@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
-  ArrowDownRight,
   ArrowUpRight,
   Bell,
   Building2,
@@ -430,7 +429,7 @@ function ControlTowerContent() {
                   </article>
                 ))}
               </div> : <div className="px-5 py-10 text-center"><CheckCircle2 className="mx-auto h-7 w-7 text-emerald-200/50" /><p className="mt-2 text-xs font-bold text-white">Tidak ada tindak lanjut baru</p><p className="mt-1 text-[9px] text-slate-400">Notifikasi sesuai kewenangan akan tampil di panel ini.</p></div>}
-              <div className="border-t border-white/[0.07] px-4 py-3"><Link href="/pengaturan/notifikasi" className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-200 hover:underline">Pengaturan notifikasi <ArrowUpRight className="h-3 w-3" /></Link></div>
+              <div className="border-t border-white/[0.07] px-4 py-3"><Link href="/pengaturan" className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-200 hover:underline">Pengaturan notifikasi <ArrowUpRight className="h-3 w-3" /></Link></div>
             </section>
 
             <section className="rounded-3xl border border-white/[0.09] bg-white/[0.035] p-4 shadow-xl shadow-black/10 sm:p-5">
