@@ -43,7 +43,7 @@ export type RebarCalculationResult = {
 const SNI_NOMINAL_WEIGHT_KG_PER_M: Record<number, number> = {
   6: 0.222, 8: 0.395, 10: 0.617, 12: 0.888, 13: 1.042, 14: 1.208,
   16: 1.578, 19: 2.226, 22: 2.984, 25: 3.853, 28: 4.834, 29: 5.185,
-  32: 6.313, 36: 7.990, 40: 9.865, 50: 15.413,
+  32: 6.313, 36: 7.990, 40: 9.865, 50: 15.413, 54: 17.978, 57: 20.031,
 };
 
 const LABELS: Record<RebarStructureKind, string> = {
@@ -108,7 +108,7 @@ function addOptionalLinearBars(
     const extraLength = numeric(group.extra_length_m || 0);
     const fixedLength = numeric(group.fixed_length_m);
     const started = [group.diameter_mm, group.bars_per_member, group.fixed_length_m, group.extra_length_m]
-      .some((value, fieldIndex) => fieldIndex < 2 && value !== undefined && value !== null && String(value).trim() !== '');
+      .some((value, fieldIndex) => fieldIndex < 3 && value !== undefined && value !== null && String(value).trim() !== '');
     if (!started) return;
     positive(diameter, 'Diameter ' + label);
     integerPositive(barsPerMember, 'Jumlah tulangan ' + label);
@@ -132,8 +132,8 @@ function addOptionalTies(
   const width = positive(numeric(parameters.tie_width_mm), 'Lebar sengkang/cincin');
   const depth = positive(numeric(parameters.tie_depth_mm), 'Tinggi/dimensi kedua sengkang');
   const spacing = positive(numeric(parameters.tie_spacing_mm), 'Jarak sengkang/cincin');
-  const cover = nonNegative(numeric(parameters.tie_cover_mm || 0), 'Selimut sengkang');
-  const hook = nonNegative(numeric(parameters.tie_hook_mm || 0), 'Panjang kait sengkang');
+  const cover = positive(numeric(parameters.tie_cover_mm), 'Selimut sengkang');
+  const hook = positive(numeric(parameters.tie_hook_mm), 'Panjang kait sengkang');
   const endOffset = nonNegative(numeric(parameters.tie_end_offset_mm || 0), 'Jarak sengkang dari ujung');
   const innerWidth = width - 2 * cover;
   const innerDepth = depth - 2 * cover;
@@ -155,7 +155,7 @@ function addFlatGrid(
   const width = positive(numeric(parameters.flat_width_m), 'Lebar bidang');
   const quantity = integerPositive(numeric(parameters.member_count || 1), 'Jumlah bidang');
   const layers = integerPositive(numeric(parameters.layers), 'Jumlah layer/lapis');
-  const cover = nonNegative(numeric(parameters.cover_mm || 0), 'Selimut beton');
+  const cover = positive(numeric(parameters.cover_mm), 'Selimut beton');
   const lap = nonNegative(numeric(parameters.lap_allowance_mm || 0), 'Tambahan panjang sambungan per batang');
   const spacingX = positive(numeric(parameters.spacing_x_mm), 'Jarak tulangan arah X');
   const spacingY = positive(numeric(parameters.spacing_y_mm), 'Jarak tulangan arah Y');
