@@ -202,7 +202,7 @@ export default function RebarStructureFields({ value, onChange }: Props) {
         {field('waste_pct', 'Allowance waste pemotongan', '%')}
       </div>
       <p className="rounded-lg bg-amber-50 px-3 py-2 text-[9px] leading-4 text-amber-900">
-        Kalkulator ini adalah estimasi kuantitas / bar bending take-off berdasarkan geometri dan allowance yang Anda masukkan, bukan pemeriksaan kapasitas atau desain struktur. Panjang kait, penyaluran, sambungan lewatan, selimut, dan detail penempatan harus mengikuti gambar struktur serta verifikasi perencana. Default panjang stok 12 m (pilihan panjang standar juga dapat diubah menjadi 10 m).
+        Kalkulator ini adalah estimasi kuantitas / bar bending take-off menggunakan tabel berat nominal SNI 2052:2024, bukan pemeriksaan kapasitas atau desain struktur. Panjang kait, penyaluran, sambungan lewatan, selimut, dan detail penempatan harus mengikuti gambar struktur serta verifikasi perencana. Default panjang stok 12 m (pilihan panjang standar juga dapat diubah menjadi 10 m).
       </p>
     </section>
   );
