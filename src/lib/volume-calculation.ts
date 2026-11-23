@@ -108,7 +108,7 @@ function addOptionalLinearBars(
     const extraLength = numeric(group.extra_length_m || 0);
     const fixedLength = numeric(group.fixed_length_m);
     const started = [group.diameter_mm, group.bars_per_member, group.fixed_length_m, group.extra_length_m]
-      .some((value) => value !== undefined && value !== null && String(value).trim() !== '');
+      .some((value, fieldIndex) => fieldIndex < 2 && value !== undefined && value !== null && String(value).trim() !== '');
     if (!started) return;
     positive(diameter, 'Diameter ' + label);
     integerPositive(barsPerMember, 'Jumlah tulangan ' + label);
@@ -354,4 +354,40 @@ export function describeCustomBuilder(parameters: CustomFormulaParameters): stri
   return groups.map((group, index) =>
     (index ? ' ' + (group.operator || '+') + ' ' : '') + describeCustomNode(group),
   ).join(' ');
+}
+
+export function defaultRebarStructureParameters(kind: RebarStructureKind = 'beam') {
+  const common = { structure_type: kind, stock_length_m: '12', waste_pct: '0', cover_mm: '' };
+  if (kind === 'footplat' || kind === 'slab') {
+    return { ...common, flat_length_m: '', flat_width_m: '', member_count: '1', layers: '1', spacing_x_mm: '', spacing_y_mm: '', diameter_x_mm: '', diameter_y_mm: '', lap_allowance_mm: '' };
+  }
+  if (kind === 'stair') {
+    return {
+      ...common, step_count: '', tread_width_m: '', riser_height_m: '', stair_width_m: '', flight_count: '1',
+      stair_main_diameter_mm: '', stair_main_spacing_mm: '', stair_main_layers: '1', stair_main_anchor_mm: '',
+      stair_distribution_diameter_mm: '', stair_distribution_spacing_mm: '', stair_distribution_layers: '1', stair_distribution_extra_mm: '',
+      landing_count: '0', landing_length_m: '', landing_width_m: '', landing_layers: '1',
+      landing_diameter_x_mm: '', landing_diameter_y_mm: '', landing_spacing_x_mm: '', landing_spacing_y_mm: '',
+    };
+  }
+  const longitudinal = kind === 'beam'
+    ? [
+        { label: 'Tulangan utama menerus', diameter_mm: '', bars_per_member: '', positions_per_member: '1', length_mode: 'member', fixed_length_m: '', extra_length_m: '' },
+        { label: 'Tulangan tambahan tumpuan', diameter_mm: '', bars_per_member: '', positions_per_member: '2', length_mode: 'fixed', fixed_length_m: '', extra_length_m: '' },
+        { label: 'Tulangan tambahan lapangan', diameter_mm: '', bars_per_member: '', positions_per_member: '1', length_mode: 'fixed', fixed_length_m: '', extra_length_m: '' },
+      ]
+    : [{ label: 'Tulangan pokok memanjang', diameter_mm: '', bars_per_member: '', positions_per_member: '1', length_mode: 'member', fixed_length_m: '', extra_length_m: '' }];
+  return {
+    ...common, member_length_m: '', member_count: '1', longitudinal_groups: longitudinal,
+    tie_diameter_mm: '', tie_width_mm: '', tie_depth_mm: '', tie_spacing_mm: '', tie_cover_mm: '', tie_hook_mm: '', tie_end_offset_mm: '',
+  };
+}
+
+export function defaultCustomBuilderParameters(): CustomFormulaParameters {
+  return {
+    groups: [{
+      id: 'category-a', label: 'Kategori A', kind: 'group', operator: '+',
+      children: [{ id: 'sub-a-1', label: 'Sub-kategori 1', kind: 'value', value: '0', unit: '', operator: '+' }],
+    }],
+  };
 }
