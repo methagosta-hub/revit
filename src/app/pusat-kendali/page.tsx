@@ -145,7 +145,7 @@ function ControlTowerContent() {
   const [error, setError] = useState('');
   const [connection, setConnection] = useState<'connecting' | 'live' | 'offline'>('connecting');
   const [filter, setFilter] = useState<ModuleKey>('all');
-  const [timeWindow, setTimeWindow] = useState<TimeWindow>('24h');
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>('all');
   const [search, setSearch] = useState('');
   const [clock, setClock] = useState(() => new Date());
 
@@ -333,7 +333,7 @@ function ControlTowerContent() {
               </div>
               <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-300/10 bg-amber-300/[0.045] px-3 py-2.5 text-[9px] leading-4 text-slate-400">
                 <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-200" />
-                Aktivitas personalia belum diterbitkan ke stream perusahaan pada integrasi saat ini. Modul personalia tetap dapat dibuka, tetapi indikator live akan aktif setelah event SDM dihubungkan.
+                Aktivitas SDM yang telah terhubung ke stream perusahaan mencakup data karyawan, perjanjian kerja, penugasan, absensi, dan status payroll. Rincian nominal gaji individual tetap dibatasi sesuai hak akses.
               </div>
             </section>
 
