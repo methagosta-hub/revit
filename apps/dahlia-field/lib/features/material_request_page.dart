@@ -27,11 +27,19 @@ class _MaterialRequestPageState extends State<MaterialRequestPage> {
   final List<_MaterialLine> _lines = [_MaterialLine()];
   bool _isSaving = false;
 
+  List<Map<String, dynamic>> get _eligibleProjects => widget.projects
+      .where(
+        (project) =>
+            project['status']?.toString().toUpperCase() == 'DIKERJAKAN',
+      )
+      .toList(growable: false);
+
   @override
   void initState() {
     super.initState();
-    if (widget.projects.isNotEmpty) {
-      _projectId = widget.projects.first['project_id'] as String;
+    final projects = _eligibleProjects;
+    if (projects.isNotEmpty) {
+      _projectId = projects.first['project_id'] as String;
     }
   }
 
@@ -48,6 +56,18 @@ class _MaterialRequestPageState extends State<MaterialRequestPage> {
   Future<void> _submit() async {
     final projectId = _projectId;
     if (projectId == null) return;
+    if (!_eligibleProjects.any(
+      (project) => project['project_id'] == projectId,
+    )) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Permintaan material hanya dapat diajukan untuk proyek berstatus DIKERJAKAN.',
+          ),
+        ),
+      );
+      return;
+    }
     final validLines = <Map<String, dynamic>>[];
 
     for (final line in _lines) {
@@ -131,7 +151,7 @@ class _MaterialRequestPageState extends State<MaterialRequestPage> {
               labelText: 'Proyek',
               prefixIcon: Icon(Icons.apartment_outlined),
             ),
-            items: widget.projects.map((project) {
+            items: _eligibleProjects.map((project) {
               final id = project['project_id'] as String;
               return DropdownMenuItem<String>(
                 value: id,
