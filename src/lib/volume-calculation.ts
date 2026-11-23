@@ -175,11 +175,12 @@ function addFlatGrid(
   lines.push(makeLine(label + ' · tulangan arah Y', diameterY, barsAlongY * quantity * layers, yCut));
 }
 
-export function calculateStructuredRebar(parametersValue: Record<string, any>): RebarCalculationResult {
+export function calculateStructuredRebar(parametersValue: Record<string, any>, multiplierValue = 1): RebarCalculationResult {
   const parameters = parametersValue || {};
   const structure = (parameters.structure_type || 'beam') as RebarStructureKind;
   if (!(structure in LABELS)) throw new Error('Jenis struktur pembesian tidak dikenal.');
   const stockLengthM = positive(numeric(parameters.stock_length_m || 12), 'Panjang besi per batang');
+  const multiplier = nonNegative(numeric(multiplierValue), 'Faktor pengali pembesian');
   const wastePct = nonNegative(numeric(parameters.waste_pct || 0), 'Persentase waste');
   if (wastePct > 30) throw new Error('Waste dibatasi maksimal 30%.');
   const lines: RebarBreakdownLine[] = [];
@@ -255,8 +256,8 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>): 
   const diameterMap = new Map<number, { totalLengthM: number; requiredWeightKg: number; weightPerMeter: number }>();
   lines.forEach((line) => {
     const old = diameterMap.get(line.diameter) || { totalLengthM: 0, requiredWeightKg: 0, weightPerMeter: line.weightPerMeter };
-    old.totalLengthM += line.totalLengthM;
-    old.requiredWeightKg += line.weightKg;
+    old.totalLengthM += line.totalLengthM * multiplier;
+    old.requiredWeightKg += line.weightKg * multiplier;
     diameterMap.set(line.diameter, old);
   });
   const diameterSummary = Array.from(diameterMap.entries()).sort((a, b) => a[0] - b[0]).map(([diameter, totals]) => {
@@ -270,8 +271,8 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>): 
       stockWeightKg: stockBars * stockLengthM * totals.weightPerMeter,
     };
   });
-  const totalLengthM = lines.reduce((sum, line) => sum + line.totalLengthM, 0);
-  const totalWeightKg = lines.reduce((sum, line) => sum + line.weightKg, 0);
+  const totalLengthM = lines.reduce((sum, line) => sum + line.totalLengthM, 0) * multiplier;
+  const totalWeightKg = lines.reduce((sum, line) => sum + line.weightKg, 0) * multiplier;
   const totalStockBars = diameterSummary.reduce((sum, line) => sum + line.stockBars, 0);
   const totalStockWeightKg = diameterSummary.reduce((sum, line) => sum + line.stockWeightKg, 0);
   const formulas = lines.map((line) =>
@@ -292,8 +293,8 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>): 
   };
 }
 
-export function describeStructuredRebar(parameters: Record<string, any>): string {
-  const result = calculateStructuredRebar(parameters);
+export function describeStructuredRebar(parameters: Record<string, any>, multiplier = 1): string {
+  const result = calculateStructuredRebar(parameters, multiplier);
   const summary = result.diameterSummary.map((row) =>
     'Ø' + shown(row.diameter, 0) + ': ' + shown(row.totalLengthM, 3) + ' m / ' +
     shown(row.requiredWeightKg, 3) + ' kg / ' + row.stockBars + ' batang stok ' +
