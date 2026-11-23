@@ -114,7 +114,7 @@ function addOptionalLinearBars(
     integerPositive(barsPerMember, 'Jumlah tulangan ' + label);
     integerPositive(positions, 'Jumlah posisi/segmen ' + label);
     nonNegative(extraLength, 'Tambahan panjang ' + label);
-    const cover = nonNegative(numeric(parameters.cover_mm || 0), 'Selimut beton elemen');
+    const cover = positive(numeric(parameters.cover_mm), 'Selimut beton elemen');
     const clearMemberLength = memberLength - (group.length_mode === 'fixed' ? 0 : (2 * cover) / 1000);
     const baseLength = group.length_mode === 'fixed' ? positive(fixedLength, 'Panjang potongan ' + label) : positive(clearMemberLength, 'Panjang bersih tulangan ' + label);
     lines.push(makeLine(label, diameter, barsPerMember * positions * memberCount, baseLength + extraLength));
@@ -193,7 +193,7 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>, m
     const riser = positive(numeric(parameters.riser_height_m), 'Tinggi anak tangga');
     const stairWidth = positive(numeric(parameters.stair_width_m), 'Lebar tangga');
     const flights = integerPositive(numeric(parameters.flight_count || 1), 'Jumlah bidang/flight tangga');
-    const cover = nonNegative(numeric(parameters.cover_mm || 0), 'Selimut beton tangga');
+    const cover = positive(numeric(parameters.cover_mm), 'Selimut beton tangga');
     const slopeLength = Math.sqrt((steps * tread) ** 2 + (steps * riser) ** 2);
     const mainDiameter = positive(numeric(parameters.stair_main_diameter_mm), 'Diameter tulangan utama tangga');
     const mainSpacing = positive(numeric(parameters.stair_main_spacing_mm), 'Jarak tulangan utama tangga');
@@ -230,19 +230,20 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>, m
       const landingDiameterY = positive(numeric(parameters.landing_diameter_y_mm), 'Diameter tulangan bordes arah Y');
       const clearLandingLength = landingLength * 1000 - 2 * cover;
       const clearLandingWidth = landingWidth * 1000 - 2 * cover;
+      const landingLap = nonNegative(numeric(parameters.landing_lap_allowance_mm || 0), 'Tambahan sambungan tulangan bordes');
       positive(clearLandingLength, 'Panjang bersih bordes');
       positive(clearLandingWidth, 'Lebar bersih bordes');
       lines.push(makeLine(
         'Bordes · tulangan arah X',
         landingDiameterX,
         (Math.ceil(clearLandingWidth / landingSpacingY) + 1) * landingCount * landingLayers,
-        clearLandingLength / 1000,
+        (clearLandingLength + landingLap) / 1000,
       ));
       lines.push(makeLine(
         'Bordes · tulangan arah Y',
         landingDiameterY,
         (Math.ceil(clearLandingLength / landingSpacingX) + 1) * landingCount * landingLayers,
-        clearLandingWidth / 1000,
+        (clearLandingWidth + landingLap) / 1000,
       ));
     }
   } else {
