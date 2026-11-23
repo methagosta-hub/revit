@@ -47,14 +47,14 @@ function subitems(rows: any[]): string {
 function rebarBreakdown(row: any): string {
   if (row.calc_mode !== 'rebar_structure') return '';
   try {
-    const result = calculateStructuredRebar(row.parameters || {});
+    const result = calculateStructuredRebar(row.parameters || {}, Number(row.multiplier ?? 1));
     const componentRows = result.breakdown.map((line) =>
       '<tr><td>'+e(line.label)+'</td><td class="center">Ø'+num(line.diameter,0)+'</td><td class="right">'+num(line.pieces,0)+'</td><td class="right">'+num(line.cutLengthM,3)+'</td><td class="right">'+num(line.totalLengthM,3)+'</td><td class="right">'+num(line.weightKg,3)+'</td></tr>'
     ).join('');
     const diameterRows = result.diameterSummary.map((line) =>
       '<tr><td class="center">Ø'+num(line.diameter,0)+'</td><td class="right">'+num(line.totalLengthM,3)+' m</td><td class="right">'+num(line.requiredWeightKg,3)+' kg</td><td class="right">'+num(line.stockBars,0)+' batang × '+num(result.stockLengthM,2)+' m</td><td class="right">'+num(line.stockWeightKg,3)+' kg</td></tr>'
     ).join('');
-    return '<div class="rebar-detail"><b>Rincian potongan dan berat tulangan</b><table class="rebar-pieces"><thead><tr><th>Kelompok tulangan</th><th>Diameter</th><th class="right">Jumlah potong</th><th class="right">Panjang/potong (m)</th><th class="right">Total panjang (m)</th><th class="right">Berat (kg)</th></tr></thead><tbody>'+componentRows+'</tbody></table><b>Rekap kebutuhan batang stok per diameter</b><table class="rebar-stock"><thead><tr><th>Diameter</th><th class="right">Panjang perlu</th><th class="right">Berat perlu</th><th class="right">Batang stok</th><th class="right">Berat stok ekuivalen</th></tr></thead><tbody>'+diameterRows+'</tbody></table><p class="rebar-total">Total panjang '+num(result.totalLengthM,3)+' m · Berat kebutuhan teoritis '+num(result.totalWeightKg,3)+' kg · Estimasi batang stok '+num(result.totalStockBars,0)+' batang · Berat ekuivalen stok '+num(result.totalStockWeightKg,3)+' kg</p></div>';
+    return '<div class="rebar-detail"><b>Rincian potongan dasar per set (rekap batang stok dan berat telah dikalikan faktor '+num(row.multiplier ?? 1,2)+')</b><table class="rebar-pieces"><thead><tr><th>Kelompok tulangan</th><th>Diameter</th><th class="right">Potongan / set</th><th class="right">Panjang/potong (m)</th><th class="right">Total panjang (m)</th><th class="right">Berat (kg)</th></tr></thead><tbody>'+componentRows+'</tbody></table><b>Rekap kebutuhan batang stok per diameter</b><table class="rebar-stock"><thead><tr><th>Diameter</th><th class="right">Panjang perlu</th><th class="right">Berat perlu</th><th class="right">Batang stok</th><th class="right">Berat stok ekuivalen</th></tr></thead><tbody>'+diameterRows+'</tbody></table><p class="rebar-total">Total panjang '+num(result.totalLengthM,3)+' m · Berat kebutuhan teoritis '+num(result.totalWeightKg,3)+' kg · Estimasi batang stok '+num(result.totalStockBars,0)+' batang · Berat ekuivalen stok '+num(result.totalStockWeightKg,3)+' kg</p></div>';
   } catch (error) {
     return '<p class="muted">Rincian pembesian tidak dapat dibaca: '+e(error instanceof Error ? error.message : 'parameter tidak valid')+'</p>';
   }
