@@ -20,8 +20,19 @@ import {
 import { supabase } from '@/lib/supabase';
 import { formatRupiah } from '@/lib/format';
 import { recalculateProjectTotalFromRabItem } from '@/lib/services/projectService';
+import RebarStructureFields from '@/components/rab/RebarStructureFields';
+import CustomFormulaBuilder from '@/components/rab/CustomFormulaBuilder';
+import {
+  calculateStructuredRebar,
+  describeStructuredRebar,
+  calculateCustomBuilder,
+  describeCustomBuilder,
+  defaultRebarStructureParameters,
+  defaultCustomBuilderParameters,
+  type CustomFormulaParameters,
+} from '@/lib/volume-calculation';
 
-type CalcMode = 'standard' | 'wall_area' | 'frame_length' | 'glass_area' | 'opening_count' | 'trapezoid' | 'rebar' | 'custom_formula';
+type CalcMode = 'standard' | 'wall_area' | 'frame_length' | 'glass_area' | 'opening_count' | 'trapezoid' | 'rebar' | 'rebar_structure' | 'custom_builder' | 'custom_formula';
 
 type OpeningDimension = { label?: string; width: number | string; height: number | string; quantity: number | string };
 type FrameSegment = { label?: string; length: number | string; quantity: number | string };
@@ -143,8 +154,10 @@ const MODE_OPTIONS: Array<{ value: CalcMode; label: string; description: string 
   { value: 'glass_area', label: 'Kaca (luas bidang)', description: 'Lebar × tinggi setiap panel kaca × jumlah (m²)' },
   { value: 'opening_count', label: 'Bukaan (unit)', description: 'Jumlah unit pintu, jendela, ventilasi, atau bukaan lainnya' },
   { value: 'trapezoid', label: 'Penampang trapesium', description: 'Untuk galian saluran, talud, dan penampang' },
-  { value: 'rebar', label: 'Berat pembesian', description: 'Berat besi berdasarkan diameter dan panjang' },
-  { value: 'custom_formula', label: 'Rumus khusus', description: 'Masukkan operasi hitung sesuai kebutuhan' },
+  { value: 'rebar', label: 'Berat pembesian (metode lama)', description: 'Berat besi berdasarkan diameter dan panjang; data lama tetap didukung' },
+  { value: 'rebar_structure', label: 'Pembesian struktur otomatis', description: 'Footplat, pedestal, balok/sloof/ring balok, kolom, plat, dan tangga; hitung kg dan batang' },
+  { value: 'custom_builder', label: 'Rumus kustom bertingkat', description: 'Kategori, sub-kategori, dan operator hitung yang dapat disusun sendiri' },
+  { value: 'custom_formula', label: 'Rumus khusus (metode lama)', description: 'Rumus aritmetika sederhana; tetap kompatibel dengan data lama' },
 ];
 
 function defaultParametersForMode(mode: CalcMode): VolumeParameters {
@@ -156,6 +169,8 @@ function defaultParametersForMode(mode: CalcMode): VolumeParameters {
     case 'opening_count': return { opening_units: [{ label: 'Unit pintu/jendela', quantity: '1' }] };
     case 'trapezoid': return { top_width: '1', bottom_width: '1', depth: '1', length: '1', quantity: '1' };
     case 'rebar': return { diameter: '10', bar_length: '1', bars: '1' };
+    case 'rebar_structure': return defaultRebarStructureParameters('beam') as VolumeParameters;
+    case 'custom_builder': return defaultCustomBuilderParameters() as unknown as VolumeParameters;
     case 'custom_formula': return { formula: '' };
   }
 }
@@ -323,11 +338,57 @@ function calculateBase(mode: CalcMode, parameters: VolumeParameters): number {
     // Rumus pendekatan berat teoritis besi: d² / 162 kg per meter (d dalam mm).
     return ((diameter * diameter) / 162) * barLength * bars;
   }
+  if (mode === 'rebar_structure') {
+    return calculateStructuredRebar(parameters as Record<string, unknown>).totalWeightKg;
+  }
+  if (mode === 'custom_builder') {
+    return calculateCustomBuilder(parameters as unknown as CustomFormulaParameters);
+  }
   return safeExpression(String(parameters.formula ?? ''));
 }
 
 function normalizeParameters(mode: CalcMode, parameters: VolumeParameters): VolumeParameters {
   if (mode === 'custom_formula') return { formula: String(parameters.formula ?? '').trim() };
+  if (mode === 'custom_builder') {
+    const normalizeNode = (node: any): any => ({
+      id: String(node.id ?? ''), label: String(node.label ?? '').trim(), kind: node.kind === 'group' ? 'group' : 'value',
+      operator: ['+', '-', '*', '/'].includes(node.operator) ? node.operator : '+',
+      value: node.kind === 'group' ? undefined : (String(node.value ?? '').trim() === '' ? '' : Number(node.value)),
+      unit: String(node.unit ?? '').trim(),
+      children: node.kind === 'group' ? (Array.isArray(node.children) ? node.children.map(normalizeNode) : []) : undefined,
+    });
+    const groups = Array.isArray(parameters.groups) ? parameters.groups : [];
+    return { groups: groups.map(normalizeNode) } as unknown as VolumeParameters;
+  }
+  if (mode === 'rebar_structure') {
+    const normalized: Record<string, unknown> = { ...parameters, structure_type: String(parameters.structure_type || 'beam') };
+    const numericKeys = [
+      'stock_length_m', 'waste_pct', 'member_length_m', 'member_count', 'cover_mm', 'tie_diameter_mm',
+      'tie_width_mm', 'tie_depth_mm', 'tie_spacing_mm', 'tie_cover_mm', 'tie_hook_mm', 'tie_end_offset_mm',
+      'flat_length_m', 'flat_width_m', 'layers', 'spacing_x_mm', 'spacing_y_mm', 'diameter_x_mm', 'diameter_y_mm',
+      'lap_allowance_mm', 'step_count', 'tread_width_m', 'riser_height_m', 'stair_width_m', 'flight_count',
+      'stair_main_diameter_mm', 'stair_main_spacing_mm', 'stair_main_layers', 'stair_main_anchor_mm',
+      'stair_distribution_diameter_mm', 'stair_distribution_spacing_mm', 'stair_distribution_layers',
+      'stair_distribution_extra_mm', 'landing_count', 'landing_length_m', 'landing_width_m', 'landing_layers',
+      'landing_diameter_x_mm', 'landing_diameter_y_mm', 'landing_spacing_x_mm', 'landing_spacing_y_mm',
+    ];
+    numericKeys.forEach((key) => {
+      const raw = normalized[key];
+      if (raw !== undefined && raw !== null && String(raw).trim() !== '') normalized[key] = Number(raw);
+    });
+    if (Array.isArray(parameters.longitudinal_groups)) {
+      normalized.longitudinal_groups = parameters.longitudinal_groups.map((group: any) => ({
+        ...group,
+        label: String(group.label ?? '').trim(),
+        diameter_mm: String(group.diameter_mm ?? '').trim() === '' ? '' : Number(group.diameter_mm),
+        bars_per_member: String(group.bars_per_member ?? '').trim() === '' ? '' : Number(group.bars_per_member),
+        positions_per_member: String(group.positions_per_member ?? '').trim() === '' ? 1 : Number(group.positions_per_member),
+        fixed_length_m: String(group.fixed_length_m ?? '').trim() === '' ? '' : Number(group.fixed_length_m),
+        extra_length_m: String(group.extra_length_m ?? '').trim() === '' ? 0 : Number(group.extra_length_m),
+      }));
+    }
+    return normalized as VolumeParameters;
+  }
   if (mode === 'wall_area') {
     const openings = Array.isArray(parameters.openings) ? parameters.openings : [];
     return {
@@ -414,6 +475,10 @@ function calculationExpression(row: VolumeDetail, unit: string): string {
     expression = `((${value('top_width', 0)} m + ${value('bottom_width', 0)} m) ÷ 2) × ${value('depth', 0)} m × ${value('length', 0)} m × ${value('quantity')} kali`;
   } else if (mode === 'rebar') {
     expression = `(Ø${value('diameter', 0)}² ÷ 162) × ${value('bar_length', 0)} m × ${value('bars', 0)} batang`;
+  } else if (mode === 'rebar_structure') {
+    expression = describeStructuredRebar(parameters as Record<string, unknown>);
+  } else if (mode === 'custom_builder') {
+    expression = describeCustomBuilder(parameters as unknown as CustomFormulaParameters);
   } else {
     expression = String(parameters.formula ?? '').trim() || 'Rumus khusus belum tercatat';
   }
@@ -1136,6 +1201,20 @@ export default function VolumeBackupDrawer({ open, item, onClose, onSaved }: Pro
                     </div>
                     <p className="text-[10px] text-slate-400">Berat teoritis dihitung dengan pendekatan d²/162 × panjang × jumlah. Hasil satuan kg; cocok untuk AHSP dengan satuan kg.</p>
                   </div>
+                )}
+
+                {form.calcMode === 'rebar_structure' && (
+                  <RebarStructureFields
+                    value={form.parameters as Record<string, unknown>}
+                    onChange={(parameters) => setForm((current) => ({ ...current, parameters: parameters as VolumeParameters }))}
+                  />
+                )}
+
+                {form.calcMode === 'custom_builder' && (
+                  <CustomFormulaBuilder
+                    value={form.parameters as unknown as CustomFormulaParameters}
+                    onChange={(next) => setForm((current) => ({ ...current, parameters: { ...current.parameters, ...next } }))}
+                  />
                 )}
 
                 {form.calcMode === 'custom_formula' && (
