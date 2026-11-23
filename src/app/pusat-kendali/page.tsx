@@ -70,7 +70,7 @@ const MODULES: Array<{
 function moduleOf(eventType: string): ModuleKey {
   const type = eventType.toLowerCase();
   if (type.startsWith('material_request') || type.includes('purchase') || type.includes('procurement')) return 'procurement';
-  if (type === 'warehouse_issue' || type === 'stock_low' || type.includes('warehouse')) return 'warehouse';
+  if (type === 'warehouse_issue' || type === 'stock_low' || type.includes('warehouse') || type.startsWith('material_receipt')) return 'warehouse';
   if (type.startsWith('subcontract_payment') || type.includes('payment') || type.includes('finance')) return 'finance';
   if (type.includes('personnel') || type.includes('employee') || type.includes('attendance') || type.includes('payroll') || type.includes('hr_')) return 'personnel';
   if (type.includes('project')) return 'project';
