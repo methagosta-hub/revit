@@ -49,12 +49,26 @@ class _FieldHomePageState extends State<FieldHomePage>
     final projects = isDirector
         ? await _repository.listDirectorProjects()
         : await _repository.listProjects();
+    var materialRequestProjects = <Map<String, dynamic>>[];
+    String? materialRequestProjectsError;
+    if (!isDirector && !isSubcontractor) {
+      try {
+        materialRequestProjects =
+            await _repository.listMaterialRequestProjects();
+      } catch (error) {
+        // Keep the other field modules available while the database migration
+        // is pending. Material requests remain disabled until the RPC exists.
+        materialRequestProjectsError = error.toString();
+      }
+    }
     final segments = isSubcontractor
         ? await _repository.listMySegments()
         : <Map<String, dynamic>>[];
     return _HomeData(
       contextData: contextData,
       projects: projects,
+      materialRequestProjects: materialRequestProjects,
+      materialRequestProjectsError: materialRequestProjectsError,
       segments: segments,
     );
   }
@@ -238,19 +252,28 @@ class _FieldHomePageState extends State<FieldHomePage>
                   _FeatureCard(
                     icon: Icons.inventory_2_outlined,
                     title: 'Permintaan material',
-                    description: 'Ajukan kebutuhan barang untuk ditinjau Purchasing.',
-                    onTap: data.projects.isEmpty
+                    description: 'Ajukan kebutuhan barang pada proyek yang sedang dikerjakan.',
+                    onTap: data.materialRequestProjects.isEmpty
                         ? null
                         : () => Navigator.of(context).push(
                               MaterialPageRoute<void>(
                                 builder: (_) => MaterialRequestPage(
                                   repository: _repository,
                                   sync: _sync,
-                                  projects: data.projects,
+                                  projects: data.materialRequestProjects,
                                 ),
                               ),
                             ),
                   ),
+                  if (data.materialRequestProjectsError != null)
+                    const _InfoCard(
+                      message: 'Daftar proyek untuk permintaan material belum tersedia. Perbarui database Dahlia Field sebelum menggunakan menu ini.',
+                    ),
+                  if (data.materialRequestProjectsError == null &&
+                      data.materialRequestProjects.isEmpty)
+                    const _InfoCard(
+                      message: 'Belum ada proyek berstatus DIKERJAKAN yang memiliki izin pengajuan material.',
+                    ),
                   if (data.projects.isEmpty)
                     const _InfoCard(
                       message: 'Belum ada proyek dengan hak akses lapangan pada akun ini.',
@@ -291,11 +314,15 @@ class _HomeData {
   const _HomeData({
     required this.contextData,
     required this.projects,
+    required this.materialRequestProjects,
+    required this.materialRequestProjectsError,
     required this.segments,
   });
 
   final Map<String, dynamic> contextData;
   final List<Map<String, dynamic>> projects;
+  final List<Map<String, dynamic>> materialRequestProjects;
+  final String? materialRequestProjectsError;
   final List<Map<String, dynamic>> segments;
 }
 
