@@ -162,6 +162,7 @@ export async function fetchProjectDetail(projectId: string) {
         backupDetails:volume_details(
           id,
           rab_item_id,
+          subitem_path,
           description,
           drawing_ref,
           multiplier,
