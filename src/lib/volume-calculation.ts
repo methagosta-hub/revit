@@ -114,7 +114,9 @@ function addOptionalLinearBars(
     integerPositive(barsPerMember, 'Jumlah tulangan ' + label);
     integerPositive(positions, 'Jumlah posisi/segmen ' + label);
     nonNegative(extraLength, 'Tambahan panjang ' + label);
-    const baseLength = group.length_mode === 'fixed' ? positive(fixedLength, 'Panjang potongan ' + label) : memberLength;
+    const cover = nonNegative(numeric(parameters.cover_mm || 0), 'Selimut beton elemen');
+    const clearMemberLength = memberLength - (group.length_mode === 'fixed' ? 0 : (2 * cover) / 1000);
+    const baseLength = group.length_mode === 'fixed' ? positive(fixedLength, 'Panjang potongan ' + label) : positive(clearMemberLength, 'Panjang bersih tulangan ' + label);
     lines.push(makeLine(label, diameter, barsPerMember * positions * memberCount, baseLength + extraLength));
   });
 }
@@ -194,9 +196,10 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>): 
     const slopeLength = Math.sqrt((steps * tread) ** 2 + (steps * riser) ** 2);
     const mainDiameter = positive(numeric(parameters.stair_main_diameter_mm), 'Diameter tulangan utama tangga');
     const mainSpacing = positive(numeric(parameters.stair_main_spacing_mm), 'Jarak tulangan utama tangga');
+    const stairClearWidth = positive(stairWidth * 1000 - 2 * cover, 'Lebar bersih tangga setelah selimut');
     const mainLayers = integerPositive(numeric(parameters.stair_main_layers || 1), 'Layer tulangan utama tangga');
     const mainAnchor = nonNegative(numeric(parameters.stair_main_anchor_mm || 0), 'Tambahan penyaluran tulangan utama tangga');
-    const mainCount = Math.ceil((stairWidth * 1000 - 2 * cover) / mainSpacing) + 1;
+    const mainCount = Math.ceil(stairClearWidth / mainSpacing) + 1;
     lines.push(makeLine(
       'Tangga · tulangan utama mengikuti bidang miring',
       mainDiameter,
@@ -208,7 +211,6 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>): 
     const distributionLayers = integerPositive(numeric(parameters.stair_distribution_layers || 1), 'Layer tulangan pembagi tangga');
     const distributionExtra = nonNegative(numeric(parameters.stair_distribution_extra_mm || 0), 'Tambahan panjang tulangan pembagi tangga');
     const barsAlongSlope = Math.ceil((slopeLength * 1000) / distributionSpacing) + 1;
-    const stairClearWidth = positive(stairWidth * 1000 - 2 * cover, 'Lebar bersih tangga setelah selimut');
     lines.push(makeLine(
       'Tangga · tulangan pembagi melintang',
       distributionDiameter,
