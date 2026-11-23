@@ -16,6 +16,7 @@ import {
   Database,
   FileText,
   FolderKanban,
+  Gauge,
   HardHat,
   Home,
   LogIn,
@@ -55,6 +56,7 @@ const navGroups: NavigationGroup[] = [
   {
     title: 'Beranda',
     items: [
+      { name: 'Pusat Kendali Operasional', href: '/pusat-kendali', icon: Gauge },
       { name: 'Dashboard Perusahaan', href: '/dashboard', icon: Home },
       { name: 'Daftar Proyek', href: '/proyek/daftar', icon: FolderKanban },
       { name: 'Buat Proyek', href: '/proyek/baru', icon: PlusCircle, permission: 'project.manage' },
@@ -127,7 +129,7 @@ export default function Sidebar() {
   const visibleNavGroups = isPortfolioAccount
     ? navGroups.slice(0, 1).map((group) => ({
         ...group,
-        items: group.items.filter((item) => item.href !== '/proyek/baru'),
+        items: group.items.filter((item) => item.href !== '/proyek/baru' && item.href !== '/pusat-kendali'),
       }))
     : navGroups;
   const [signingOut, setSigningOut] = useState(false);
