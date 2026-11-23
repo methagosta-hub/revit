@@ -39,6 +39,7 @@ import {
 import RabCategoryBoard from '@/components/rab/RabCategoryBoard';
 import { fetchProjectDetail, recalculateProjectTotal } from '@/lib/services/projectService';
 import { generateRABExcel } from '@/lib/excel-generator';
+import { buildLocationRabPdfHtml } from '@/lib/rab-location-pdf';
 import { formatRupiah } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { getMyAccess, hasPermission } from '@/lib/services/authService';
@@ -481,7 +482,7 @@ export default function ProjectWorkspacePage() {
   const [pdfBoldWeight, setPdfBoldWeight] = useState<PdfBoldWeight>(800);
   const [pdfSignatureCount, setPdfSignatureCount] = useState<1 | 2 | 3>(2);
   const [pdfSigners, setPdfSigners] = useState<PdfSigner[]>([
-    { role: 'Disusun oleh', name: '', identifier: '' },
+    { role: 'Perencana', name: '', identifier: '' },
     { role: 'Mengetahui', name: '', identifier: '' },
     { role: 'Menyetujui', name: '', identifier: '' },
   ]);
@@ -558,7 +559,7 @@ export default function ProjectWorkspacePage() {
   useEffect(() => {
     if (!project) return;
     setPdfSigners([
-      { role: 'Disusun oleh', name: project.planning_consultant || '', identifier: project.planning_consultant_skk || '' },
+      { role: 'Perencana', name: project.planning_consultant || '', identifier: project.planning_consultant_skk || '' },
       { role: 'Mengetahui', name: project.principal_name || '', identifier: project.principal_nip || '' },
       { role: 'Menyetujui', name: project.supervisory_consultant || '', identifier: project.supervisory_consultant_skk || '' },
     ]);
@@ -758,6 +759,30 @@ export default function ProjectWorkspacePage() {
     }
   };
 
+  // Setiap lokasi menghasilkan satu paket PDF mandiri: cover, rekapitulasi
+  // seluruh lokasi, rincian RAB, AHSP, dan backup volume lokasi terpilih.
+  const handleExportDivisionPdf = (divisionId: string) => {
+    if (!project) return;
+    const division = (project.divisions ?? []).find((entry) => entry.id === divisionId);
+    if (!division) { setErrorMessage('Lokasi pekerjaan tidak ditemukan. Segarkan halaman lalu coba kembali.'); return; }
+    const planner = pdfSigners[0];
+    if (!planner || !planner.name.trim()) { setErrorMessage('Nama Perencana wajib diisi pada Pengaturan Tanda Tangan PDF sebelum mengekspor dokumen lokasi.'); return; }
+    const exportDate = new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date());
+    const html = buildLocationRabPdfHtml({ project, division, divisions: project.divisions ?? [], accent: activePdfTheme.accent, soft: activePdfTheme.soft, border: activePdfTheme.border, text: activePdfTheme.text, font: PDF_FONTS[pdfFont].css, bold: pdfBoldWeight, signers: pdfSigners.slice(0, pdfSignatureCount), date: exportDate });
+    let url = ''; let printWindow: Window | null = null;
+    try {
+      url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+      printWindow = window.open(url, '_blank');
+      if (!printWindow) { URL.revokeObjectURL(url); setErrorMessage('Jendela cetak diblokir browser. Izinkan pop-up lalu ulangi ekspor.'); return; }
+      const target = printWindow; let started = false;
+      const start = () => { if (started || target.closed) return; started = true; target.focus(); target.print(); };
+      target.onload = () => window.setTimeout(start, 500);
+      target.onafterprint = () => target.close();
+      target.addEventListener('pagehide', () => URL.revokeObjectURL(url), { once: true });
+      window.setTimeout(start, 1500);
+      setErrorMessage(''); setSuccessMessage('Paket PDF lokasi ' + division.name + ' berhasil disiapkan. Pilih Save as PDF pada dialog cetak.');
+    } catch (error) { if (printWindow && !printWindow.closed) printWindow.close(); if (url) URL.revokeObjectURL(url); setErrorMessage('Gagal menyiapkan PDF lokasi: ' + getErrorMessage(error)); }
+  };
   const divisions = project?.divisions ?? [];
 
   const divisionTotals = useMemo(
@@ -1654,14 +1679,14 @@ export default function ProjectWorkspacePage() {
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {pdfSigners.slice(0, pdfSignatureCount).map((signer, index) => (
               <div key={index} className="rounded-xl border border-slate-200 p-3">
-                <p className="mb-2 text-xs font-bold text-slate-700">Penandatangan {index + 1}</p>
+                <p className="mb-2 text-xs font-bold text-slate-700">{index === 0 ? "Perencana · Wajib" : "Penandatangan " + (index + 1) + " · Opsional"}</p>
                 <label className="block text-xs font-medium text-slate-600">
                   Jabatan / keterangan
                   <input value={signer.role} onChange={(event) => setPdfSigners((current) => current.map((entry, entryIndex) => entryIndex === index ? { ...entry, role: event.target.value } : entry))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Contoh: Disusun oleh" />
                 </label>
                 <label className="mt-2 block text-xs font-medium text-slate-600">
                   Nama penandatangan
-                  <input value={signer.name} onChange={(event) => setPdfSigners((current) => current.map((entry, entryIndex) => entryIndex === index ? { ...entry, name: event.target.value } : entry))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Nama lengkap" />
+                  <input required={index === 0} value={signer.name} onChange={(event) => setPdfSigners((current) => current.map((entry, entryIndex) => entryIndex === index ? { ...entry, name: event.target.value } : entry))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder={index === 0 ? "Nama Perencana (wajib)" : "Nama lengkap (opsional)"} />
                 </label>
                 <label className="mt-2 block text-xs font-medium text-slate-600">
                   NIP / SKK / identitas (opsional)
@@ -1763,6 +1788,15 @@ export default function ProjectWorkspacePage() {
                     <span className="mr-1 text-sm font-bold tabular-nums text-slate-900">
                       {formatRupiah(divisionTotal)}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => handleExportDivisionPdf(division.id)}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
+                      title={'Ekspor paket PDF lengkap untuk lokasi ' + division.name}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      PDF Lokasi
+                    </button>
                     {canEditRab && <button
                       type="button"
                       onClick={() => openAhspPicker(division.id, division.name)}
