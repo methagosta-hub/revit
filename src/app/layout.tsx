@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import Sidebar from '@/components/layout/Sidebar';
 import { AuthProvider } from '@/components/auth/AuthProvider';
+import OperationsLiveHub from '@/components/common/OperationsLiveHub';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -28,8 +29,9 @@ export default function RootLayout({
         <AuthProvider>
           <div className="flex min-h-screen flex-col xl:flex-row">
             <Sidebar />
-            <main id="dahlia-main" className="flex min-w-0 max-w-full flex-1 flex-col">{children}</main>
+            <main id="dahlia-main" className="flex min-w-0 max-w-full flex-1 flex-col pb-12">{children}</main>
           </div>
+          <OperationsLiveHub />
         </AuthProvider>
       </body>
     </html>
