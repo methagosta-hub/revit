@@ -370,7 +370,7 @@ function normalizeParameters(mode: CalcMode, parameters: VolumeParameters): Volu
       'stair_main_diameter_mm', 'stair_main_spacing_mm', 'stair_main_layers', 'stair_main_anchor_mm',
       'stair_distribution_diameter_mm', 'stair_distribution_spacing_mm', 'stair_distribution_layers',
       'stair_distribution_extra_mm', 'landing_count', 'landing_length_m', 'landing_width_m', 'landing_layers',
-      'landing_diameter_x_mm', 'landing_diameter_y_mm', 'landing_spacing_x_mm', 'landing_spacing_y_mm',
+      'landing_diameter_x_mm', 'landing_diameter_y_mm', 'landing_spacing_x_mm', 'landing_spacing_y_mm', 'landing_lap_allowance_mm',
     ];
     numericKeys.forEach((key) => {
       const raw = normalized[key];
