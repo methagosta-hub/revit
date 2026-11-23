@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { ArrowUpRight, ClipboardCheck, FileText, PackageCheck, Truck, Users } from 'lucide-react';
+import { ArrowUpRight, ClipboardCheck, ClipboardList, FileText, PackageCheck, Truck, Users } from 'lucide-react';
 import RequireAuth from '@/components/auth/RequireAuth';
 
 const cards = [
+  { title: 'Permintaan Barang', description: 'Tinjau PR material yang diajukan Mandor melalui Dahlia Field.', href: '/pengadaan/permintaan', icon: ClipboardList },
   { title: 'Data Supplier', description: 'Daftar pemasok dan kontak pembelian.', href: '/pengadaan/supplier', icon: Users },
   { title: 'Proses Purchasing', description: 'Buat PO untuk kebutuhan material proyek.', href: '/pengadaan/purchasing', icon: FileText },
   { title: 'Persetujuan Pembelian', description: 'Direktur meninjau dan menyetujui PO.', href: '/pengadaan/persetujuan', icon: ClipboardCheck },
