@@ -185,6 +185,7 @@ export default function RebarStructureFields({ value, onChange }: Props) {
                 {field('landing_length_m', 'Panjang bordes', 'm')}
                 {field('landing_width_m', 'Lebar bordes', 'm')}
                 {field('landing_layers', 'Jumlah layer bordes', 'layer')}
+                {field('landing_lap_allowance_mm', 'Tambahan sambungan bordes', 'mm')}
                 {field('landing_thickness_mm', 'Tebal bordes', 'mm')}
                 {field('landing_diameter_x_mm', 'Diameter arah X', 'mm')}
                 {field('landing_spacing_x_mm', 'Jarak arah X', 'mm')}
