@@ -1204,10 +1204,39 @@ export default function VolumeBackupDrawer({ open, item, onClose, onSaved }: Pro
                 )}
 
                 {form.calcMode === 'rebar_structure' && (
-                  <RebarStructureFields
-                    value={form.parameters as Record<string, unknown>}
-                    onChange={(parameters) => setForm((current) => ({ ...current, parameters: parameters as VolumeParameters }))}
-                  />
+                  <>
+                    <RebarStructureFields
+                      value={form.parameters as Record<string, unknown>}
+                      onChange={(parameters) => setForm((current) => ({ ...current, parameters: parameters as VolumeParameters }))}
+                    />
+                    {(() => {
+                      try {
+                        const result = calculateStructuredRebar(
+                          form.parameters as Record<string, unknown>,
+                          Number(form.multiplier || 1),
+                        );
+                        return (
+                          <div className="rounded-xl border border-emerald-200 bg-white p-3">
+                            <div className="grid gap-2 sm:grid-cols-3">
+                              <div><p className="text-[9px] font-semibold uppercase text-slate-500">Total panjang tulangan</p><p className="text-base font-bold tabular-nums text-slate-900">{formatNumber(result.totalLengthM, 3)} m</p></div>
+                              <div><p className="text-[9px] font-semibold uppercase text-slate-500">Berat kebutuhan</p><p className="text-base font-bold tabular-nums text-emerald-800">{formatNumber(result.totalWeightKg, 3)} kg</p></div>
+                              <div><p className="text-[9px] font-semibold uppercase text-slate-500">Estimasi batang stok</p><p className="text-base font-bold tabular-nums text-slate-900">{formatNumber(result.totalStockBars, 0)} batang</p></div>
+                            </div>
+                            <div className="mt-3 overflow-x-auto">
+                              <table className="w-full min-w-[430px] text-[10px]">
+                                <thead><tr className="border-b border-slate-100 text-left text-slate-500"><th className="py-2">Diameter</th><th className="py-2 text-right">Panjang</th><th className="py-2 text-right">Berat perlu</th><th className="py-2 text-right">Batang {formatNumber(result.stockLengthM, 2)} m</th></tr></thead>
+                                <tbody>{result.diameterSummary.map((row) => (
+                                  <tr key={row.diameter} className="border-b border-slate-50 text-slate-700"><td className="py-1.5 font-semibold">Ø{formatNumber(row.diameter, 0)}</td><td className="py-1.5 text-right tabular-nums">{formatNumber(row.totalLengthM, 3)} m</td><td className="py-1.5 text-right tabular-nums">{formatNumber(row.requiredWeightKg, 3)} kg</td><td className="py-1.5 text-right tabular-nums">{formatNumber(row.stockBars, 0)} batang</td></tr>
+                                ))}</tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      } catch {
+                        return <p className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-[10px] text-slate-500">Isi dimensi, jumlah tulangan, diameter, serta jarak untuk melihat estimasi kg dan batang besi per diameter.</p>;
+                      }
+                    })()}
+                  </>
                 )}
 
                 {form.calcMode === 'custom_builder' && (
