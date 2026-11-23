@@ -118,7 +118,7 @@ export default function OperationsLiveHub() {
           .from('activity_feed')
           .select('id, source_table, source_id, event_type, actor_name, project_name, title, summary, target_url, metadata, created_at')
           .order('created_at', { ascending: false })
-          .limit(12),
+          .limit(30),
       ]);
 
       if (notificationResult.error) throw notificationResult.error;
