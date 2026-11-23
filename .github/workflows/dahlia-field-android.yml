@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/dahlia-field-mobile
+      - fix/dahlia-field-draft-material
     paths:
       - "apps/dahlia-field/**"
       - "supabase/migrations/**"
