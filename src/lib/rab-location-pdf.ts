@@ -15,17 +15,21 @@ function heading(no: string, title: string, division: any, accent: string) {
 }
 function calc(row: any) {
   const p=row.parameters||{}, v=(k:string,d=1)=>num(p[k]??d,2);
-  switch(row.calc_mode||'standard'){
-    case 'standard': return v('length')+' × '+v('width')+' × '+v('height')+' × '+v('quantity')+' kali';
-    case 'wall_area': return '('+v('wall_height',0)+' × '+v('wall_length',0)+') − luas bukaan';
-    case 'frame_length': return 'Akumulasi panjang segmen kusen';
-    case 'glass_area': return 'Akumulasi luas panel kaca';
-    case 'opening_count': return 'Akumulasi jumlah unit bukaan';
-    case 'trapezoid': return '(('+v('top_width',0)+' + '+v('bottom_width',0)+') ÷ 2) × '+v('depth',0)+' × '+v('length',0)+' × '+v('quantity');
-    case 'rebar': return '(Ø'+v('diameter',0)+'² ÷ 162) × '+v('bar_length',0)+' × '+v('bars',0);
-    case 'rebar_structure': return describeStructuredRebar(p);
-    case 'custom_builder': return describeCustomBuilder(p);
-    default: return e(p.formula||'Rumus khusus belum tercatat');
+  try {
+    switch(row.calc_mode||'standard'){
+      case 'standard': return v('length')+' × '+v('width')+' × '+v('height')+' × '+v('quantity')+' kali';
+      case 'wall_area': return '('+v('wall_height',0)+' × '+v('wall_length',0)+') − luas bukaan';
+      case 'frame_length': return 'Akumulasi panjang segmen kusen';
+      case 'glass_area': return 'Akumulasi luas panel kaca';
+      case 'opening_count': return 'Akumulasi jumlah unit bukaan';
+      case 'trapezoid': return '(('+v('top_width',0)+' + '+v('bottom_width',0)+') ÷ 2) × '+v('depth',0)+' × '+v('length',0)+' × '+v('quantity');
+      case 'rebar': return '(Ø'+v('diameter',0)+'² ÷ 162) × '+v('bar_length',0)+' × '+v('bars',0);
+      case 'rebar_structure': return describeStructuredRebar(p);
+      case 'custom_builder': return describeCustomBuilder(p);
+      default: return String(p.formula||'Rumus khusus belum tercatat');
+    }
+  } catch (error) {
+    return 'Parameter belum lengkap / tidak valid: '+(error instanceof Error ? error.message : 'periksa kembali input');
   }
 }
 function componentTable(rows: any[]) {
