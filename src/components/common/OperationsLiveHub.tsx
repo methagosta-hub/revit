@@ -39,6 +39,9 @@ type ActivityRow = {
   summary: string;
   target_url: string | null;
   created_at: string;
+  source_table?: string | null;
+  source_id?: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 function timeLabel(value: string): string {
@@ -78,6 +81,8 @@ export default function OperationsLiveHub() {
   const [soundReady, setSoundReady] = useState(false);
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [toast, setToast] = useState<NotificationRow | null>(null);
+  const [activityToast, setActivityToast] = useState<ActivityRow | null>(null);
+  const [activeTab, setActiveTab] = useState<'office' | 'personal'>('office');
   const [feedStatus, setFeedStatus] = useState('');
 
   const unreadCount = useMemo(
@@ -111,7 +116,7 @@ export default function OperationsLiveHub() {
           .limit(30),
         supabase
           .from('activity_feed')
-          .select('id, event_type, actor_name, project_name, title, summary, target_url, created_at')
+          .select('id, source_table, source_id, event_type, actor_name, project_name, title, summary, target_url, metadata, created_at')
           .order('created_at', { ascending: false })
           .limit(12),
       ]);
@@ -147,6 +152,9 @@ export default function OperationsLiveHub() {
         if (payload.eventType === 'INSERT') {
           const incoming = payload.new as NotificationRow;
           setNotifications((current) => [incoming, ...current.filter((item) => item.id !== incoming.id)].slice(0, 30));
+          // Operational events with a source are announced once through the shared activity stream.
+          // Personal-only notices remain announced directly to their intended recipient.
+          if (incoming.metadata?.source_table || incoming.metadata?.source_id) return;
           setToast(incoming);
           const voiceText = String(incoming.metadata?.voice_text ?? incoming.message ?? '');
           if (soundEnabled && voiceText) speak(voiceText);
@@ -164,7 +172,10 @@ export default function OperationsLiveHub() {
         table: 'activity_feed',
       }, (payload) => {
         const incoming = payload.new as ActivityRow;
-        setActivities((current) => [incoming, ...current.filter((item) => item.id !== incoming.id)].slice(0, 12));
+        setActivities((current) => [incoming, ...current.filter((item) => item.id !== incoming.id)].slice(0, 30));
+        setActivityToast(incoming);
+        const voiceText = String(incoming.metadata?.voice_text ?? incoming.summary ?? incoming.title ?? '');
+        if (soundEnabled && voiceText) speak(voiceText);
       })
       .subscribe();
 
@@ -184,6 +195,12 @@ export default function OperationsLiveHub() {
     const timeout = window.setTimeout(() => setToast(null), 8500);
     return () => window.clearTimeout(timeout);
   }, [toast]);
+
+  useEffect(() => {
+    if (!activityToast) return;
+    const timeout = window.setTimeout(() => setActivityToast(null), 8500);
+    return () => window.clearTimeout(timeout);
+  }, [activityToast]);
 
   const enableSound = () => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
@@ -239,6 +256,22 @@ export default function OperationsLiveHub() {
 
   return (
     <>
+      {activityToast ? (
+        <div className="fixed right-4 top-20 z-[95] w-[min(92vw,390px)] rounded-2xl border border-emerald-200 bg-white p-4 shadow-2xl shadow-slate-950/15">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><Activity className="h-4 w-4" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">Aktivitas kantor · transparan</p>
+              <p className="mt-1 text-sm font-bold text-slate-900">{activityToast.title}</p>
+              <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-600">{activityToast.summary}</p>
+              <p className="mt-1 text-[10px] text-slate-500">{activityToast.actor_name} · {activityToast.project_name}</p>
+              {activityToast.target_url ? <Link href={activityToast.target_url} onClick={() => setActivityToast(null)} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-emerald-800 hover:underline">Buka aktivitas <ChevronRight className="h-3.5 w-3.5" /></Link> : null}
+            </div>
+            <button type="button" onClick={() => setActivityToast(null)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100" aria-label="Tutup aktivitas kantor"><X className="h-4 w-4" /></button>
+          </div>
+        </div>
+      ) : null}
+
       {toast ? (
         <div className="fixed right-4 top-20 z-[95] w-[min(92vw,390px)] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-950/15">
           <div className="flex items-start gap-3">
@@ -272,8 +305,8 @@ export default function OperationsLiveHub() {
                     <BellRing className="h-4 w-4" />
                     <span className="text-[10px] font-bold uppercase tracking-[0.16em]">Dahlia Operations Desk</span>
                   </div>
-                  <h2 className="mt-1 text-lg font-extrabold">Pemberitahuan Anda</h2>
-                  <p className="mt-1 text-[11px] text-slate-300">Disesuaikan dengan peran dan kewenangan akun aktif.</p>
+                  <h2 className="mt-1 text-lg font-extrabold">Pusat Notifikasi</h2>
+                  <p className="mt-1 text-[11px] text-slate-300">Aktivitas perusahaan terbuka untuk akun internal; tugas pribadi mengikuti kewenangan akun.</p>
                 </div>
                 <button type="button" onClick={() => setPanelOpen(false)} className="rounded-lg p-2 text-slate-300 hover:bg-white/10" aria-label="Tutup panel">
                   <X className="h-4 w-4" />
@@ -282,15 +315,20 @@ export default function OperationsLiveHub() {
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-3 py-1.5 text-[10px] font-semibold text-slate-200">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.8)]" />
-                  Live · {unreadCount} belum dibaca
+                  Live · {activities.length} aktivitas kantor · {unreadCount} tugas belum dibaca
                 </div>
-                {unreadCount > 0 ? (
+                {activeTab === 'personal' && unreadCount > 0 ? (
                   <button type="button" onClick={() => void markAllRead()} className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-200 hover:text-white">
                     <CheckCheck className="h-3.5 w-3.5" /> Tandai semua dibaca
                   </button>
                 ) : null}
               </div>
             </header>
+
+            <div className="grid grid-cols-2 border-b border-slate-100 bg-white">
+              <button type="button" onClick={() => setActiveTab('office')} className={`px-3 py-3 text-[11px] font-bold transition ${activeTab === 'office' ? 'border-b-2 border-emerald-700 bg-emerald-50/60 text-emerald-800' : 'text-slate-500 hover:bg-slate-50'}`}>Aktivitas Kantor <span className="ml-1 text-[9px] opacity-70">({activities.length})</span></button>
+              <button type="button" onClick={() => setActiveTab('personal')} className={`px-3 py-3 text-[11px] font-bold transition ${activeTab === 'personal' ? 'border-b-2 border-emerald-700 bg-emerald-50/60 text-emerald-800' : 'text-slate-500 hover:bg-slate-50'}`}>Tugas Anda <span className="ml-1 text-[9px] opacity-70">({unreadCount})</span></button>
+            </div>
 
             <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
               <div className="flex items-center justify-between gap-2">
@@ -314,7 +352,27 @@ export default function OperationsLiveHub() {
 
             <div className="min-h-0 flex-1 overflow-y-auto">
               {feedStatus ? <p role="status" className="m-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">{feedStatus}</p> : null}
-              {loadingFeed && notifications.length === 0 ? (
+              {activeTab === 'office' ? (
+                loadingFeed && activities.length === 0 ? (
+                  <div className="space-y-3 p-4"><div className="h-16 animate-pulse rounded-xl bg-slate-100" /><div className="h-16 animate-pulse rounded-xl bg-slate-100" /></div>
+                ) : activities.length ? (
+                  <div className="divide-y divide-slate-100">
+                    {activities.map((item) => (
+                      <article key={item.id} className="flex gap-3 bg-white px-4 py-3.5">
+                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700"><Activity className="h-4 w-4" /></span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold leading-5 text-slate-900">{item.title}</p>
+                          <p className="mt-1 whitespace-pre-line text-[11px] leading-5 text-slate-600">{item.summary}</p>
+                          <p className="mt-2 text-[9px] text-slate-400">{item.actor_name} · {item.project_name} · {timeLabel(item.created_at)}</p>
+                          {item.target_url ? <Link href={item.target_url} className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 hover:underline">Lihat detail <ChevronRight className="h-3 w-3" /></Link> : null}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-5 py-12 text-center"><Activity className="mx-auto h-7 w-7 text-slate-300" /><p className="mt-3 text-sm font-bold text-slate-900">Belum ada aktivitas kantor</p><p className="mt-1 text-xs leading-5 text-slate-500">Aktivitas lintas divisi akan tampil di sini secara langsung saat tercatat.</p></div>
+                )
+              ) : loadingFeed && notifications.length === 0 ? (
                 <div className="space-y-3 p-4"><div className="h-16 animate-pulse rounded-xl bg-slate-100" /><div className="h-16 animate-pulse rounded-xl bg-slate-100" /></div>
               ) : notifications.length ? (
                 <div className="divide-y divide-slate-100">
@@ -352,7 +410,7 @@ export default function OperationsLiveHub() {
               )}
             </div>
             <footer className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-4 py-2.5">
-              <span className="text-[9px] text-slate-500">Informasi pribadi · sesuai otoritas</span>
+              <span className="text-[9px] text-slate-500">{activeTab === 'office' ? 'Ringkasan operasional untuk seluruh akun internal' : 'Informasi tugas pribadi · sesuai otoritas'}</span>
               <button type="button" onClick={() => void loadFeeds()} className="text-[10px] font-bold text-emerald-800 hover:underline">Segarkan</button>
             </footer>
           </section>
