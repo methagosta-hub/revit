@@ -53,6 +53,21 @@ body {
   display: none;
 }
 
+
+/* Company-wide operations ticker; pauses while the user hovers or focuses it. */
+.dahlia-marquee-track {
+  min-width: max-content;
+  animation: dahlia-marquee-scroll 76s linear infinite;
+}
+.dahlia-marquee-track:hover,
+.dahlia-marquee-track:focus-within {
+  animation-play-state: paused;
+}
+@keyframes dahlia-marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
 /* Shared A4 print-document components; popup exports reuse the same tokens. */
 .dahlia-doc-content > * + * {
   margin-top: 0.9rem;
