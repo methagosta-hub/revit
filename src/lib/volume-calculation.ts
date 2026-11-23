@@ -43,7 +43,7 @@ export type RebarCalculationResult = {
 const SNI_NOMINAL_WEIGHT_KG_PER_M: Record<number, number> = {
   6: 0.222, 8: 0.395, 10: 0.617, 12: 0.888, 13: 1.042, 14: 1.208,
   16: 1.578, 19: 2.226, 22: 2.984, 25: 3.853, 28: 4.834, 29: 5.185,
-  32: 6.313, 36: 7.990, 40: 9.865, 50: 15.413, 54: 17.978, 57: 20.031,
+  32: 6.313, 36: 7.990, 38: 8.903, 40: 9.865, 43: 11.400, 50: 15.413, 54: 17.978, 57: 20.031,
 };
 
 const LABELS: Record<RebarStructureKind, string> = {
@@ -74,7 +74,7 @@ const integerPositive = (value: number, name: string) => {
   return value;
 };
 const kgPerMeter = (diameter: number) =>
-  SNI_NOMINAL_WEIGHT_KG_PER_M[diameter] ?? (diameter * diameter) / 162;
+  SNI_NOMINAL_WEIGHT_KG_PER_M[diameter] ?? (0.785 * 0.7854 * diameter * diameter) / 100;
 
 function makeLine(label: string, diameterValue: unknown, piecesValue: number, cutLengthValue: number): RebarBreakdownLine {
   const diameter = positive(numeric(diameterValue), 'Diameter besi (' + label + ')');
