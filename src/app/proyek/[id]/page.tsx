@@ -768,7 +768,8 @@ export default function ProjectWorkspacePage() {
     const planner = pdfSigners[0];
     if (!planner || !planner.name.trim()) { setErrorMessage('Nama Perencana wajib diisi pada Pengaturan Tanda Tangan PDF sebelum mengekspor dokumen lokasi.'); return; }
     const exportDate = new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date());
-    const html = buildLocationRabPdfHtml({ project, division, divisions: project.divisions ?? [], accent: activePdfTheme.accent, soft: activePdfTheme.soft, border: activePdfTheme.border, text: activePdfTheme.text, font: PDF_FONTS[pdfFont].css, bold: pdfBoldWeight, signers: pdfSigners.slice(0, pdfSignatureCount), date: exportDate });
+    const categorizedDivision = { ...division, items: (division.items ?? []).map((item) => ({ ...item, categoryName: getAhspCodeClassification(String(item.code || '')).subdivisionName })) };
+    const html = buildLocationRabPdfHtml({ project, division: categorizedDivision, divisions: project.divisions ?? [], accent: activePdfTheme.accent, soft: activePdfTheme.soft, border: activePdfTheme.border, text: activePdfTheme.text, font: PDF_FONTS[pdfFont].css, bold: pdfBoldWeight, signers: pdfSigners.slice(0, pdfSignatureCount), date: exportDate });
     let url = ''; let printWindow: Window | null = null;
     try {
       url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
