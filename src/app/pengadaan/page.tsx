@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   Activity,
   AlertTriangle,
-  ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
   BadgeCheck,
@@ -21,7 +20,6 @@ import {
   ShoppingCart,
   Truck,
   Users,
-  Wallet,
   Zap,
 } from 'lucide-react';
 import RequireAuth from '@/components/auth/RequireAuth';
