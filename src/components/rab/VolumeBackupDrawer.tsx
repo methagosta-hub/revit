@@ -364,7 +364,7 @@ function normalizeParameters(mode: CalcMode, parameters: VolumeParameters): Volu
     const normalized: Record<string, unknown> = { ...parameters, structure_type: String(parameters.structure_type || 'beam') };
     const numericKeys = [
       'stock_length_m', 'waste_pct', 'member_length_m', 'member_count', 'cover_mm', 'tie_diameter_mm',
-      'tie_width_mm', 'tie_depth_mm', 'tie_spacing_mm', 'tie_cover_mm', 'tie_hook_mm', 'tie_end_offset_mm',
+      'tie_width_mm', 'tie_depth_mm', 'tie_spacing_mm', 'tie_support_zone_m', 'tie_support_spacing_mm', 'tie_cover_mm', 'tie_hook_mm', 'tie_end_offset_mm',
       'flat_length_m', 'flat_width_m', 'layers', 'spacing_x_mm', 'spacing_y_mm', 'diameter_x_mm', 'diameter_y_mm',
       'lap_allowance_mm', 'step_count', 'tread_width_m', 'riser_height_m', 'stair_width_m', 'flight_count',
       'stair_main_diameter_mm', 'stair_main_spacing_mm', 'stair_main_layers', 'stair_main_anchor_mm',
