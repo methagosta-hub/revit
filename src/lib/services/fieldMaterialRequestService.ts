@@ -101,7 +101,7 @@ export async function createPurchaseOrderFromFieldRequest(input: {
   orderDate: string;
   expectedDate?: string | null;
   notes?: string | null;
-  itemPrices: Array<{ item_id: string; unit_price: number }>;
+  itemPrices: Array<{ item_id: string; material_code?: string | null; unit_price: number }>;
 }): Promise<string> {
   if (!input.requestId || !input.supplierId) {
     throw new Error('PR dan supplier wajib dipilih.');
