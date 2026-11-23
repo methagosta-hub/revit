@@ -108,15 +108,17 @@ export default function RebarStructureFields({ value, onChange }: Props) {
           <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
             <p className="text-[11px] font-bold text-slate-700">Sengkang / cincin</p>
             <div className="grid gap-3 sm:grid-cols-4">
-              {field('tie_width_mm', 'Lebar sengkang', 'mm')}
-              {field('tie_depth_mm', structure === 'column' || structure === 'pedestal' ? 'Tebal sisi kedua' : 'Tinggi sengkang', 'mm')}
-              {field('tie_spacing_mm', 'Jarak antar sengkang', 'mm')}
+              {field('tie_width_mm', 'Lebar penampang beton (b)', 'mm')}
+              {field('tie_depth_mm', structure === 'column' || structure === 'pedestal' ? 'Kedalaman penampang beton (h)', 'mm' : 'Tinggi penampang beton (h)', 'mm')}
+              {field('tie_spacing_mm', 'Jarak sengkang zona lapangan', 'mm')}
+              {field('tie_support_zone_m', 'Panjang zona tumpuan tiap ujung', 'm', 'Kosongkan bila seluruh elemen memakai jarak seragam')}
+              {field('tie_support_spacing_mm', 'Jarak sengkang zona tumpuan', 'mm', 'Diisi bersama panjang zona tumpuan bila jarak di ujung lebih rapat')}
               {field('tie_diameter_mm', 'Diameter sengkang', 'mm')}
-              {field('tie_cover_mm', 'Selimut ke sengkang', 'mm')}
+              {field('tie_cover_mm', 'Selimut beton ke sisi luar sengkang', 'mm')}
               {field('tie_hook_mm', 'Panjang kait tiap ujung', 'mm')}
               {field('tie_end_offset_mm', 'Jarak sengkang dari ujung', 'mm')}
             </div>
-            <p className="text-[9px] leading-4 text-slate-500">Jumlah cincin dihitung dari panjang/tinggi/kedalaman elemen dan jarak maksimum yang diinput. Panjang potong memperhitungkan dimensi bersih, selimut, serta dua kait sesuai nilai yang Anda masukkan.</p>
+            <p className="text-[9px] leading-4 text-slate-500">Dimensi yang dimasukkan adalah ukuran penampang beton. Panjang potong dihitung pada garis tengah sengkang setelah dikurangi selimut beton dan diameter sengkang, lalu ditambah panjang dua kait. Bila zona tumpuan diisi, jarak rapat di kedua ujung dihitung terpisah dari jarak zona lapangan.</p>
           </div>
         </>
       )}
