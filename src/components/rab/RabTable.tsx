@@ -70,6 +70,18 @@ export type RabTableItem = {
   work_group_name?: string | null;
   sort_order?: number | null;
   is_volume_from_backup?: boolean;
+  /** Rincian backup volume JSONB yang dimuat untuk ekspor PDF per lokasi. */
+  backupDetails?: Array<{
+    id: string;
+    rab_item_id: string;
+    subitem_path?: string | null;
+    description: string;
+    drawing_ref?: string | null;
+    multiplier: number | string | null;
+    calc_mode: string | null;
+    parameters: Record<string, unknown> | null;
+    subtotal: number | string | null;
+  }> | null;
 };
 
 export type RabItemUpdate = {
