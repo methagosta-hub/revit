@@ -112,8 +112,9 @@ export interface ExecutiveDashboardSnapshot {
   payable_orders: DashboardPayableOrder[];
   stock_line_count: number;
   low_stock_count: number;
-  stock_rules_configured: number;
+  stock_rules_configured: number | null;
   stock_lines: DashboardStockLine[];
+  low_stock_lines: DashboardStockLine[];
   payment_obligations: DashboardPaymentObligation[];
   outstanding_obligation_count: number;
   outstanding_obligation_total: number;
@@ -313,7 +314,7 @@ async function loadWarehouse(
   canManageWarehouse: boolean,
 ): Promise<{
   lineCount: number;
-  ruleCount: number;
+  ruleCount: number | null;
   lowRows: DashboardStockLine[];
   stockRows: DashboardStockLine[];
 }> {
@@ -359,7 +360,7 @@ async function loadWarehouse(
 
   return {
     lineCount: stockResult.count ?? stockRows.length,
-    ruleCount: rules.length,
+    ruleCount: canManageWarehouse ? rules.length : null,
     lowRows: lowRows.slice(0, 5),
     stockRows: stockRows.slice(0, 8),
   };
@@ -592,8 +593,8 @@ export async function fetchExecutiveDashboardSnapshot(access: ExecutiveDashboard
   ] = await Promise.all([
     optionalSection('antrean persetujuan PO', { pendingCount: 0, pendingRows: [] }, warnings,
       () => access.canViewProcurement ? loadProcurement(projectNames, access.canApprovePurchase) : Promise.resolve({ pendingCount: 0, pendingRows: [] })),
-    optionalSection('persediaan gudang', { lineCount: 0, ruleCount: 0, lowRows: [], stockRows: [] }, warnings,
-      () => access.canViewWarehouse ? loadWarehouse(projectNames, access.canManageWarehouse) : Promise.resolve({ lineCount: 0, ruleCount: 0, lowRows: [], stockRows: [] })),
+    optionalSection('persediaan gudang', { lineCount: 0, ruleCount: null, lowRows: [], stockRows: [] }, warnings,
+      () => access.canViewWarehouse ? loadWarehouse(projectNames, access.canManageWarehouse) : Promise.resolve({ lineCount: 0, ruleCount: null, lowRows: [], stockRows: [] })),
     optionalSection('ringkasan keuangan', { payableCount: 0, payableRemaining: 0, payableOrders: [], obligations: [] }, warnings,
       () => canViewPayments ? loadFinance(projects) : Promise.resolve({ payableCount: 0, payableRemaining: 0, payableOrders: [], obligations: [] })),
     optionalSection('ringkasan termin subkontraktor', null, warnings,
@@ -633,6 +634,7 @@ export async function fetchExecutiveDashboardSnapshot(access: ExecutiveDashboard
     low_stock_count: warehouse.lowRows.length,
     stock_rules_configured: warehouse.ruleCount,
     stock_lines: warehouse.stockRows,
+    low_stock_lines: warehouse.lowRows,
     payment_obligations: obligations.slice(0, 5),
     outstanding_obligation_count: obligations.length,
     outstanding_obligation_total: obligations.reduce((sum, row) => sum + row.remaining, 0),
