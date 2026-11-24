@@ -68,15 +68,15 @@ class DahliaAccess {
   bool get canReviewMaterialRequest =>
       hasPermission('procurement.request.review');
 
-  bool get canReceiveMaterial => hasPermission('warehouse.receive');
+  bool get canReceiveMaterial => hasPermission('warehouse.receive') || hasAnyProjectPermission(['warehouse.receive']);
 
-  bool get canIssueMaterial => hasPermission('warehouse.issue');
+  bool get canIssueMaterial => hasPermission('warehouse.issue') || hasAnyProjectPermission(['warehouse.issue']);
 
-  bool get canManageWarehouse => hasPermission('warehouse.manage');
+  bool get canManageWarehouse => hasPermission('warehouse.manage') || hasAnyProjectPermission(['warehouse.manage']);
 
-  bool get canReadFinance => hasPermission('finance.read');
+  bool get canReadFinance => hasPermission('finance.read') || hasAnyProjectPermission(['finance.read']);
 
-  bool get canManagePayments => hasPermission('finance.payment.manage');
+  bool get canManagePayments => hasPermission('finance.payment.manage') || hasAnyProjectPermission(['finance.payment.manage']);
 
   bool get canReadPersonnel => hasPermission('personnel.read');
 

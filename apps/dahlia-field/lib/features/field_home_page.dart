@@ -8,6 +8,10 @@ import '../data/dahlia_access.dart';
 import '../data/field_repository.dart';
 import '../data/procurement_repository.dart';
 import '../data/task_center_repository.dart';
+import '../data/warehouse_repository.dart';
+import '../data/finance_repository.dart';
+import 'warehouse_page.dart';
+import 'finance_page.dart';
 import 'attendance_page.dart';
 import 'material_request_page.dart';
 import 'daily_report_page.dart';
@@ -29,6 +33,8 @@ class _FieldHomePageState extends State<FieldHomePage>
     with WidgetsBindingObserver {
   late final FieldRepository _repository;
   late final ProcurementRepository _procurementRepository;
+  late final WarehouseRepository _warehouseRepository;
+  late final FinanceRepository _financeRepository;
   late final TaskCenterService _taskCenter;
   late final FieldSyncService _sync;
   late Future<_HomeData> _homeFuture;
@@ -43,6 +49,8 @@ class _FieldHomePageState extends State<FieldHomePage>
     final client = Supabase.instance.client;
     _repository = FieldRepository(client: client, outbox: widget.outbox);
     _procurementRepository = ProcurementRepository(client: client);
+    _warehouseRepository = WarehouseRepository(client: client);
+    _financeRepository = FinanceRepository(client: client);
     _taskCenter = TaskCenterService(
       repository: TaskCenterRepository(client: client),
     );
@@ -223,6 +231,8 @@ class _FieldHomePageState extends State<FieldHomePage>
               data.access.canApprovePurchaseOrder ||
               data.access.canReviewMaterialRequest;
           final hasDirectorMonitor = isDirector && data.access.hasPermission('project.read');
+          final hasWarehouseWorkspace = data.access.canManageWarehouse || data.access.canReceiveMaterial || data.access.canIssueMaterial;
+          final hasFinanceWorkspace = data.access.canReadFinance || data.access.canManagePayments;
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -272,6 +282,40 @@ class _FieldHomePageState extends State<FieldHomePage>
                       MaterialPageRoute<void>(
                         builder: (_) => ProcurementPage(
                           repository: _procurementRepository,
+                          access: data.access,
+                        ),
+                      ),
+                    ).then((_) => _reloadHome()),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                if (hasWarehouseWorkspace) ...[
+                  _FeatureCard(
+                    icon: Icons.warehouse_rounded,
+                    color: const Color(0xFF2F7190),
+                    title: 'Operasional Gudang',
+                    description: 'Pantau stok, catat penerimaan dan pengeluaran, serta buat berita acara PDF.',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => WarehousePage(
+                          repository: _warehouseRepository,
+                          access: data.access,
+                        ),
+                      ),
+                    ).then((_) => _reloadHome()),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                if (hasFinanceWorkspace) ...[
+                  _FeatureCard(
+                    icon: Icons.account_balance_wallet_rounded,
+                    color: const Color(0xFF23835F),
+                    title: 'Pusat Keuangan',
+                    description: 'Kelola kas, pembayaran supplier, kewajiban, ringkasan proyek, dan rekap PDF.',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => FinancePage(
+                          repository: _financeRepository,
                           access: data.access,
                         ),
                       ),
@@ -383,7 +427,7 @@ class _FieldHomePageState extends State<FieldHomePage>
                     const _InfoCard(
                       message: 'Belum ada proyek berstatus DIKERJAKAN yang memiliki izin pengajuan material.',
                     ),
-                  if (!hasFieldReport && !hasAttendance && !hasMaterialRequest && !hasProcurementWorkspace && !hasDirectorMonitor)
+                  if (!hasFieldReport && !hasAttendance && !hasMaterialRequest && !hasProcurementWorkspace && !hasWarehouseWorkspace && !hasFinanceWorkspace && !hasDirectorMonitor)
                     const _InfoCard(
                       message: 'Belum ada modul APK yang aktif untuk permission akun ini. Modul lain akan ditambahkan bertahap tanpa perubahan dashboard atau database.',
                     ),
@@ -554,12 +598,14 @@ class _FeatureCard extends StatelessWidget {
     required this.title,
     required this.description,
     required this.onTap,
+    this.color = const Color(0xFF244C45),
   });
 
   final IconData icon;
   final String title;
   final String description;
   final VoidCallback? onTap;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -575,10 +621,10 @@ class _FeatureCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE5EFEB),
-                  borderRadius: BorderRadius.circular(14),
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(15),
                 ),
-                child: Icon(icon, color: const Color(0xFF244C45)),
+                child: Icon(icon, color: color, size: 23),
               ),
               const SizedBox(width: 14),
               Expanded(
