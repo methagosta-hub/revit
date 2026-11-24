@@ -192,6 +192,7 @@ function CompanyDashboardContent() {
         canManageWarehouse: can('warehouse.manage'),
         canViewFinance: can('finance.read'),
         canViewSubcontractFinance: can('finance.read') && (can('payroll.read') || can('execution.payment.read') || can('execution.payment.manage')),
+        canViewCompanyActivity: !isPortfolioAccount,
         canAccessExecutionProject: (projectId) => can('execution.read', projectId),
       });
       setSnapshot(data);
