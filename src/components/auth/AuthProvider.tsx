@@ -77,8 +77,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     };
 
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      // Supabase menyarankan operasi jaringan lanjutan dijalankan setelah callback auth selesai.
+    const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      // Perpanjangan token adalah proses normal. Jangan memicu pemeriksaan akses
+      // penuh karena RequireAuth akan melepas halaman dan membuang state formulir.
+      if (event === 'TOKEN_REFRESHED' && nextSession?.user) {
+        window.setTimeout(() => {
+          if (active) setSession(nextSession);
+        }, 0);
+        return;
+      }
+
+      // Event autentikasi selain refresh token dapat mengubah identitas atau akses.
+      // Jalankan pemeriksaan jaringan setelah callback auth selesai.
       window.setTimeout(() => {
         if (active) void loadForSession(nextSession);
       }, 0);
