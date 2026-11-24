@@ -133,6 +133,7 @@ export interface ExecutiveDashboardAccess {
   canManageWarehouse: boolean;
   canViewFinance: boolean;
   canViewSubcontractFinance: boolean;
+  canViewCompanyActivity: boolean;
   canAccessExecutionProject: (projectId: string) => boolean;
 }
 
@@ -501,7 +502,7 @@ async function loadExecution(
     supabase.from('execution_segments')
       .select('id,package_id')
       .in('package_id', packageIds)
-      .eq('status', 'active')
+      .in('status', ['active', 'closed'])
       .limit(500),
   ]);
   if (itemsResult.error) throw new Error(itemsResult.error.message);
@@ -602,6 +603,7 @@ export async function fetchExecutiveDashboardSnapshot(access: ExecutiveDashboard
     optionalSection('ringkasan termin subkontraktor', null, warnings,
       () => canReadSubcontract ? loadSubcontractSummary() : Promise.resolve(null)),
     optionalSection('aktivitas perusahaan', [], warnings, async () => {
+      if (!access.canViewCompanyActivity) return [];
       const { data, error } = await supabase.from('activity_feed')
         .select('id,event_type,actor_name,project_name,title,summary,target_url,created_at')
         .order('created_at', { ascending: false })
