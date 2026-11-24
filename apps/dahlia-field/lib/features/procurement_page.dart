@@ -18,7 +18,6 @@ class ProcurementPage extends StatefulWidget {
 }
 
 class _ProcurementPageState extends State<ProcurementPage> {
-  late Future<void> _loadFuture;
   List<Map<String, dynamic>> _orders = [];
   List<Map<String, dynamic>> _requests = [];
   bool _loading = true;
@@ -34,7 +33,7 @@ class _ProcurementPageState extends State<ProcurementPage> {
   @override
   void initState() {
     super.initState();
-    _loadFuture = _load();
+    _load();
   }
 
   Future<void> _load() async {
@@ -65,7 +64,7 @@ class _ProcurementPageState extends State<ProcurementPage> {
 
   Future<void> _refresh() async {
     final next = _load();
-    setState(() => _loadFuture = next);
+    setState(() {});
     await next;
   }
 
@@ -976,7 +975,6 @@ String _statusLabel(String status) {
     'under_review': 'Sedang ditinjau',
     'rejected': 'Ditolak',
     'converted': 'Sudah menjadi PO',
-    'cancelled': 'Dibatalkan',
   };
   return labels[status] ?? status.replaceAll('_', ' ');
 }
