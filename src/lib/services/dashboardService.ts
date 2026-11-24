@@ -596,7 +596,7 @@ export async function fetchExecutiveDashboardSnapshot(access: ExecutiveDashboard
     optionalSection('antrean persetujuan PO', { pendingCount: 0, pendingRows: [] }, warnings,
       () => access.canViewProcurement ? loadProcurement(projectNames, access.canApprovePurchase) : Promise.resolve({ pendingCount: 0, pendingRows: [] })),
     optionalSection('persediaan gudang', { lineCount: 0, ruleCount: null, lowRows: [], lowStockCount: 0, stockRows: [] }, warnings,
-      () => access.canViewWarehouse ? loadWarehouse(projectNames, access.canManageWarehouse) : Promise.resolve({ lineCount: 0, ruleCount: null, lowRows: [], stockRows: [] })),
+      () => access.canViewWarehouse ? loadWarehouse(projectNames, access.canManageWarehouse) : Promise.resolve({ lineCount: 0, ruleCount: null, lowRows: [], lowStockCount: 0, stockRows: [] })),
     optionalSection('ringkasan keuangan', { payableCount: 0, payableRemaining: 0, payableOrders: [], obligations: [] }, warnings,
       () => canViewPayments ? loadFinance(projects) : Promise.resolve({ payableCount: 0, payableRemaining: 0, payableOrders: [], obligations: [] })),
     optionalSection('ringkasan termin subkontraktor', null, warnings,
