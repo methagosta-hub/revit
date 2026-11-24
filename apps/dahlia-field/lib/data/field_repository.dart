@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/offline/secure_outbox.dart';
+import 'dahlia_access.dart';
 
 class FieldRepository {
   FieldRepository({
@@ -18,6 +19,11 @@ class FieldRepository {
     final id = _client.auth.currentUser?.id;
     if (id == null) throw StateError('Sesi login sudah berakhir.');
     return id;
+  }
+
+  Future<DahliaAccess> getAccess() async {
+    final result = await _client.rpc('get_my_access');
+    return DahliaAccess.fromRpc(result);
   }
 
   Future<Map<String, dynamic>> getContext() async {
