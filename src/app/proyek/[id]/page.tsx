@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -468,7 +468,7 @@ function formatPdfNumber(value: number | string | null | undefined, maximumFract
 
 
 
-export default function ProjectWorkspacePage() {
+function ProjectWorkspaceContent() {
   const params = useParams<{ id: string }>();
   const projectId = params?.id;
   const searchParams = useSearchParams();
@@ -2422,5 +2422,13 @@ export default function ProjectWorkspacePage() {
         </footer>
       </div>
     </main>
+  );
+}
+
+export default function ProjectWorkspacePage() {
+  return (
+    <Suspense fallback={<main className="flex min-h-[70vh] items-center justify-center p-6"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></main>}>
+      <ProjectWorkspaceContent />
+    </Suspense>
   );
 }
