@@ -4,11 +4,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/offline/secure_outbox.dart';
 import '../core/sync/field_sync_service.dart';
 import '../data/field_repository.dart';
+import '../data/procurement_repository.dart';
 import 'attendance_page.dart';
 import 'material_request_page.dart';
 import 'daily_report_page.dart';
 import 'subcontractor_page.dart';
 import 'director_monitor_page.dart';
+import 'procurement_page.dart';
 
 class FieldHomePage extends StatefulWidget {
   const FieldHomePage({required this.outbox, super.key});
@@ -22,6 +24,7 @@ class FieldHomePage extends StatefulWidget {
 class _FieldHomePageState extends State<FieldHomePage>
     with WidgetsBindingObserver {
   late final FieldRepository _repository;
+  late final ProcurementRepository _procurementRepository;
   late final FieldSyncService _sync;
   late Future<_HomeData> _homeFuture;
   bool _syncStarted = false;
@@ -33,12 +36,14 @@ class _FieldHomePageState extends State<FieldHomePage>
     WidgetsBinding.instance.addObserver(this);
     final client = Supabase.instance.client;
     _repository = FieldRepository(client: client, outbox: widget.outbox);
+    _procurementRepository = ProcurementRepository(client: client);
     _sync = FieldSyncService(client: client, outbox: widget.outbox);
     _homeFuture = _loadHome();
   }
 
   Future<_HomeData> _loadHome() async {
     final contextData = await _repository.getContext();
+    final access = await _repository.getAccess();
     final isDirector = contextData['field_role'] == 'director';
     final isSubcontractor = contextData['field_role'] == 'subcontractor';
     _syncEnabled = !isDirector;
@@ -66,6 +71,7 @@ class _FieldHomePageState extends State<FieldHomePage>
         : <Map<String, dynamic>>[];
     return _HomeData(
       contextData: contextData,
+      access: access,
       projects: projects,
       materialRequestProjects: materialRequestProjects,
       materialRequestProjectsError: materialRequestProjectsError,
@@ -145,15 +151,20 @@ class _FieldHomePageState extends State<FieldHomePage>
           final role = data.contextData['field_role'] as String? ?? 'internal';
           final isSubcontractor = role == 'subcontractor';
           final isDirector = role == 'director';
-          final name = data.contextData['full_name'] as String? ?? 'Pengguna';
-
-          if (isDirector) {
-            return DirectorMonitorPage(
-              repository: _repository,
-              projects: data.projects,
-              onRefresh: _reloadHome,
-            );
-          }
+          final name = data.access.fullName.isNotEmpty
+              ? data.access.fullName
+              : (data.contextData['full_name'] as String? ?? 'Pengguna');
+          final roleLabels = data.access.roleCodes.map(dahliaRoleLabel).toList();
+          final hasFieldReport = data.access.hasPermission('execution.report.create') ||
+              data.access.hasAnyProjectPermission(['execution.report.create']);
+          final hasAttendance = data.access.hasPermission('attendance.record') ||
+              data.access.hasAnyProjectPermission(['attendance.record']);
+          final hasMaterialRequest = data.access.hasPermission('procurement.request.create') ||
+              data.access.hasAnyProjectPermission(['procurement.request.create']);
+          final hasProcurementWorkspace = data.access.canCreatePurchaseOrder ||
+              data.access.canApprovePurchaseOrder ||
+              data.access.canReviewMaterialRequest;
+          final hasDirectorMonitor = isDirector && data.access.hasPermission('project.read');
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -167,8 +178,10 @@ class _FieldHomePageState extends State<FieldHomePage>
                   name: name,
                   subtitle: isSubcontractor
                       ? 'Portal mitra pelaksana pekerjaan'
-                      : 'Operasional proyek dan tim lapangan',
-                  roleLabel: isSubcontractor ? 'SUBKONTRAKTOR' : 'TIM INTERNAL',
+                      : 'Ruang kerja sesuai kewenangan akun Dahlia',
+                  roleLabel: isSubcontractor
+                      ? 'SUBKONTRAKTOR'
+                      : (roleLabels.isEmpty ? 'PENGGUNA DAHLIA' : roleLabels.join(' · ').toUpperCase()),
                 ),
                 const SizedBox(height: 14),
                 AnimatedBuilder(
@@ -188,10 +201,43 @@ class _FieldHomePageState extends State<FieldHomePage>
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'Menu lapangan',
+                  'Ruang kerja saya',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 12),
+                if (hasProcurementWorkspace) ...[
+                  _FeatureCard(
+                    icon: Icons.shopping_cart_checkout_rounded,
+                    title: 'Pengadaan & Purchasing',
+                    description: 'Kelola Purchase Order dan tinjau permintaan material sesuai permission akun.',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => ProcurementPage(
+                          repository: _procurementRepository,
+                          access: data.access,
+                        ),
+                      ),
+                    ).then((_) => _reloadHome()),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                if (hasDirectorMonitor) ...[
+                  _FeatureCard(
+                    icon: Icons.monitor_heart_outlined,
+                    title: 'Pemantauan Direktur',
+                    description: 'Pantau seluruh proyek dan riwayat laporan harian secara baca saja.',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => DirectorMonitorPage(
+                          repository: _repository,
+                          projects: data.projects,
+                          onRefresh: _reloadHome,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 if (isSubcontractor) ...[
                   _FeatureCard(
                     icon: Icons.stacked_line_chart_rounded,
@@ -215,7 +261,8 @@ class _FieldHomePageState extends State<FieldHomePage>
                       message: 'Belum ada kontrak aktif yang ditautkan ke akun ini.',
                     ),
                 ] else ...[
-                  _FeatureCard(
+                  if (hasFieldReport)
+                    _FeatureCard(
                     icon: Icons.assignment_turned_in_outlined,
                     title: 'Laporan harian proyek',
                     description: 'Catat aktivitas, volume pekerjaan, personel, material, peralatan, cuaca, dan kendala.',
@@ -231,6 +278,7 @@ class _FieldHomePageState extends State<FieldHomePage>
                               ),
                             ),
                   ),
+                  if (hasAttendance) ...[
                   const SizedBox(height: 10),
                   _FeatureCard(
                     icon: Icons.fact_check_outlined,
@@ -248,6 +296,8 @@ class _FieldHomePageState extends State<FieldHomePage>
                               ),
                             ),
                   ),
+                  ],
+                  if (hasMaterialRequest) ...[
                   const SizedBox(height: 10),
                   _FeatureCard(
                     icon: Icons.inventory_2_outlined,
@@ -265,18 +315,23 @@ class _FieldHomePageState extends State<FieldHomePage>
                               ),
                             ),
                   ),
-                  if (data.materialRequestProjectsError != null)
+                  ],
+                  if (hasMaterialRequest && data.materialRequestProjectsError != null)
                     const _InfoCard(
                       message: 'Daftar proyek untuk permintaan material belum tersedia. Perbarui database Dahlia Field sebelum menggunakan menu ini.',
                     ),
-                  if (data.materialRequestProjectsError == null &&
+                  if (hasMaterialRequest && data.materialRequestProjectsError == null &&
                       data.materialRequestProjects.isEmpty)
                     const _InfoCard(
                       message: 'Belum ada proyek berstatus DIKERJAKAN yang memiliki izin pengajuan material.',
                     ),
-                  if (data.projects.isEmpty)
+                  if (!hasFieldReport && !hasAttendance && !hasMaterialRequest && !hasProcurementWorkspace && !hasDirectorMonitor)
                     const _InfoCard(
-                      message: 'Belum ada proyek dengan hak akses lapangan pada akun ini.',
+                      message: 'Belum ada modul APK yang aktif untuk permission akun ini. Modul lain akan ditambahkan bertahap tanpa perubahan dashboard atau database.',
+                    ),
+                  if (data.projects.isEmpty && (hasFieldReport || hasAttendance))
+                    const _InfoCard(
+                      message: 'Belum ada proyek yang ditugaskan atau dapat diakses akun ini.',
                     ),
                 ],
                 const SizedBox(height: 24),
@@ -313,6 +368,7 @@ class _FieldHomePageState extends State<FieldHomePage>
 class _HomeData {
   const _HomeData({
     required this.contextData,
+    required this.access,
     required this.projects,
     required this.materialRequestProjects,
     required this.materialRequestProjectsError,
@@ -320,6 +376,7 @@ class _HomeData {
   });
 
   final Map<String, dynamic> contextData;
+  final DahliaAccess access;
   final List<Map<String, dynamic>> projects;
   final List<Map<String, dynamic>> materialRequestProjects;
   final String? materialRequestProjectsError;
