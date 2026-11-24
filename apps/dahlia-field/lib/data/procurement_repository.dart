@@ -37,12 +37,11 @@ class ProcurementRepository {
             id, material_code, material_name, unit,
             quantity_ordered, unit_price, line_total
           )
-        ''')
-        .order('created_at', ascending: false);
+        ''');
     if (statuses != null && statuses.isNotEmpty) {
       query = query.inFilter('status', statuses);
     }
-    final response = await query;
+    final response = await query.order('created_at', ascending: false);
     return _normalizePurchaseOrders(response);
   }
 
