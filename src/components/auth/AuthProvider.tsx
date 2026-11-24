@@ -150,6 +150,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessError('');
   }, []);
 
+  // Stabilkan callback izin terhadap pergantian objek Session.
+  // TOKEN_REFRESHED dapat menghasilkan objek Session baru meskipun user dan
+  // hak akses tidak berubah. Callback yang stabil mencegah useEffect halaman
+  // (misalnya pemuatan dashboard) berjalan ulang hanya karena token diperbarui.
+  const can = useCallback(
+    (permissionCode: string, projectId?: string | null) =>
+      hasPermission(access, permissionCode, projectId),
+    [access],
+  );
+  const hasRoleCode = useCallback(
+    (roleCode: string, projectId?: string | null) =>
+      hasRole(access, roleCode, projectId),
+    [access],
+  );
+
   const value = useMemo<AuthContextValue>(() => ({
     user: session?.user ?? null,
     session,
@@ -159,9 +174,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshAccess,
     signIn,
     signOut,
-    can: (permissionCode, projectId) => hasPermission(access, permissionCode, projectId),
-    hasRoleCode: (roleCode, projectId) => hasRole(access, roleCode, projectId),
-  }), [session, access, loading, accessError, refreshAccess, signIn, signOut]);
+    can,
+    hasRoleCode,
+  }), [session, access, loading, accessError, refreshAccess, signIn, signOut, can, hasRoleCode]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
