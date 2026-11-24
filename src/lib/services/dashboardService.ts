@@ -132,7 +132,7 @@ export interface ExecutiveDashboardAccess {
   canManageWarehouse: boolean;
   canViewFinance: boolean;
   canViewSubcontractFinance: boolean;
-  executionProjectIds: string[];
+  canAccessExecutionProject: (projectId: string) => boolean;
 }
 
 const EMPTY_EXECUTION: DashboardExecutionSummary = {
@@ -239,7 +239,6 @@ function buildCurve(
       boundaries.push(monthEndUtc(cursor.getUTCFullYear(), cursor.getUTCMonth()));
       cursor.setUTCMonth(cursor.getUTCMonth() + 1);
     }
-    if (!boundaries.length || boundaries.at(-1) !== lastDate) boundaries.push(lastDate);
 
     curve = boundaries.map((cutoff) => {
       const plannedValue = scheduled.reduce((sum, row) => {
@@ -580,7 +579,7 @@ export async function fetchExecutiveDashboardSnapshot(access: ExecutiveDashboard
 
   const canViewPayments = access.canViewFinance;
   const canReadSubcontract = access.canViewSubcontractFinance;
-  const executionProjectIds = access.executionProjectIds.filter((id) => projectNames.has(id));
+  const executionProjectIds = projects.filter((row) => access.canAccessExecutionProject(row.id)).map((row) => row.id);
 
   const [
     procurement,
@@ -592,7 +591,7 @@ export async function fetchExecutiveDashboardSnapshot(access: ExecutiveDashboard
     execution,
   ] = await Promise.all([
     optionalSection('antrean persetujuan PO', { pendingCount: 0, pendingRows: [] }, warnings,
-      () => loadProcurement(projectNames, access.canApprovePurchase)),
+      () => access.canViewProcurement ? loadProcurement(projectNames, access.canApprovePurchase) : Promise.resolve({ pendingCount: 0, pendingRows: [] })),
     optionalSection('persediaan gudang', { lineCount: 0, ruleCount: 0, lowRows: [], stockRows: [] }, warnings,
       () => access.canViewWarehouse ? loadWarehouse(projectNames, access.canManageWarehouse) : Promise.resolve({ lineCount: 0, ruleCount: 0, lowRows: [], stockRows: [] })),
     optionalSection('ringkasan keuangan', { payableCount: 0, payableRemaining: 0, payableOrders: [], obligations: [] }, warnings,
