@@ -94,7 +94,7 @@ export interface DashboardCurvePoint {
 
 export interface DashboardExecutionSummary {
   package_count: number;
-  active_segment_count: number;
+  active_segment_item_count: number;
   approved_progress_count: number;
   weighted_progress_percent: number | null;
   actual_weighted_value: number;
@@ -138,7 +138,7 @@ export interface ExecutiveDashboardAccess {
 
 const EMPTY_EXECUTION: DashboardExecutionSummary = {
   package_count: 0,
-  active_segment_count: 0,
+  active_segment_item_count: 0,
   approved_progress_count: 0,
   weighted_progress_percent: null,
   actual_weighted_value: 0,
@@ -268,7 +268,7 @@ function buildCurve(
 
   return {
     package_count: packages.length,
-    active_segment_count: segmentItems.length,
+    active_segment_item_count: segmentItems.length,
     approved_progress_count: approvedProgressCount,
     weighted_progress_percent: weightedProgressPercent,
     actual_weighted_value: actualWeightedValue,
@@ -316,6 +316,7 @@ async function loadWarehouse(
   lineCount: number;
   ruleCount: number | null;
   lowRows: DashboardStockLine[];
+  lowStockCount: number;
   stockRows: DashboardStockLine[];
 }> {
   const stockResult = await supabase.from('v_project_material_stock')
@@ -362,6 +363,7 @@ async function loadWarehouse(
     lineCount: stockResult.count ?? stockRows.length,
     ruleCount: canManageWarehouse ? rules.length : null,
     lowRows: lowRows.slice(0, 5),
+    lowStockCount: lowRows.length,
     stockRows: stockRows.slice(0, 8),
   };
 }
@@ -593,7 +595,7 @@ export async function fetchExecutiveDashboardSnapshot(access: ExecutiveDashboard
   ] = await Promise.all([
     optionalSection('antrean persetujuan PO', { pendingCount: 0, pendingRows: [] }, warnings,
       () => access.canViewProcurement ? loadProcurement(projectNames, access.canApprovePurchase) : Promise.resolve({ pendingCount: 0, pendingRows: [] })),
-    optionalSection('persediaan gudang', { lineCount: 0, ruleCount: null, lowRows: [], stockRows: [] }, warnings,
+    optionalSection('persediaan gudang', { lineCount: 0, ruleCount: null, lowRows: [], lowStockCount: 0, stockRows: [] }, warnings,
       () => access.canViewWarehouse ? loadWarehouse(projectNames, access.canManageWarehouse) : Promise.resolve({ lineCount: 0, ruleCount: null, lowRows: [], stockRows: [] })),
     optionalSection('ringkasan keuangan', { payableCount: 0, payableRemaining: 0, payableOrders: [], obligations: [] }, warnings,
       () => canViewPayments ? loadFinance(projects) : Promise.resolve({ payableCount: 0, payableRemaining: 0, payableOrders: [], obligations: [] })),
@@ -631,7 +633,7 @@ export async function fetchExecutiveDashboardSnapshot(access: ExecutiveDashboard
     payable_po_remaining: finance.payableRemaining,
     payable_orders: finance.payableOrders,
     stock_line_count: warehouse.lineCount,
-    low_stock_count: warehouse.lowRows.length,
+    low_stock_count: warehouse.lowStockCount,
     stock_rules_configured: warehouse.ruleCount,
     stock_lines: warehouse.stockRows,
     low_stock_lines: warehouse.lowRows,
