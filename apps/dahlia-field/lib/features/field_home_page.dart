@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/offline/secure_outbox.dart';
+import '../core/notifications/task_center_service.dart';
 import '../core/sync/field_sync_service.dart';
 import '../data/dahlia_access.dart';
 import '../data/field_repository.dart';
 import '../data/procurement_repository.dart';
+import '../data/task_center_repository.dart';
 import 'attendance_page.dart';
 import 'material_request_page.dart';
 import 'daily_report_page.dart';
 import 'subcontractor_page.dart';
 import 'director_monitor_page.dart';
 import 'procurement_page.dart';
+import 'task_center_page.dart';
 
 class FieldHomePage extends StatefulWidget {
   const FieldHomePage({required this.outbox, super.key});
@@ -26,10 +29,12 @@ class _FieldHomePageState extends State<FieldHomePage>
     with WidgetsBindingObserver {
   late final FieldRepository _repository;
   late final ProcurementRepository _procurementRepository;
+  late final TaskCenterService _taskCenter;
   late final FieldSyncService _sync;
   late Future<_HomeData> _homeFuture;
   bool _syncStarted = false;
   bool _syncEnabled = false;
+  bool _taskCenterStarted = false;
 
   @override
   void initState() {
@@ -38,6 +43,9 @@ class _FieldHomePageState extends State<FieldHomePage>
     final client = Supabase.instance.client;
     _repository = FieldRepository(client: client, outbox: widget.outbox);
     _procurementRepository = ProcurementRepository(client: client);
+    _taskCenter = TaskCenterService(
+      repository: TaskCenterRepository(client: client),
+    );
     _sync = FieldSyncService(client: client, outbox: widget.outbox);
     _homeFuture = _loadHome();
   }
@@ -45,6 +53,10 @@ class _FieldHomePageState extends State<FieldHomePage>
   Future<_HomeData> _loadHome() async {
     final contextData = await _repository.getContext();
     final access = await _repository.getAccess();
+    if (!_taskCenterStarted) {
+      _taskCenterStarted = true;
+      _taskCenter.start(access);
+    }
     final isDirector = contextData['field_role'] == 'director';
     final isSubcontractor = contextData['field_role'] == 'subcontractor';
     _syncEnabled = !isDirector;
@@ -88,8 +100,13 @@ class _FieldHomePageState extends State<FieldHomePage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _syncEnabled) {
-      _sync.syncPending();
+    if (state == AppLifecycleState.resumed) {
+      if (_syncEnabled) _sync.syncPending();
+      _taskCenter.resume();
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _taskCenter.pause();
     }
   }
 
@@ -101,6 +118,7 @@ class _FieldHomePageState extends State<FieldHomePage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _sync.dispose();
+    _taskCenter.dispose();
     super.dispose();
   }
 
@@ -127,6 +145,45 @@ class _FieldHomePageState extends State<FieldHomePage>
                 icon: Icon(isDirector ? Icons.refresh_rounded : Icons.sync_rounded),
               );
             },
+          ),
+          AnimatedBuilder(
+            animation: _taskCenter,
+            builder: (context, _) => IconButton(
+              tooltip: 'Tugas & notifikasi',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => TaskCenterPage(service: _taskCenter),
+                ),
+              ),
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.notifications_none_rounded),
+                  if (_taskCenter.pendingCount > 0)
+                    Positioned(
+                      right: -7,
+                      top: -6,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFC94C43),
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          _taskCenter.pendingCount > 9 ? '9+' : '${_taskCenter.pendingCount}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
           IconButton(
             tooltip: 'Keluar',
