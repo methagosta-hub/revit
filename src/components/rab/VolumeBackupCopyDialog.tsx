@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowRight, Copy, Loader2, X } from 'lucide-react';
+import { AlertCircle, ArrowRight, Copy, Loader2, Search, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 type SourceItem = {
@@ -77,6 +77,7 @@ export default function VolumeBackupCopyDialog({
   const [projectId, setProjectId] = useState('');
   const [divisionId, setDivisionId] = useState('');
   const [targetItemId, setTargetItemId] = useState('');
+  const [targetSearch, setTargetSearch] = useState('');
   const [targetPath, setTargetPath] = useState(ROOT_PATH);
   const [mode, setMode] = useState<'replace' | 'append' | ''>('');
   const [existingCount, setExistingCount] = useState<number | null>(null);
@@ -91,6 +92,7 @@ export default function VolumeBackupCopyDialog({
     setProjectId('');
     setDivisionId('');
     setTargetItemId('');
+    setTargetSearch('');
     setTargetPath(ROOT_PATH);
     setMode('');
     setExistingCount(null);
@@ -131,6 +133,7 @@ export default function VolumeBackupCopyDialog({
     setRabItems([]);
     setDivisionId('');
     setTargetItemId('');
+    setTargetSearch('');
     setTargetPath(ROOT_PATH);
     setExistingCount(null);
 
@@ -172,6 +175,13 @@ export default function VolumeBackupCopyDialog({
     () => rabItems.filter((item) => item.division_id === divisionId),
     [rabItems, divisionId],
   );
+  const filteredDivisionItems = useMemo(() => {
+    const keyword = targetSearch.trim().toLocaleLowerCase('id-ID');
+    if (!keyword) return divisionItems;
+    return divisionItems.filter((item) =>
+      `${item.code} ${item.name}`.toLocaleLowerCase('id-ID').includes(keyword),
+    );
+  }, [divisionItems, targetSearch]);
   const selectedItem = useMemo(
     () => divisionItems.find((item) => item.id === targetItemId) ?? null,
     [divisionItems, targetItemId],
@@ -306,20 +316,43 @@ export default function VolumeBackupCopyDialog({
             </label>
             <label className="text-xs font-semibold text-slate-700">
               Lokasi / kelompok RAB
-              <select value={divisionId} onChange={(event) => { setDivisionId(event.target.value); setTargetItemId(''); setTargetPath(ROOT_PATH); }} disabled={!projectId || loadingDestinations || saving} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm">
+              <select value={divisionId} onChange={(event) => { setDivisionId(event.target.value); setTargetItemId(''); setTargetSearch(''); setTargetPath(ROOT_PATH); }} disabled={!projectId || loadingDestinations || saving} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm">
                 <option value="">{loadingDestinations ? 'Memuat lokasi...' : 'Pilih lokasi pekerjaan'}</option>
                 {divisions.map((division) => <option key={division.id} value={division.id}>{division.code ? division.code + ' · ' : ''}{division.name}</option>)}
               </select>
             </label>
           </div>
 
-          <label className="block text-xs font-semibold text-slate-700">
-            AHSP tujuan
-            <select value={targetItemId} onChange={(event) => { setTargetItemId(event.target.value); setTargetPath(ROOT_PATH); }} disabled={!divisionId || loadingDestinations || saving} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm">
-              <option value="">Pilih AHSP</option>
-              {divisionItems.map((item) => <option key={item.id} value={item.id}>{item.code} — {item.name}</option>)}
+          <div className="space-y-1.5">
+            <label htmlFor="volume-copy-target-search" className="block text-xs font-semibold text-slate-700">
+              Cari item pekerjaan (kode atau nama)
+            </label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="volume-copy-target-search"
+                type="search"
+                value={targetSearch}
+                onChange={(event) => setTargetSearch(event.target.value)}
+                disabled={!divisionId || loadingDestinations || saving}
+                placeholder="Contoh: A.1.1.1 atau pekerjaan pasangan bata"
+                className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="volume-copy-target-select" className="text-xs font-semibold text-slate-700">AHSP tujuan</label>
+              <span className="text-[10px] font-medium text-slate-400">
+                {divisionId ? `${filteredDivisionItems.length} dari ${divisionItems.length} item` : 'Pilih lokasi terlebih dahulu'}
+              </span>
+            </div>
+            <select id="volume-copy-target-select" value={targetItemId} onChange={(event) => { setTargetItemId(event.target.value); setTargetPath(ROOT_PATH); }} disabled={!divisionId || loadingDestinations || saving} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm">
+              <option value="">{!divisionId ? 'Pilih lokasi pekerjaan terlebih dahulu' : filteredDivisionItems.length ? 'Pilih AHSP' : 'Item pekerjaan tidak ditemukan'}</option>
+              {filteredDivisionItems.map((item) => <option key={item.id} value={item.id}>{item.code} — {item.name}</option>)}
             </select>
-          </label>
+            {divisionId && targetSearch.trim() && filteredDivisionItems.length === 0 && (
+              <p className="text-[10px] text-amber-700">Tidak ada item yang cocok. Coba kata kunci lain atau periksa lokasi / kelompok RAB.</p>
+            )}
+          </div>
 
           {selectedItem && (
             <label className="block text-xs font-semibold text-slate-700">
