@@ -236,7 +236,9 @@ class _ProcurementPageState extends State<ProcurementPage> {
       pages.add(_buildRequests());
     }
 
-    return Scaffold(
+    return DefaultTabController(
+      length: tabs.isEmpty ? 1 : tabs.length,
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Pengadaan & Purchasing'),
         actions: [
@@ -271,19 +273,10 @@ class _ProcurementPageState extends State<ProcurementPage> {
                     title: 'Akses pengadaan belum tersedia',
                     message: 'Akun ini belum memiliki permission Purchasing atau peninjauan permintaan material.',
                   )
-                : DefaultTabController(
-                    length: tabs.length,
-                    child: Builder(
-                      builder: (context) => Column(
-                        children: [
-                          // The AppBar tab bar and body share the route's DefaultTabController.
-                          Expanded(child: TabBarView(children: pages)),
-                        ],
-                      ),
-                    ),
-                  ),
+                : TabBarView(children: pages),
           ),
         ],
+      ),
       ),
     );
   }
