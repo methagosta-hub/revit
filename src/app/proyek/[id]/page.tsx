@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -471,6 +471,8 @@ function formatPdfNumber(value: number | string | null | undefined, maximumFract
 export default function ProjectWorkspacePage() {
   const params = useParams<{ id: string }>();
   const projectId = params?.id;
+  const searchParams = useSearchParams();
+  const selectedDivisionId = searchParams.get('lokasi');
 
   const [project, setProject] = useState<WorkspaceProject | null>(null);
   const [canManageRabPermission, setCanManageRabPermission] = useState(false);
@@ -785,6 +787,9 @@ export default function ProjectWorkspacePage() {
     } catch (error) { if (printWindow && !printWindow.closed) printWindow.close(); if (url) URL.revokeObjectURL(url); setErrorMessage('Gagal menyiapkan PDF lokasi: ' + getErrorMessage(error)); }
   };
   const divisions = project?.divisions ?? [];
+  const selectedDivision = divisions.find((division) => division.id === selectedDivisionId) ?? null;
+  const isLocationView = Boolean(selectedDivision);
+  const visibleDivisions = isLocationView && selectedDivision ? [selectedDivision] : divisions;
 
   const divisionTotals = useMemo(
     () =>
@@ -802,6 +807,9 @@ export default function ProjectWorkspacePage() {
     () => divisionTotals.reduce((sum, division) => sum + division.total, 0),
     [divisionTotals],
   );
+  const selectedDivisionTotal = selectedDivision
+    ? divisionTotals.find((entry) => entry.id === selectedDivision.id)?.total ?? 0
+    : 0;
 
   // Pajak dan Override menggunakan parameter profil proyek. Nilai 0% sah,
   // sehingga baris tetap ditampilkan meskipun nominalnya Rp0.
@@ -1470,13 +1478,19 @@ export default function ProjectWorkspacePage() {
             <ArrowLeft className="h-3.5 w-3.5" />
             Kembali ke Daftar Proyek
           </Link>
+          {isLocationView && (
+            <Link href={`/proyek/${project.id}`} className="mb-3 ml-3 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 transition hover:text-emerald-900">
+              <ArrowLeft className="h-3.5 w-3.5" /> Semua Lokasi Pekerjaan
+            </Link>
+          )}
           <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-emerald-700">
             <Layers className="h-4 w-4" />
-            <span>Workspace Proyek · ID: {project.id}</span>
+            <span>{isLocationView ? 'RAB Lokasi Pekerjaan' : 'Workspace Proyek · Daftar Lokasi'}</span>
           </div>
           <h1 className="break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            {project.title}
+            {isLocationView && selectedDivision ? selectedDivision.name : project.title}
           </h1>
+          {isLocationView && <p className="mt-1 text-sm text-slate-500">{project.title} · Rincian Anggaran Biaya</p>}
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -1703,10 +1717,12 @@ export default function ProjectWorkspacePage() {
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
-              Rincian Anggaran Biaya per Lokasi Pekerjaan
+              {isLocationView && selectedDivision ? `RAB Lokasi: ${selectedDivision.name}` : 'Pilih Lokasi Pekerjaan'}
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              {divisions.length} lokasi pekerjaan · {totalItems} item pekerjaan · {totalAhspItems} AHSP
+              {isLocationView && selectedDivision
+                ? `${selectedDivision.items?.length ?? 0} AHSP pada lokasi ini`
+                : `${divisions.length} lokasi pekerjaan · ${totalItems} item pekerjaan · ${totalAhspItems} AHSP`}
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:items-end">
@@ -1723,13 +1739,13 @@ export default function ProjectWorkspacePage() {
               Tambah Lokasi Pekerjaan
             </button>}
             <span className="text-xs text-slate-400">
-              Susun RAB per bidang, kategori, subkategori, dan item. AHSP massal dapat menjadi item terpisah atau subpekerjaan.
+              {isLocationView ? 'Kelola rincian AHSP, volume, analisis, dan komponen untuk lokasi ini.' : 'Pilih salah satu lokasi untuk membuka dan mengelola RAB secara terpisah.'}
             </span>
           </div>
         </div>
 
         {divisions.length > 0 ? (
-          divisions.map((division, divisionIndex) => {
+          visibleDivisions.map((division, divisionIndex) => {
             const divisionTotal =
               divisionTotals.find((entry) => entry.id === division.id)?.total ?? 0;
             const orderedItems = [...(division.items ?? [])].sort(
@@ -1786,6 +1802,11 @@ export default function ProjectWorkspacePage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
+                    {!isLocationView && (
+                      <Link href={`/proyek/${project.id}?lokasi=${encodeURIComponent(division.id)}`} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700">
+                        Buka RAB <ArrowLeft className="h-3.5 w-3.5 rotate-180" />
+                      </Link>
+                    )}
                     <span className="mr-1 text-sm font-bold tabular-nums text-slate-900">
                       {formatRupiah(divisionTotal)}
                     </span>
@@ -1841,7 +1862,7 @@ export default function ProjectWorkspacePage() {
                   </div>
                 </div>
 
-                {orderedItems.length > 0 ? (
+                {isLocationView && orderedItems.length > 0 ? (
                   <RabCategoryBoard
                     groups={buildAhspItemGroups(orderedItems)}
                     onUpdate={handleUpdateItem}
@@ -1852,10 +1873,14 @@ export default function ProjectWorkspacePage() {
                     canReorder={canManageRab}
                     readOnly={!canEditRab}
                   />
-                ) : (
+                ) : isLocationView ? (
                   <div className="px-5 py-8 text-center text-sm text-slate-400">
-                    Belum ada item AHSP pada lokasi ini.
+                    Belum ada item AHSP pada lokasi ini. Gunakan tombol Tambah Item Pekerjaan untuk mulai menyusun RAB.
                   </div>
+                ) : (
+                  <Link href={`/proyek/${project.id}?lokasi=${encodeURIComponent(division.id)}`} className="flex items-center justify-between border-t border-slate-100 px-5 py-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50/60">
+                    <span>Buka rincian RAB lokasi {division.name}</span><span aria-hidden="true">→</span>
+                  </Link>
                 )}
               </article>
             );
@@ -1893,14 +1918,14 @@ export default function ProjectWorkspacePage() {
           <div className="flex flex-col items-start justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-5 py-4 sm:flex-row sm:items-center">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
-                Total keseluruhan RAB
+                {isLocationView ? 'Subtotal Lokasi Ini' : 'Total keseluruhan RAB'}
               </p>
               <p className="mt-1 text-xs text-emerald-700">
-                Akumulasi seluruh subtotal lokasi pekerjaan
+                {isLocationView ? `Akumulasi pekerjaan ${selectedDivision?.name ?? ''}` : 'Akumulasi seluruh subtotal lokasi pekerjaan'}
               </p>
             </div>
             <p className="text-2xl font-bold tabular-nums text-emerald-900">
-              {formatRupiah(totalRAB)}
+              {formatRupiah(isLocationView ? selectedDivisionTotal : totalRAB)}
             </p>
           </div>
         )}
