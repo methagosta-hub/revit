@@ -265,11 +265,12 @@ begin
   if v_source_path is null then
     insert into public.volume_details (
       rab_item_id, subitem_path, description, drawing_ref,
-      multiplier, calc_mode, parameters, subtotal
+      multiplier, calc_mode, parameters, subtotal, created_at
     )
     select
       p_target_rab_item_id, v_target_path, description, drawing_ref,
-      multiplier, calc_mode, parameters, subtotal
+      multiplier, calc_mode, parameters, subtotal,
+      clock_timestamp() + ((row_number() over (order by created_at, id) - 1) * interval '1 millisecond')
       from public.volume_details
      where rab_item_id = p_source_rab_item_id
        and subitem_path is null
@@ -277,11 +278,12 @@ begin
   else
     insert into public.volume_details (
       rab_item_id, subitem_path, description, drawing_ref,
-      multiplier, calc_mode, parameters, subtotal
+      multiplier, calc_mode, parameters, subtotal, created_at
     )
     select
       p_target_rab_item_id, v_target_path, description, drawing_ref,
-      multiplier, calc_mode, parameters, subtotal
+      multiplier, calc_mode, parameters, subtotal,
+      clock_timestamp() + ((row_number() over (order by created_at, id) - 1) * interval '1 millisecond')
       from public.volume_details
      where rab_item_id = p_source_rab_item_id
        and subitem_path = v_source_path
