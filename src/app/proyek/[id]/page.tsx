@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   Loader2,
   RefreshCw,
+  Search,
   Plus,
   Database,
   Copy,
@@ -491,6 +492,7 @@ function ProjectWorkspaceContent() {
   const activePdfTheme = PDF_THEMES[pdfTheme];
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [rabSearchKeyword, setRabSearchKeyword] = useState('');
   const [activeDivisionId, setActiveDivisionId] = useState<string | null>(null);
   const [activeDivisionName, setActiveDivisionName] = useState('');
   const [locationModalOpen, setLocationModalOpen] = useState(false);
@@ -790,6 +792,11 @@ function ProjectWorkspaceContent() {
   const selectedDivision = divisions.find((division) => division.id === selectedDivisionId) ?? null;
   const isLocationView = Boolean(selectedDivision);
   const visibleDivisions = isLocationView && selectedDivision ? [selectedDivision] : divisions;
+  const normalizedRabSearchKeyword = rabSearchKeyword.trim().toLocaleLowerCase('id-ID');
+
+  useEffect(() => {
+    setRabSearchKeyword('');
+  }, [selectedDivisionId]);
 
   const divisionTotals = useMemo(
     () =>
@@ -1721,7 +1728,13 @@ function ProjectWorkspaceContent() {
             </h2>
             <p className="mt-1 text-xs text-slate-500">
               {isLocationView && selectedDivision
-                ? `${selectedDivision.items?.length ?? 0} AHSP pada lokasi ini`
+                ? normalizedRabSearchKeyword
+                  ? `${(selectedDivision.items ?? []).filter((item) => {
+                      const tokens = normalizedRabSearchKeyword.split(/\\s+/).filter(Boolean);
+                      const searchableText = `${item.code ?? ''} ${item.name ?? ''} ${item.unit ?? ''}`.toLocaleLowerCase('id-ID');
+                      return tokens.every((token) => searchableText.includes(token));
+                    }).length} dari ${selectedDivision.items?.length ?? 0} AHSP ditemukan`
+                  : `${selectedDivision.items?.length ?? 0} AHSP pada lokasi ini`
                 : `${divisions.length} lokasi pekerjaan · ${totalItems} item pekerjaan · ${totalAhspItems} AHSP`}
             </p>
           </div>
@@ -1744,6 +1757,38 @@ function ProjectWorkspaceContent() {
           </div>
         </div>
 
+        {isLocationView && (selectedDivision?.items?.length ?? 0) > 0 && (
+          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+            <label htmlFor="rab-item-search" className="mb-2 block text-xs font-semibold text-slate-700">
+              Cari item pekerjaan berdasarkan kode atau nama
+            </label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="rab-item-search"
+                type="search"
+                value={rabSearchKeyword}
+                onChange={(event) => setRabSearchKeyword(event.target.value)}
+                placeholder="Contoh: A.1.1.1 atau pasangan bata"
+                className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-9 pr-10 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+              />
+              {rabSearchKeyword && (
+                <button
+                  type="button"
+                  onClick={() => setRabSearchKeyword('')}
+                  aria-label="Hapus kata kunci pencarian"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <p className="mt-2 text-[11px] text-slate-500">
+              Ketik kode, nama, atau satuan pekerjaan. Pencarian hanya menyaring tampilan dan tidak mengubah data RAB.
+            </p>
+          </div>
+        )}
+
         {divisions.length > 0 ? (
           visibleDivisions.map((division, divisionIndex) => {
             const divisionTotal =
@@ -1751,7 +1796,14 @@ function ProjectWorkspaceContent() {
             const orderedItems = [...(division.items ?? [])].sort(
               (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
             );
-            const workItemCount = new Set(orderedItems.map((item) => item.work_group_id || item.id)).size;
+            const searchTokens = normalizedRabSearchKeyword.split(/\\s+/).filter(Boolean);
+            const displayedItems = searchTokens.length
+              ? orderedItems.filter((item) => {
+                  const searchableText = `${item.code ?? ''} ${item.name ?? ''} ${item.unit ?? ''}`.toLocaleLowerCase('id-ID');
+                  return searchTokens.every((token) => searchableText.includes(token));
+                })
+              : orderedItems;
+            const workItemCount = new Set(displayedItems.map((item) => item.work_group_id || item.id)).size;
 
             return (
               <article
@@ -1797,7 +1849,9 @@ function ProjectWorkspaceContent() {
                         {division.name}
                       </h3>
                       <p className="mt-0.5 text-xs text-slate-500">
-                        {workItemCount} item pekerjaan · {orderedItems.length} AHSP
+                        {normalizedRabSearchKeyword
+                          ? `${workItemCount} item pekerjaan · ${displayedItems.length} dari ${orderedItems.length} AHSP`
+                          : `${workItemCount} item pekerjaan · ${orderedItems.length} AHSP`}
                       </p>
                     </div>
                   </div>
@@ -1862,20 +1916,22 @@ function ProjectWorkspaceContent() {
                   </div>
                 </div>
 
-                {isLocationView && orderedItems.length > 0 ? (
+                {isLocationView && displayedItems.length > 0 ? (
                   <RabCategoryBoard
-                    groups={buildAhspItemGroups(orderedItems)}
+                    groups={buildAhspItemGroups(displayedItems)}
                     onUpdate={handleUpdateItem}
                     onUpdateComponents={handleUpdateComponents}
                     onDelete={handleDeleteItem}
                     onVolumeUpdated={() => loadData(true)}
                     onReorder={(orderedIds) => handleReorderItems(division.id, orderedIds)}
-                    canReorder={canManageRab}
+                    canReorder={canManageRab && !normalizedRabSearchKeyword}
                     readOnly={!canEditRab}
                   />
                 ) : isLocationView ? (
                   <div className="px-5 py-8 text-center text-sm text-slate-400">
-                    Belum ada item AHSP pada lokasi ini. Gunakan tombol Tambah Item Pekerjaan untuk mulai menyusun RAB.
+                    {normalizedRabSearchKeyword
+                      ? `Tidak ditemukan item pekerjaan yang cocok dengan kata kunci “${rabSearchKeyword.trim()}”. Coba kata kunci lain atau hapus pencarian.`
+                      : 'Belum ada item AHSP pada lokasi ini. Gunakan tombol Tambah Item Pekerjaan untuk mulai menyusun RAB.'}
                   </div>
                 ) : (
                   <Link href={`/proyek/${project.id}?lokasi=${encodeURIComponent(division.id)}`} className="flex items-center justify-between border-t border-slate-100 px-5 py-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50/60">
