@@ -78,6 +78,8 @@ class DahliaAccess {
 
   bool get canManagePayments => hasPermission('finance.payment.manage') || hasAnyProjectPermission(['finance.payment.manage']);
 
+  bool get canManageDirectPurchases => hasPermission('finance.direct_purchase.manage') || hasAnyProjectPermission(['finance.direct_purchase.manage']);
+
   bool get canReadPersonnel => hasPermission('personnel.read');
 
   bool get canManageAttendance => hasPermission('attendance.manage');

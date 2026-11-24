@@ -10,8 +10,10 @@ import '../data/procurement_repository.dart';
 import '../data/task_center_repository.dart';
 import '../data/warehouse_repository.dart';
 import '../data/finance_repository.dart';
+import '../data/direct_purchase_repository.dart';
 import 'warehouse_page.dart';
 import 'finance_page.dart';
+import 'direct_material_purchase_page.dart';
 import 'attendance_page.dart';
 import 'material_request_page.dart';
 import 'daily_report_page.dart';
@@ -35,6 +37,7 @@ class _FieldHomePageState extends State<FieldHomePage>
   late final ProcurementRepository _procurementRepository;
   late final WarehouseRepository _warehouseRepository;
   late final FinanceRepository _financeRepository;
+  late final DirectMaterialPurchaseRepository _directPurchaseRepository;
   late final TaskCenterService _taskCenter;
   late final FieldSyncService _sync;
   late Future<_HomeData> _homeFuture;
@@ -51,6 +54,7 @@ class _FieldHomePageState extends State<FieldHomePage>
     _procurementRepository = ProcurementRepository(client: client);
     _warehouseRepository = WarehouseRepository(client: client);
     _financeRepository = FinanceRepository(client: client);
+    _directPurchaseRepository = DirectMaterialPurchaseRepository(client: client);
     _taskCenter = TaskCenterService(
       repository: TaskCenterRepository(client: client),
     );
@@ -233,6 +237,7 @@ class _FieldHomePageState extends State<FieldHomePage>
           final hasDirectorMonitor = isDirector && data.access.hasPermission('project.read');
           final hasWarehouseWorkspace = data.access.canManageWarehouse || data.access.canReceiveMaterial || data.access.canIssueMaterial;
           final hasFinanceWorkspace = data.access.canReadFinance || data.access.canManagePayments;
+          final hasDirectPurchaseWorkspace = data.access.canManageDirectPurchases;
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -317,6 +322,22 @@ class _FieldHomePageState extends State<FieldHomePage>
                         builder: (_) => FinancePage(
                           repository: _financeRepository,
                           access: data.access,
+                        ),
+                      ),
+                    ).then((_) => _reloadHome()),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                if (hasDirectPurchaseWorkspace) ...[
+                  _FeatureCard(
+                    icon: Icons.shopping_bag_rounded,
+                    color: const Color(0xFF9A6B2E),
+                    title: 'Pembelian Material Langsung',
+                    description: 'Catat belanja material tanpa PO; stok dan kas terhubung dalam satu transaksi.',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => DirectMaterialPurchasePage(
+                          repository: _directPurchaseRepository,
                         ),
                       ),
                     ).then((_) => _reloadHome()),
@@ -427,7 +448,7 @@ class _FieldHomePageState extends State<FieldHomePage>
                     const _InfoCard(
                       message: 'Belum ada proyek berstatus DIKERJAKAN yang memiliki izin pengajuan material.',
                     ),
-                  if (!hasFieldReport && !hasAttendance && !hasMaterialRequest && !hasProcurementWorkspace && !hasWarehouseWorkspace && !hasFinanceWorkspace && !hasDirectorMonitor)
+                  if (!hasFieldReport && !hasAttendance && !hasMaterialRequest && !hasProcurementWorkspace && !hasWarehouseWorkspace && !hasFinanceWorkspace && !hasDirectPurchaseWorkspace && !hasDirectorMonitor)
                     const _InfoCard(
                       message: 'Belum ada modul APK yang aktif untuk permission akun ini. Modul lain akan ditambahkan bertahap tanpa perubahan dashboard atau database.',
                     ),

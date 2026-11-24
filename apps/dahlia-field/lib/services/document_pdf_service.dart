@@ -59,6 +59,34 @@ class DahliaDocumentPdf {
     );
   }
 
+  static Future<void> shareDirectPurchase(Map<String, dynamic> purchase) async {
+    final rows = _rows(purchase['items']).map((item) => [
+      item['material_code']?.toString() ?? '-',
+      item['material_name']?.toString() ?? 'Material',
+      item['unit']?.toString() ?? '-',
+      _qty(item['quantity_received']),
+      _qty(item['quantity_damaged']),
+      _qty(item['quantity_accepted']),
+      _money(item['unit_price']),
+      _money(item['line_total']),
+    ]).toList(growable: false);
+    await _shareRecord(
+      title: 'BUKTI PEMBELIAN MATERIAL LANGSUNG',
+      number: purchase['purchase_number']?.toString() ?? '-',
+      project: purchase['project_title']?.toString() ?? 'Proyek',
+      reference: 'Supplier: ' + (purchase['supplier_name']?.toString() ?? '-') +
+          ' | Faktur: ' + (purchase['invoice_number']?.toString() ?? '-') +
+          ' | Pembayaran: ' + (purchase['payment_method']?.toString() ?? '-'),
+      date: purchase['purchase_date']?.toString() ?? '',
+      headers: const ['Kode', 'Material', 'Sat.', 'Diterima', 'Rusak', 'Layak', 'Harga', 'Jumlah'],
+      rows: rows,
+      notes: purchase['notes']?.toString() ?? '',
+      fileName: 'Bukti-Pembelian-' + (purchase['purchase_number']?.toString() ?? 'material') + '.pdf',
+      receiverLabel: 'Petugas Gudang',
+      handoverLabel: 'Supplier / Toko',
+    );
+  }
+
   static Future<void> shareFinanceRecap(Map<String, dynamic> document) async {
     final snapshot = _map(document['snapshot']);
     final summary = _map(snapshot['summary']);
