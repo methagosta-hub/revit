@@ -16,7 +16,9 @@ import {
   RotateCcw,
   LockKeyhole,
   Sigma,
+  Copy,
 } from 'lucide-react';
+import VolumeBackupCopyDialog from '@/components/rab/VolumeBackupCopyDialog';
 import { supabase } from '@/lib/supabase';
 import { formatRupiah } from '@/lib/format';
 import { recalculateProjectTotalFromRabItem } from '@/lib/services/projectService';
@@ -595,6 +597,7 @@ export default function VolumeBackupDrawer({ open, item, onClose, onSaved }: Pro
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [copyOpen, setCopyOpen] = useState(false);
   const isSubitemTarget = isSubitemBackupTarget(item);
 
   const loadDetails = useCallback(async (): Promise<VolumeDetail[]> => {
@@ -954,9 +957,21 @@ export default function VolumeBackupDrawer({ open, item, onClose, onSaved }: Pro
             <p className="mt-1 font-mono text-xs text-slate-500">{item.code}</p>
             <p className="mt-0.5 max-w-xl text-sm font-semibold leading-5 text-slate-800">{item.name}</p>
           </div>
-          <button type="button" onClick={onClose} disabled={saving} aria-label="Tutup backup volume" className="ml-3 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 disabled:opacity-50">
-            <X className="h-5 w-5" />
-          </button>
+          <div className="ml-3 flex shrink-0 items-center gap-2">
+            {details.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setCopyOpen(true)}
+                disabled={saving || loading}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-40"
+              >
+                <Copy className="h-3.5 w-3.5" /> Salin backup
+              </button>
+            )}
+            <button type="button" onClick={onClose} disabled={saving} aria-label="Tutup backup volume" className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 disabled:opacity-50">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </header>
 
         <div className="shrink-0 border-b border-slate-200 bg-white px-5 py-3 sm:px-6">
@@ -1355,6 +1370,16 @@ export default function VolumeBackupDrawer({ open, item, onClose, onSaved }: Pro
           <button type="button" onClick={onClose} disabled={saving} className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Tutup</button>
         </footer>
       </aside>
+      <VolumeBackupCopyDialog
+        open={copyOpen}
+        sourceItem={item}
+        sourceDetailsCount={details.length}
+        onClose={() => setCopyOpen(false)}
+        onCopied={async () => {
+          setSuccess('Backup volume berhasil disalin ke AHSP tujuan.');
+          await onSaved?.(totalVolume);
+        }}
+      />
     </div>
   );
 }
