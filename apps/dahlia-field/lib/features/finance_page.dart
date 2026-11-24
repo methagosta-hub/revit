@@ -1186,3 +1186,13 @@ bool _validDate(String? value) {
   if (value == null || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) return false;
   return DateTime.tryParse(value) != null;
 }
+
+String _friendlyError(Object error) {
+  final raw = error.toString().replaceFirst('Exception: ', '').trim();
+  if (raw.contains('42501') ||
+      raw.toLowerCase().contains('permission denied') ||
+      raw.toLowerCase().contains('row-level security')) {
+    return 'Akun ini belum memiliki izin untuk membuka data keuangan. Periksa permission Finance.';
+  }
+  return raw.isEmpty ? 'Terjadi kesalahan. Periksa koneksi lalu coba kembali.' : raw;
+}

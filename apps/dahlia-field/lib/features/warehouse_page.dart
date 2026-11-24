@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/dahlia_access.dart';
 import '../data/warehouse_repository.dart';
