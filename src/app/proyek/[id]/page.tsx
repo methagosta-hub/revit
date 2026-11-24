@@ -1730,7 +1730,7 @@ function ProjectWorkspaceContent() {
               {isLocationView && selectedDivision
                 ? normalizedRabSearchKeyword
                   ? `${(selectedDivision.items ?? []).filter((item) => {
-                      const tokens = normalizedRabSearchKeyword.split(/\\s+/).filter(Boolean);
+                      const tokens = normalizedRabSearchKeyword.split(/\s+/).filter(Boolean);
                       const searchableText = `${item.code ?? ''} ${item.name ?? ''} ${item.unit ?? ''}`.toLocaleLowerCase('id-ID');
                       return tokens.every((token) => searchableText.includes(token));
                     }).length} dari ${selectedDivision.items?.length ?? 0} AHSP ditemukan`
@@ -1796,7 +1796,7 @@ function ProjectWorkspaceContent() {
             const orderedItems = [...(division.items ?? [])].sort(
               (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
             );
-            const searchTokens = normalizedRabSearchKeyword.split(/\\s+/).filter(Boolean);
+            const searchTokens = normalizedRabSearchKeyword.split(/\s+/).filter(Boolean);
             const displayedItems = searchTokens.length
               ? orderedItems.filter((item) => {
                   const searchableText = `${item.code ?? ''} ${item.name ?? ''} ${item.unit ?? ''}`.toLocaleLowerCase('id-ID');
