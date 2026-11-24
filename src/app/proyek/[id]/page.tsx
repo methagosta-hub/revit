@@ -2194,6 +2194,7 @@ function ProjectWorkspaceContent() {
           setActiveDivisionName('');
         }}
         onAdd={handleAddAhsp}
+        canAdd={canEditRab}
       />
 
       <style jsx global>{`
