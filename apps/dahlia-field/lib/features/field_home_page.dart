@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/offline/secure_outbox.dart';
 import '../core/sync/field_sync_service.dart';
+import '../data/dahlia_access.dart';
 import '../data/field_repository.dart';
 import '../data/procurement_repository.dart';
 import 'attendance_page.dart';
