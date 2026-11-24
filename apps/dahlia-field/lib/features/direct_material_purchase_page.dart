@@ -823,20 +823,3 @@ String _friendlyError(Object error) {
       ? 'Terjadi kesalahan. Periksa koneksi lalu coba kembali.'
       : raw;
 }
-).hasMatch(value)) {
-    return false;
-  }
-  return DateTime.tryParse(value) != null;
-}
-
-String _friendlyError(Object error) {
-  final raw = error.toString().replaceFirst('Exception: ', '').trim();
-  if (raw.contains('42501') ||
-      raw.toLowerCase().contains('permission denied') ||
-      raw.toLowerCase().contains('row-level security')) {
-    return 'Akun ini belum memiliki permission pembelian material langsung.';
-  }
-  return raw.isEmpty
-      ? 'Terjadi kesalahan. Periksa koneksi lalu coba kembali.'
-      : raw;
-}
