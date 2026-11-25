@@ -95,14 +95,14 @@ export default function ProjectCreatePage() {
   const [form, setForm] = useState<ProjectForm>(initialForm);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [companyName, setCompanyName] = useState('DAHLIA Construction');
+  const [companyName, setCompanyName] = useState('JAVAWASTHU MANAGEMENT');
 
   useEffect(() => {
     let active = true;
     void fetchAppSettings()
       .then((appSettings) => {
         if (!active) return;
-        setCompanyName(appSettings.company_name || 'DAHLIA Construction');
+        setCompanyName(/^DAHLIA(?:\s+(?:CONSTRUCTION|MANAGEMENT SYSTEM))?$/i.test(appSettings.company_name.trim()) ? 'JAVAWASTHU MANAGEMENT' : (appSettings.company_name || 'JAVAWASTHU MANAGEMENT'));
         setForm((current) => ({
           ...current,
           tax_rate: String(appSettings.default_tax_rate ?? 11),

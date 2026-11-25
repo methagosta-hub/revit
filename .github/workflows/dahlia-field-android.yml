@@ -1,0 +1,99 @@
+name: Dahlia Field Android CI
+
+on:
+  push:
+    branches:
+      - feat/dahlia-field-mobile
+    paths:
+      - "apps/dahlia-field/**"
+      - "supabase/migrations/**"
+      - ".github/workflows/dahlia-field-android.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "apps/dahlia-field/**"
+      - "supabase/migrations/**"
+      - ".github/workflows/dahlia-field-android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dahlia-field-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Analyze, test and build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate isolated Android host
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp_project="$(mktemp -d)"
+          flutter create \
+            --project-name dahlia_field \
+            --org id.dahlia.management \
+            --platforms android \
+            --empty \
+            "$temp_project"
+          mkdir -p apps/dahlia-field/android
+          cp -R "$temp_project/android/." apps/dahlia-field/android/
+          if [ -f "$temp_project/.metadata" ]; then
+            cp "$temp_project/.metadata" apps/dahlia-field/.metadata
+          fi
+          manifest="apps/dahlia-field/android/app/src/main/AndroidManifest.xml"
+          if ! grep -q 'android.permission.INTERNET' "$manifest"; then
+            sed -i 's#<manifest #<manifest android:installLocation="auto" #g' "$manifest"
+            sed -i '/<application/i\    <uses-permission android:name="android.permission.INTERNET" />' "$manifest"
+          fi
+
+      - name: Resolve Flutter dependencies
+        working-directory: apps/dahlia-field
+        run: flutter pub get
+
+      - name: Analyze Dart source
+        working-directory: apps/dahlia-field
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run unit tests
+        working-directory: apps/dahlia-field
+        run: flutter test --reporter expanded
+
+      - name: Build release APK
+        working-directory: apps/dahlia-field
+        env:
+          # Supabase publishable key is intended for client apps. Never use service_role here.
+          DAHLIA_SUPABASE_URL: https://ggqpenjrptqescagvcze.supabase.co
+          DAHLIA_SUPABASE_PUBLISHABLE_KEY: sb_publishable_J_FFHUsphFJVmEz08yvHfg_9Ykaa3B9
+        run: |
+          flutter build apk --release \
+            --dart-define=DAHLIA_SUPABASE_URL="$DAHLIA_SUPABASE_URL" \
+            --dart-define=DAHLIA_SUPABASE_PUBLISHABLE_KEY="$DAHLIA_SUPABASE_PUBLISHABLE_KEY"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dahlia-field-android-apk
+          path: apps/dahlia-field/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 7

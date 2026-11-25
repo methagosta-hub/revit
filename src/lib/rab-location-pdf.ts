@@ -1,0 +1,112 @@
+import { calculateStructuredRebar, describeStructuredRebar, describeCustomBuilder } from '@/lib/volume-calculation';
+
+type Signer = { role: string; name: string; identifier?: string };
+type Input = { project: any; division: any; divisions: any[]; accent: string; soft: string; border: string; text: string; font: string; bold: number; signers: Signer[]; date: string };
+const e = (v: unknown) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const num = (v: unknown, digits=2) => Number(v ?? 0).toLocaleString('id-ID',{minimumFractionDigits:digits,maximumFractionDigits:digits});
+const money = (v: unknown) => 'Rp '+num(v,2);
+function signatures(signers: Signer[]) {
+  return '<div class="signatures">' + signers.filter((s,i)=>i===0 || String(s.name||'').trim()).map((s,i)=>
+    '<div class="sign"><b>'+e(s.role || (i===0?'Perencana':'Penandatangan'))+'</b><div class="space"></div><strong>'+e(s.name||' ')+'</strong><small>'+e(s.identifier||'')+'</small></div>'
+  ).join('') + '</div>';
+}
+function heading(no: string, title: string, division: any, accent: string) {
+  return '<header><small>'+no+'</small><h2>'+title+'</h2><p>'+e(division.name)+'</p><i style="background:'+accent+'"></i></header>';
+}
+function calc(row: any) {
+  const p=row.parameters||{}, v=(k:string,d=1)=>num(p[k]??d,2);
+  try {
+    switch(row.calc_mode||'standard'){
+      case 'standard': return v('length')+' × '+v('width')+' × '+v('height')+' × '+v('quantity')+' kali';
+      case 'wall_area': return '('+v('wall_height',0)+' × '+v('wall_length',0)+') − luas bukaan';
+      case 'frame_length': return 'Akumulasi panjang segmen kusen';
+      case 'glass_area': return 'Akumulasi luas panel kaca';
+      case 'opening_count': return 'Akumulasi jumlah unit bukaan';
+      case 'trapezoid': return '(('+v('top_width',0)+' + '+v('bottom_width',0)+') ÷ 2) × '+v('depth',0)+' × '+v('length',0)+' × '+v('quantity');
+      case 'rebar': return '(Ø'+v('diameter',0)+'² ÷ 162) × '+v('bar_length',0)+' × '+v('bars',0);
+      case 'rebar_structure': return describeStructuredRebar(p);
+      case 'custom_builder': return describeCustomBuilder(p);
+      default: return String(p.formula||'Rumus khusus belum tercatat');
+    }
+  } catch (error) {
+    return 'Parameter belum lengkap / tidak valid: '+(error instanceof Error ? error.message : 'periksa kembali input');
+  }
+}
+function componentTable(rows: any[]) {
+  const materials=(rows||[]).filter(r=>r.type!=='labor');
+  const labor=(rows||[]).filter(r=>r.type==='labor');
+  const render=(label:string,list:any[])=>list.length?'<tr class="category"><td colspan="5">'+label+'</td></tr>'+list.map(r=>
+    '<tr><td>'+e(r.name)+'</td><td class="right">'+num(r.coefficient,2)+'</td><td class="center">'+e(r.unit)+'</td><td class="right">'+money(r.unit_price)+'</td><td class="right">'+money(Number(r.coefficient||0)*Number(r.unit_price||0))+'</td></tr>'
+  ).join(''):'';
+  if(!rows?.length) return '<p class="muted">Komponen AHSP belum dirinci dalam snapshot.</p>';
+  return '<table class="ahsp"><colgroup><col style="width:47%"><col style="width:10%"><col style="width:8%"><col style="width:17%"><col style="width:18%"></colgroup><thead><tr><th>Uraian Pekerjaan</th><th class="right">Koefisien</th><th class="center">Satuan</th><th class="right">Harga Satuan</th><th class="right">Jumlah Harga</th></tr></thead><tbody>'+render('BAHAN',materials)+render('UPAH',labor)+'</tbody></table>';
+}
+function subitems(rows: any[]): string {
+  return (rows||[]).map(r=>'<div class="sub"><b>'+e(r.code)+' · '+e(r.name)+'</b><span>'+e(r.unit)+' | Koef. '+num(r.coefficient,2)+' | '+money(r.line_total)+'</span>'+componentTable(r.components||[])+subitems(r.subitems||[])+'</div>').join('');
+}
+function rebarBreakdown(row: any): string {
+  if (row.calc_mode !== 'rebar_structure') return '';
+  try {
+    const result = calculateStructuredRebar(row.parameters || {}, Number(row.multiplier ?? 1));
+    const componentRows = result.breakdown.map((line) =>
+      '<tr><td>'+e(line.label)+'</td><td class="center">Ø'+num(line.diameter,0)+'</td><td class="right">'+num(line.pieces,0)+'</td><td class="right">'+num(line.cutLengthM,3)+'</td><td class="right">'+num(line.totalLengthM,3)+'</td><td class="right">'+num(line.weightKg,3)+'</td></tr>'
+    ).join('');
+    const diameterRows = result.diameterSummary.map((line) =>
+      '<tr><td class="center">Ø'+num(line.diameter,0)+'</td><td class="right">'+num(line.totalLengthM,3)+' m</td><td class="right">'+num(line.requiredWeightKg,3)+' kg</td><td class="right">'+num(line.stockBars,0)+' batang × '+num(result.stockLengthM,2)+' m</td><td class="right">'+num(line.stockWeightKg,3)+' kg</td></tr>'
+    ).join('');
+    return '<div class="rebar-detail"><b>Rincian potongan dasar per set (rekap batang stok dan berat telah dikalikan faktor '+num(row.multiplier ?? 1,2)+')</b><table class="rebar-pieces"><thead><tr><th>Kelompok tulangan</th><th>Diameter</th><th class="right">Potongan / set</th><th class="right">Panjang/potong (m)</th><th class="right">Total panjang (m)</th><th class="right">Berat (kg)</th></tr></thead><tbody>'+componentRows+'</tbody></table><b>Rekap kebutuhan batang stok per diameter</b><table class="rebar-stock"><thead><tr><th>Diameter</th><th class="right">Panjang perlu</th><th class="right">Berat perlu</th><th class="right">Batang stok</th><th class="right">Berat stok ekuivalen</th></tr></thead><tbody>'+diameterRows+'</tbody></table><p class="rebar-total">Total panjang '+num(result.totalLengthM,3)+' m · Berat kebutuhan teoritis '+num(result.totalWeightKg,3)+' kg · Estimasi batang stok '+num(result.totalStockBars,0)+' batang · Berat ekuivalen stok '+num(result.totalStockWeightKg,3)+' kg</p></div>';
+  } catch (error) {
+    return '<p class="muted">Rincian pembesian tidak dapat dibaca: '+e(error instanceof Error ? error.message : 'parameter tidak valid')+'</p>';
+  }
+}
+function backup(item: any, rows: any[], index: number) {
+  const body=rows.length?rows.map((r:any,i:number)=>'<tr><td class="center">'+(i+1)+'</td><td><b>'+e(r.description||item.name)+'</b><p>'+e(calc(r))+' × faktor '+num(r.multiplier,2)+'</p>'+rebarBreakdown(r)+'</td><td class="right">'+num(r.subtotal,2)+'</td><td class="center">'+e(item.unit)+'</td></tr>').join(''):
+    '<tr><td class="center">'+index+'</td><td><b>'+e(item.name)+'</b><p class="muted">Belum ada rincian perhitungan backup volume.</p></td><td class="right"></td><td class="center">'+e(item.unit)+'</td></tr>';
+  return '<div class="item"><h3>'+index+'. '+e(item.code)+' · '+e(item.name)+'</h3><small>Volume RAB: '+num(item.volume,2)+' '+e(item.unit)+'</small><table class="backup"><colgroup><col style="width:5%"><col style="width:65%"><col style="width:18%"><col style="width:12%"></colgroup><thead><tr><th class="center">No</th><th>Perhitungan dan rumus</th><th class="right">Volume</th><th class="center">Satuan</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+}
+export function buildLocationRabPdfHtml(input: Input): string {
+  const {project,division,accent,soft,border,text,font,bold,signers,date}=input;
+  const items=[...(division.items||[])].sort((a:any,b:any)=>Number(a.sort_order||0)-Number(b.sort_order||0));
+  const locTotal=items.reduce((s:number,r:any)=>s+Number(r.total_price||0),0);
+  const categoryKey=(item:any)=>{
+    const savedId=String(item.rab_subcategory_id||'').trim();
+    if(savedId) return savedId;
+    const savedName=String(item.categoryName||item.category_name||'').trim();
+    if(savedName) return savedName;
+    const code=String(item.code||'').trim().toUpperCase();
+    const prefix=code.split('.').filter(Boolean).slice(0,3).join('.');
+    return prefix || String(item.work_group_name||'TANPA-KATEGORI');
+  };
+  const categories=new Map<string,{name:string,total:number}>();
+  for(const item of items){
+    const key=categoryKey(item);
+    const name=String(item.categoryName||item.category_name||item.work_group_name||'Pekerjaan Lainnya');
+    const current=categories.get(key)||{name,total:0};
+    current.total+=Number(item.total_price||0); categories.set(key,current);
+  }
+  const recapRows=Array.from(categories.values()).map((c,i)=>'<tr><td class="center">'+(i+1)+'</td><td>'+e(c.name)+'</td><td class="right">'+money(c.total)+'</td></tr>').join('');
+  const cover='<section class="page cover"><div class="brand">JAVAWASTHU MANAGEMENT <span>DOKUMEN TEKNIS · RAB</span></div><div class="mark">D</div><small>PAKET DOKUMEN PER LOKASI</small><h1>'+e(division.name)+'</h1><h2>'+e(project.title)+'</h2><div class="rule"></div><div class="meta"><div><small>PEMILIK / INSTANSI</small><b>'+e(project.client||'-')+'</b></div><div><small>LOKASI PROYEK</small><b>'+e(project.location||project.kabupaten_kota||'-')+'</b></div><div><small>KODE LOKASI</small><b>'+e(division.code||'-')+'</b></div><div><small>TANGGAL</small><b>'+e(date)+'</b></div></div><footer>REKAPITULASI PEKERJAAN LOKASI · RINCIAN RAB · AHSP · BACKUP VOLUME</footer></section>';
+  const recap='<section class="page"><div class="body">'+heading('01 · IKHTISAR LOKASI','REKAPITULASI PEKERJAAN LOKASI',division,accent)+'<table class="recap"><colgroup><col style="width:8%"><col style="width:62%"><col style="width:30%"></colgroup><thead><tr><th class="center">No</th><th>Kategori Pekerjaan</th><th class="right">Jumlah Harga</th></tr></thead><tbody>'+(recapRows||'<tr><td colspan="3" class="center">Belum ada kategori pekerjaan.</td></tr>')+'<tr class="total"><td colspan="2">JUMLAH TOTAL</td><td class="right">'+money(locTotal)+'</td></tr></tbody></table>'+signatures(signers)+'</div></section>';
+  const itemGroups=new Map<string,any[]>();
+  for(const row of items){
+    const category=String(row.categoryName||row.category_name||row.work_group_name||'Pekerjaan Lainnya');
+    const current=itemGroups.get(category)||[]; current.push(row); itemGroups.set(category,current);
+  }
+  let rabNumber=0;
+  const rabGroupMap=new Map<string,{category:string;rows:any[]}>();
+  for(const row of items){
+    const key=categoryKey(row);
+    const category=String(row.categoryName||row.category_name||row.work_group_name||'Pekerjaan Lainnya');
+    const existing=rabGroupMap.get(key);
+    if(existing) existing.rows.push(row);
+    else rabGroupMap.set(key,{category,rows:[row]});
+  }
+  const rabRows=Array.from(rabGroupMap.values()).map(({category,rows})=>'<tr class="category"><td colspan="7">'+e(category)+'</td></tr>'+rows.map((r:any)=>
+    '<tr><td class="center">'+(++rabNumber)+'</td><td>'+e(r.code)+'</td><td>'+e(r.name)+'</td><td class="center">'+e(r.unit)+'</td><td class="right">'+num(r.volume,2)+'</td><td class="right">'+money(r.unit_price)+'</td><td class="right">'+money(r.total_price)+'</td></tr>'
+  ).join('')).join('');
+  const rab='<section class="page"><div class="body">'+heading('02 · RINCIAN BIAYA','RINCIAN RENCANA ANGGARAN BIAYA',division,accent)+'<table class="rab"><colgroup><col style="width:4%"><col style="width:10%"><col style="width:37%"><col style="width:7%"><col style="width:8%"><col style="width:17%"><col style="width:17%"></colgroup><thead><tr><th class="center">No</th><th>Kode</th><th>Uraian Pekerjaan</th><th class="center">Satuan</th><th class="right">Vol.</th><th class="right">Harga Satuan</th><th class="right">Jumlah Harga</th></tr></thead><tbody>'+(rabRows||'<tr><td colspan="7" class="center">Belum ada item RAB.</td></tr>')+'<tr class="total"><td colspan="6">JUMLAH TOTAL</td><td class="right">'+money(locTotal)+'</td></tr></tbody></table>'+signatures(signers)+'</div></section>';
+  const ahsp='<section class="page"><div class="body">'+heading('03 · ANALISA HARGA','ANALISA HARGA SATUAN PEKERJAAN (AHSP)',division,accent)+'<p class="lead">Komponen bahan dan upah berdasarkan snapshot AHSP setiap item RAB.</p>'+items.map((r:any,i:number)=>'<div class="item"><h3>'+(i+1)+'. '+e(r.code)+' · '+e(r.name)+'</h3>'+componentTable(r.components_snapshot||[])+subitems(r.subitems_snapshot||[])+'<p class="right">Harga satuan AHSP: <b>'+money(r.unit_price)+'</b></p></div>').join('')+signatures(signers)+'</div></section>';
+  const vol='<section class="page"><div class="body">'+heading('04 · DASAR PERHITUNGAN','BACKUP VOLUME / BACK UP DATA',division,accent)+'<p class="lead">Urutan item mengikuti RAB. Rumus, parameter geometri, kelompok tulangan, berat, dan estimasi batang stok ditampilkan sesuai data yang tersimpan.</p><p class="technical-note"><b>Catatan teknis:</b> Berat nominal batang mengacu pada ukuran nominal SNI 2052:2024; panjang batang stok default 12 m (pilihan panjang standar 10 m atau 12 m, mengikuti spesifikasi material proyek). Rumus geometri adalah estimasi kuantitas pembesian, bukan pemeriksaan kapasitas/desain. Selimut, kait, panjang penyaluran, sambungan lewatan, dan detail penempatan wajib diverifikasi terhadap gambar struktur dan perencana berdasarkan SNI 2847:2019.</p>'+items.map((r:any,i:number)=>{const details=r.backupDetails||[];const root=details.filter((x:any)=>!x.subitem_path);const nested=details.filter((x:any)=>!!x.subitem_path);return '<div class="item">'+backup(r,root,i+1)+nested.map((x:any)=>'<div class="sub"><b>Backup sub-item · '+e(x.subitem_path)+'</b>'+backup(r,[x],i+1)+'</div>').join('')+'</div>';}).join('')+signatures(signers)+'</div></section>';
+  const css='@page{size:A4 portrait;margin:13mm 12mm 14mm}*{box-sizing:border-box}body{margin:0;color:#1e293b;font:8.5pt '+font+';line-height:1.35}.page{min-height:268mm;page-break-after:always;break-after:page}.page:last-child{page-break-after:auto}.cover{padding:15mm;background:linear-gradient(145deg,#fff,#f8fafc,'+soft+');border:1px solid '+border+';display:flex;flex-direction:column}.brand{display:flex;justify-content:space-between;border-bottom:1px solid '+border+';padding-bottom:7mm;font-size:7pt;letter-spacing:1px;color:#64748b}.mark{margin-top:34mm;background:'+accent+';color:white;width:23mm;height:23mm;border-radius:7mm;display:grid;place-items:center;font-size:25pt;font-weight:900}.cover>small{margin-top:9mm;color:'+accent+';font-weight:800;letter-spacing:2px}.cover h1{font-size:32pt;line-height:1.05;color:'+text+';margin:4mm 0;font-weight:'+bold+'}.cover h2{font-size:14pt;color:#475569;font-weight:500}.rule{width:40mm;height:2mm;background:'+accent+';margin:8mm 0}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin-top:10mm}.meta div{border-bottom:1px solid '+border+';padding-bottom:4mm}.meta small{display:block;color:#64748b;font-size:7pt;margin-bottom:2mm}.meta b{font-size:9pt}.cover footer{margin-top:auto;border-top:1px solid '+border+';padding-top:6mm;color:#64748b;font-size:7pt}.body{padding:0 0 4mm}header{margin-bottom:7mm}header small{color:'+accent+';font-weight:800;letter-spacing:1.5px}header h2{font-size:16pt;color:'+text+';margin:2mm 0;font-weight:'+bold+'}header p{color:#64748b;margin:0}header i{display:block;width:25mm;height:1.5mm;margin-top:4mm}.lead{color:#64748b;margin-bottom:6mm}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:7.2pt;margin:3mm 0 6mm}th{background:'+accent+';color:#fff;text-align:left;padding:5px 4px;border:1px solid '+accent+'}td{border:1px solid #cbd5e1;padding:5px 4px;vertical-align:top;overflow-wrap:anywhere}.right{text-align:right!important;white-space:nowrap}.center{text-align:center!important}.total{background:'+soft+';font-weight:'+bold+';color:'+text+'}.rab td:nth-child(2){white-space:nowrap;font-size:6.8pt}.rab td:nth-child(4),.backup td:nth-child(4){text-align:center}.highlight{display:flex;justify-content:space-between;padding:5mm;background:'+soft+';border:1px solid '+border+'}.signatures{display:grid;grid-template-columns:repeat(3,1fr);gap:8mm;margin-top:14mm;break-inside:avoid}.sign{text-align:center;min-height:34mm;display:flex;flex-direction:column}.sign b{font-size:8pt}.space{height:19mm}.sign strong{border-bottom:1px solid #64748b;padding-bottom:2px;font-size:8pt}.sign small{color:#64748b;font-size:7pt;margin-top:2px}.item{border:1px solid #e2e8f0;padding:3mm;margin-bottom:5mm;break-inside:auto}.item h3{font-size:8.2pt;margin:0 0 2mm;color:'+text+'}.item>small{color:#64748b}.item table{font-size:7pt}.item th,.item td{padding:4px}.item p{font-size:7pt;color:#475569;margin:2mm 0}.muted{color:#94a3b8;font-style:italic}.sub{margin:3mm 0 3mm 5mm;padding-left:3mm;border-left:2px solid '+border+'}.sub span{display:block;font-size:7pt;color:#64748b}.category td{background:'+soft+';color:'+text+';font-weight:800;letter-spacing:.5px}.ahsp td:nth-child(1){text-align:left}.ahsp td:nth-child(3){text-align:center}.backup td:nth-child(2){overflow-wrap:anywhere}.backup td:nth-child(3){text-align:right}.backup td p{white-space:normal}.rebar-detail{margin:2mm 0 1mm;padding:2mm;background:#f8fafc;border:1px solid #e2e8f0}.rebar-detail>b{display:block;margin:1mm 0;font-size:6.8pt}.rebar-detail table{font-size:6pt;margin:1mm 0 3mm}.rebar-detail th,.rebar-detail td{padding:3px}.rebar-total{font-weight:700;color:#0f172a}.technical-note{padding:3mm;margin:2mm 0 5mm;border:1px solid #fde68a;background:#fffbeb;color:#78350f;font-size:7pt;line-height:1.5}.sketch,.drawing{display:none}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  return '<!doctype html><html lang="id"><head><meta charset="utf-8"><title>'+e(project.title)+' - '+e(division.name)+'</title><style>'+css+'</style></head><body>'+cover+recap+rab+ahsp+vol+'</body></html>';
+}

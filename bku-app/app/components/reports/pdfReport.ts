@@ -237,7 +237,7 @@ export function buildBkuPdfHtml(options: PdfReportOptions) {
     </style></head><body>
     <div class="toolbar"><button class="secondary" onclick="window.close()">Tutup</button><button onclick="window.print()">Cetak / Simpan PDF</button></div>
     <main class="sheet">
-      <header class="top"><div><div class="brand">Dahlia Management System · Buku Kas Eksternal</div><h1>${includeBku ? "Laporan Buku Kas Umum" : includeAttendance && includeMaterials ? "Laporan Rekapitulasi Proyek" : includeAttendance ? "Matriks Absensi Pekerja" : "Rekap Material Proyek"}</h1><div class="subtitle">Periode ${dateLabel(startDate)} – ${dateLabel(endDate)}</div></div><div class="pill">REKAP PERIODE</div></header>
+      <header class="top"><div><div class="brand">JAVAWASTHU MANAGEMENT · Buku Kas Eksternal</div><h1>${includeBku ? "Laporan Buku Kas Umum" : includeAttendance && includeMaterials ? "Laporan Rekapitulasi Proyek" : includeAttendance ? "Matriks Absensi Pekerja" : "Rekap Material Proyek"}</h1><div class="subtitle">Periode ${dateLabel(startDate)} – ${dateLabel(endDate)}</div></div><div class="pill">REKAP PERIODE</div></header>
       <section class="identity">
         <div><span>Nama Sekolah</span><strong>${escapeHtml(book.name)}</strong></div><div><span>NPSN</span><strong>${escapeHtml(book.npsn || "—")}</strong></div>
         <div><span>Alamat</span><strong>${escapeHtml(book.address || "—")}</strong></div><div><span>Telepon</span><strong>${escapeHtml(book.phone || "—")}</strong></div>

@@ -77,8 +77,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     };
 
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      // Supabase menyarankan operasi jaringan lanjutan dijalankan setelah callback auth selesai.
+    const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      // Perpanjangan token adalah proses normal. Jangan memicu pemeriksaan akses
+      // penuh karena RequireAuth akan melepas halaman dan membuang state formulir.
+      if (event === 'TOKEN_REFRESHED' && nextSession?.user) {
+        window.setTimeout(() => {
+          if (active) setSession(nextSession);
+        }, 0);
+        return;
+      }
+
+      // Event autentikasi selain refresh token dapat mengubah identitas atau akses.
+      // Jalankan pemeriksaan jaringan setelah callback auth selesai.
       window.setTimeout(() => {
         if (active) void loadForSession(nextSession);
       }, 0);
@@ -140,6 +150,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessError('');
   }, []);
 
+  // Stabilkan callback izin terhadap pergantian objek Session.
+  // TOKEN_REFRESHED dapat menghasilkan objek Session baru meskipun user dan
+  // hak akses tidak berubah. Callback yang stabil mencegah useEffect halaman
+  // (misalnya pemuatan dashboard) berjalan ulang hanya karena token diperbarui.
+  const can = useCallback(
+    (permissionCode: string, projectId?: string | null) =>
+      hasPermission(access, permissionCode, projectId),
+    [access],
+  );
+  const hasRoleCode = useCallback(
+    (roleCode: string, projectId?: string | null) =>
+      hasRole(access, roleCode, projectId),
+    [access],
+  );
+
   const value = useMemo<AuthContextValue>(() => ({
     user: session?.user ?? null,
     session,
@@ -149,9 +174,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshAccess,
     signIn,
     signOut,
-    can: (permissionCode, projectId) => hasPermission(access, permissionCode, projectId),
-    hasRoleCode: (roleCode, projectId) => hasRole(access, roleCode, projectId),
-  }), [session, access, loading, accessError, refreshAccess, signIn, signOut]);
+    can,
+    hasRoleCode,
+  }), [session, access, loading, accessError, refreshAccess, signIn, signOut, can, hasRoleCode]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

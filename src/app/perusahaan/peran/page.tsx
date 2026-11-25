@@ -369,7 +369,7 @@ export default function RolePermissionPage() {
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm"><ShieldCheck className="h-6 w-6" /></div>
               <div>
                 <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Pusat Role & Otoritas</h1>
-                <p className="mt-1 max-w-2xl text-sm text-slate-500">Atur jabatan, hak akses, dan cakupan kewenangan pengguna Dahlia Management System.</p>
+                <p className="mt-1 max-w-2xl text-sm text-slate-500">Atur jabatan, hak akses, dan cakupan kewenangan pengguna JAVAWASTHU MANAGEMENT.</p>
               </div>
             </div>
           </div>

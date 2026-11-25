@@ -48,7 +48,7 @@ export default function LoginPage() {
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white">
               <Building2 className="h-6 w-6" />
             </div>
-            <p className="mt-8 text-xs font-bold uppercase tracking-[0.22em] text-emerald-300">DAHLIA Construction</p>
+            <p className="mt-8 text-xs font-bold uppercase tracking-[0.22em] text-emerald-300">JAVAWASTHU MANAGEMENT</p>
             <h1 className="mt-3 max-w-md text-4xl font-extrabold leading-tight">Satu ruang kerja untuk seluruh aktivitas perusahaan.</h1>
             <p className="mt-4 max-w-md text-sm leading-7 text-slate-300">
               Kelola perencanaan, pelaksanaan, pengadaan, tenaga kerja dan laporan proyek melalui satu sistem terpadu.
@@ -62,7 +62,7 @@ export default function LoginPage() {
             <div className="flex items-center gap-3 lg:hidden">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white"><Building2 className="h-5 w-5" /></div>
               <div>
-                <p className="text-sm font-extrabold text-slate-900">DAHLIA</p>
+                <p className="text-sm font-extrabold text-slate-900">JAVAWASTHU MANAGEMENT</p>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">Construction Hub</p>
               </div>
             </div>

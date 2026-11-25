@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Info,
+  Link2,
   Plus,
   RefreshCw,
   Save,
@@ -13,6 +14,7 @@ import {
   Shield,
   ShieldCheck,
   Users,
+  Unlink,
   X,
 } from 'lucide-react';
 import RequireAuth from '@/components/auth/RequireAuth';
@@ -52,6 +54,23 @@ type ManagedUser = {
   assignments: Assignment[];
 };
 type ApiData = { users: ManagedUser[]; roles: Role[]; projects: Project[]; server_date: string };
+type FieldEmployeeOption = {
+  employee_id: string;
+  employee_number: string | null;
+  full_name: string;
+  preferred_name: string | null;
+  position_title: string | null;
+};
+type FieldUserLink = {
+  linked: boolean;
+  field_role: 'internal' | 'subcontractor' | null;
+  employee_id: string | null;
+  employee_number: string | null;
+  employee_name: string | null;
+  preferred_name: string | null;
+  position_title: string | null;
+  subcontractor_id: string | null;
+};
 type AssignmentDraft = { role_id: string; project_id: string; valid_from: string; valid_until: string };
 
 const INPUT = 'mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10';
@@ -145,6 +164,14 @@ function UserManagementContent() {
   const [profileEmployeeCode, setProfileEmployeeCode] = useState('');
   const [profileIsDemoUser, setProfileIsDemoUser] = useState(false);
 
+  const [fieldEmployees, setFieldEmployees] = useState<FieldEmployeeOption[]>([]);
+  const [fieldUserLink, setFieldUserLink] = useState<FieldUserLink | null>(null);
+  const [fieldEmployeeId, setFieldEmployeeId] = useState('');
+  const [fieldEmployeeSearch, setFieldEmployeeSearch] = useState('');
+  const [fieldLinkLoading, setFieldLinkLoading] = useState(false);
+  const [fieldLinkBusy, setFieldLinkBusy] = useState(false);
+  const [fieldLinkError, setFieldLinkError] = useState('');
+
   const today = data?.server_date || new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date());
@@ -187,6 +214,19 @@ function UserManagementContent() {
   useEffect(() => { void load(); }, [load]);
 
   const selectedUser = useMemo(() => data?.users.find((user) => user.id === selectedId) ?? null, [data, selectedId]);
+  const selectedIsCompanyDirector = useMemo(() => selectedUser?.assignments.some((assignment) =>
+    assignment.role?.code === 'director'
+    && assignment.project_id === null
+    && isEffective(assignment, today),
+  ) ?? false, [selectedUser, today]);
+  const filteredFieldEmployees = useMemo(() => {
+    const q = fieldEmployeeSearch.trim().toLocaleLowerCase('id');
+    if (!q) return fieldEmployees;
+    return fieldEmployees.filter((employee) =>
+      [employee.full_name, employee.preferred_name ?? '', employee.employee_number ?? '', employee.position_title ?? '']
+        .some((value) => value.toLocaleLowerCase('id').includes(q)),
+    );
+  }, [fieldEmployees, fieldEmployeeSearch]);
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLocaleLowerCase('id');
     return (data?.users ?? []).filter((user) => {
@@ -216,8 +256,106 @@ function UserManagementContent() {
     setProfileIsDemoUser(selectedUser.is_demo_user === true);
   }, [selectedUser]);
 
+  const selectedUserId = selectedUser?.id;
+  useEffect(() => {
+    let active = true;
+    if (!selectedUserId) {
+      setFieldUserLink(null);
+      setFieldEmployees([]);
+      setFieldEmployeeId('');
+      setFieldLinkLoading(false);
+      return () => { active = false; };
+    }
+
+    setFieldLinkLoading(true);
+    setFieldLinkError('');
+    setFieldUserLink(null);
+    setFieldEmployeeId('');
+    setFieldEmployeeSearch('');
+
+    void Promise.all([
+      supabase.rpc('dahlia_field_get_user_link', { p_user_id: selectedUserId }),
+      supabase.rpc('dahlia_field_list_linkable_employees', { p_search: null }),
+    ]).then(([linkResult, employeesResult]) => {
+      if (linkResult.error) throw linkResult.error;
+      if (employeesResult.error) throw employeesResult.error;
+      if (!active) return;
+      const link = (linkResult.data ?? { linked: false }) as FieldUserLink;
+      setFieldUserLink(link);
+      setFieldEmployeeId(link.field_role === 'internal' ? link.employee_id ?? '' : '');
+      setFieldEmployees((employeesResult.data ?? []) as FieldEmployeeOption[]);
+    }).catch((error: unknown) => {
+      if (!active) return;
+      setFieldLinkError(error instanceof Error
+        ? error.message
+        : 'Informasi tautan Dahlia Field gagal dimuat.');
+    }).finally(() => {
+      if (active) setFieldLinkLoading(false);
+    });
+
+    return () => { active = false; };
+  }, [selectedUserId]);
+
   function notifyError(message: string) { setError(message); setNotice(''); }
   function notifySuccess(message: string) { setNotice(message); setError(''); }
+
+  async function refreshFieldUserLink(userId: string) {
+    const { data: link, error: linkError } = await supabase.rpc(
+      'dahlia_field_get_user_link',
+      { p_user_id: userId },
+    );
+    if (linkError) throw linkError;
+    const normalized = (link ?? { linked: false }) as FieldUserLink;
+    setFieldUserLink(normalized);
+    setFieldEmployeeId(normalized.field_role === 'internal' ? normalized.employee_id ?? '' : '');
+  }
+
+  async function saveFieldUserLink() {
+    if (!selectedUser || !fieldEmployeeId || fieldLinkBusy || selectedIsCompanyDirector) return;
+    setFieldLinkBusy(true);
+    setFieldLinkError('');
+    setError('');
+    setNotice('');
+    try {
+      const { error: linkError } = await supabase.rpc('dahlia_field_link_user', {
+        p_user_id: selectedUser.id,
+        p_field_role: 'internal',
+        p_employee_id: fieldEmployeeId,
+        p_subcontractor_id: null,
+      });
+      if (linkError) throw linkError;
+      await refreshFieldUserLink(selectedUser.id);
+      notifySuccess(`Akun ${selectedUser.full_name} berhasil ditautkan ke data karyawan untuk Dahlia Field.`);
+    } catch (error) {
+      setFieldLinkError(error instanceof Error ? error.message : 'Tautan Dahlia Field gagal disimpan.');
+    } finally {
+      setFieldLinkBusy(false);
+    }
+  }
+
+  async function removeFieldUserLink() {
+    if (!selectedUser || !fieldUserLink?.linked || fieldLinkBusy) return;
+    const confirmed = window.confirm(
+      `Lepaskan tautan Dahlia Field dari akun ${selectedUser.full_name}? Riwayat absensi dan laporan yang sudah tersimpan tidak dihapus.`,
+    );
+    if (!confirmed) return;
+    setFieldLinkBusy(true);
+    setFieldLinkError('');
+    setError('');
+    setNotice('');
+    try {
+      const { error: unlinkError } = await supabase.rpc('dahlia_field_unlink_user', {
+        p_user_id: selectedUser.id,
+      });
+      if (unlinkError) throw unlinkError;
+      await refreshFieldUserLink(selectedUser.id);
+      notifySuccess(`Tautan Dahlia Field untuk ${selectedUser.full_name} berhasil dilepaskan.`);
+    } catch (error) {
+      setFieldLinkError(error instanceof Error ? error.message : 'Tautan Dahlia Field gagal dilepaskan.');
+    } finally {
+      setFieldLinkBusy(false);
+    }
+  }
 
   function updateNewAssignment(index: number, patch: Partial<AssignmentDraft>) {
     setNewAssignments((rows) => rows.map((row, i) => i === index ? { ...row, ...patch } : row));
@@ -447,6 +585,115 @@ function UserManagementContent() {
             </label>
             <div className="flex items-end sm:col-span-2 xl:col-span-3"><button type="submit" disabled={busy || !profileName.trim()} className={SECONDARY}><Save className="h-4 w-4"/> Simpan profil</button></div>
           </form>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><Link2 className="h-5 w-5"/></div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-bold text-slate-900">Integrasi akun Dahlia Field</h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Hubungkan akun login ini dengan satu data karyawan aktif. Penugasan role dan proyek tetap diatur pada bagian di bawah.
+              </p>
+            </div>
+            {fieldUserLink?.linked ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">TERTAUT</span> : null}
+          </div>
+
+          {selectedIsCompanyDirector ? (
+            <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs leading-5 text-blue-800">
+              Akun ini memiliki role Direktur tingkat perusahaan. Dahlia Field mengenalinya sebagai mode pemantauan read-only, sehingga tidak perlu ditautkan ke data karyawan.
+            </div>
+          ) : selectedUser.is_demo_user ? (
+            <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs leading-5 text-violet-800">
+              Akun PORTOFOLIO / Dummy tidak dapat ditautkan ke identitas operasional Dahlia Field.
+            </div>
+          ) : fieldLinkLoading ? (
+            <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Memuat tautan akun dan daftar karyawan...</div>
+          ) : fieldLinkError ? (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-5 text-rose-800">
+              {fieldLinkError}
+              <p className="mt-1 text-[11px] text-rose-700">Pastikan migration integrasi dashboard sudah diterapkan dan sesi administrator masih aktif.</p>
+            </div>
+          ) : fieldUserLink?.field_role === 'subcontractor' ? (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+              Akun ini sudah ditautkan sebagai akun Subkontraktor. Penautan karyawan tidak dapat dilakukan bersamaan. Lepaskan tautan tersebut dahulu hanya bila jenis akun memang perlu diubah.
+              <div className="mt-3">
+                <button type="button" onClick={() => void removeFieldUserLink()} disabled={fieldLinkBusy || !selectedUser.is_active} className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">
+                  <Unlink className="h-3.5 w-3.5"/> Lepaskan tautan
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {fieldUserLink?.linked && fieldUserLink.employee_id ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Karyawan tertaut saat ini</p>
+                  <p className="mt-1 font-semibold text-slate-900">{fieldUserLink.employee_name ?? 'Nama karyawan tidak ditemukan'}</p>
+                  <p className="mt-0.5 text-xs text-slate-600">
+                    {fieldUserLink.employee_number ?? 'Tanpa nomor karyawan'}
+                    {fieldUserLink.position_title ? ` · ${fieldUserLink.position_title}` : ''}
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                  Akun ini belum ditautkan ke data karyawan. Pengguna belum dapat masuk ke mode operasional Dahlia Field.
+                </div>
+              )}
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                <div>
+                  <label className={LABEL}>Cari karyawan aktif</label>
+                  <input
+                    value={fieldEmployeeSearch}
+                    onChange={(event) => setFieldEmployeeSearch(event.target.value)}
+                    placeholder="Cari nama, nama panggilan, atau nomor karyawan..."
+                    className={INPUT}
+                    disabled={!selectedUser.is_active}
+                  />
+                  <label className={cx(LABEL, 'mt-3')}>Pilih data karyawan</label>
+                  <select
+                    value={fieldEmployeeId}
+                    onChange={(event) => setFieldEmployeeId(event.target.value)}
+                    className={INPUT}
+                    disabled={!selectedUser.is_active || fieldLinkBusy}
+                  >
+                    <option value="">Pilih karyawan aktif</option>
+                    {filteredFieldEmployees.map((employee) => (
+                      <option key={employee.employee_id} value={employee.employee_id}>
+                        {employee.full_name} · {employee.employee_number ?? 'Tanpa nomor'}
+                        {employee.preferred_name ? ` · ${employee.preferred_name}` : ''}
+                        {employee.position_title ? ` · ${employee.position_title}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {filteredFieldEmployees.length === 0 ? (
+                    <p className="mt-1 text-[11px] text-amber-700">Tidak ada karyawan aktif yang cocok dengan pencarian.</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void saveFieldUserLink()}
+                  disabled={!selectedUser.is_active || !fieldEmployeeId || fieldLinkBusy}
+                  className={cx(PRIMARY, 'min-h-11')}
+                >
+                  <Link2 className="h-4 w-4"/>
+                  {fieldLinkBusy ? 'Menyimpan...' : fieldUserLink?.linked ? 'Perbarui tautan' : 'Tautkan akun'}
+                </button>
+              </div>
+              {fieldUserLink?.linked ? (
+                <button
+                  type="button"
+                  onClick={() => void removeFieldUserLink()}
+                  disabled={fieldLinkBusy || !selectedUser.is_active}
+                  className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                >
+                  <Unlink className="h-3.5 w-3.5"/> Lepaskan tautan
+                </button>
+              ) : null}
+            </div>
+          )}
+          <p className="mt-3 border-t border-slate-100 pt-3 text-[11px] leading-5 text-slate-500">
+            Penautan hanya menghubungkan identitas login dengan data karyawan. Hak akses proyek tetap mengikuti role, cakupan proyek, dan masa berlaku penugasan yang tercatat pada akun.
+          </p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">

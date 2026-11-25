@@ -68,8 +68,21 @@ export type RabTableItem = {
   /** ID dan nama kelompok item pekerjaan yang memuat beberapa AHSP. */
   work_group_id?: string | null;
   work_group_name?: string | null;
+  rab_subcategory_id?: string | null;
   sort_order?: number | null;
   is_volume_from_backup?: boolean;
+  /** Rincian backup volume JSONB yang dimuat untuk ekspor PDF per lokasi. */
+  backupDetails?: Array<{
+    id: string;
+    rab_item_id: string;
+    subitem_path?: string | null;
+    description: string;
+    drawing_ref?: string | null;
+    multiplier: number | string | null;
+    calc_mode: string | null;
+    parameters: Record<string, unknown> | null;
+    subtotal: number | string | null;
+  }> | null;
 };
 
 export type RabItemUpdate = {
@@ -94,6 +107,8 @@ type Props = {
   onVolumeUpdated?: () => void | Promise<void>;
   /** Persists a complete manual row order within this location. */
   onReorder?: (orderedIds: string[]) => Promise<void>;
+  subcategories?: Array<{ id: string; name: string; categoryName: string }>;
+  onMoveItem?: (itemId: string, subcategoryId: string) => Promise<void>;
   /** Allows reordering at FINAL RAB while normal editing remains locked. */
   canReorder?: boolean;
   readOnly?: boolean;
@@ -858,7 +873,7 @@ function collectSubitemComponents(items: RabSubitemSnapshot[]): RabComponentSnap
   ]);
 }
 
-export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete, onVolumeUpdated, onReorder, canReorder = false, readOnly = false }: Props) {
+export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete, onVolumeUpdated, onReorder, subcategories, onMoveItem, canReorder = false, readOnly = false }: Props) {
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EditForm>({ code: '', name: '', volume: '' });
@@ -1023,6 +1038,26 @@ export default function RabTable({ items, onUpdate, onUpdateComponents, onDelete
                       <div>
                         {item.work_group_name?.trim() && <span className="mb-1 inline-flex rounded-md border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">{item.work_group_name}</span>}
                         <span className="block font-medium leading-5 text-slate-900">{item.name}</span>
+                        {!readOnly && onMoveItem && (subcategories?.length ?? 0) > 0 && (
+                          <label className="mt-2 flex max-w-xl flex-wrap items-center gap-2 text-[10px] text-slate-500">
+                            <span>Pindahkan ke:</span>
+                            <select
+                              value={item.rab_subcategory_id ?? ''}
+                              onChange={(event) => {
+                                const nextId = event.target.value;
+                                if (nextId && nextId !== item.rab_subcategory_id) {
+                                  void onMoveItem(item.id, nextId).catch((error) => setFormError(error instanceof Error ? error.message : 'Gagal memindahkan item.'));
+                                }
+                              }}
+                              className="max-w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-700"
+                              aria-label={'Pindahkan kategori untuk ' + item.name}
+                            >
+                              {(subcategories ?? []).map((subcategory) => (
+                                <option key={subcategory.id} value={subcategory.id}>{subcategory.categoryName} · {subcategory.name}</option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                       </div>
                     )}
                   </td>

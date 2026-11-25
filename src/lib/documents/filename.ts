@@ -19,7 +19,7 @@ export function buildBusinessDocumentFilename(identity: Pick<BusinessDocumentIde
 
   const projectPart = identity.projectCode ? `${filePart(identity.projectCode, 28)}__` : '';
   const revision = Math.max(1, Math.trunc(identity.revision ?? 1)).toString().padStart(2, '0');
-  return `DAHLIA__${filePart(code, 48)}__${projectPart}${filePart(identity.title, 48)}__R${revision}.pdf`;
+  return `JAVAWASTHU_MANAGEMENT__${filePart(code, 48)}__${projectPart}${filePart(identity.title, 48)}__R${revision}.pdf`;
 }
 
 export function escapeDocumentHtml(value: unknown): string {

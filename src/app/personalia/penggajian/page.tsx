@@ -434,7 +434,7 @@ function PayrollContent() {
 
         {tab === 'overview' && <div className="grid gap-4 xl:grid-cols-3">
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
-            <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center"><div><h2 className="font-bold text-slate-900">Alur pembayaran Dahlia</h2><p className="mt-1 text-xs text-slate-500">Sumber perhitungan berbeda, register kewajiban dan kas tetap terintegrasi.</p></div><span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Satu pusat kendali</span></div>
+            <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center"><div><h2 className="font-bold text-slate-900">Alur pembayaran JAVAWASTHU MANAGEMENT</h2><p className="mt-1 text-xs text-slate-500">Sumber perhitungan berbeda, register kewajiban dan kas tetap terintegrasi.</p></div><span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Satu pusat kendali</span></div>
             <div className="mt-5 grid gap-3 md:grid-cols-3">
               <FlowCard title="Payroll internal" detail="Bulanan, harian, per jam, komponen, dan borongan internal." value={`${data?.runs.length ?? 0} payroll`} />
               <FlowCard title="Borongan internal" detail="Pembagian volume progres terverifikasi ke karyawan." value={`${data?.pieceworkShares.length ?? 0} pembagian`} />

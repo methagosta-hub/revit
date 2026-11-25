@@ -11,8 +11,16 @@ import type { Supplier, SupplierInput } from '@/types/procurement';
 type FormState = { supplier_code: string; name: string; contact_person: string; phone: string; email: string; address: string; notes: string };
 const emptyForm = (): FormState => ({ supplier_code: '', name: '', contact_person: '', phone: '', email: '', address: '', notes: '' });
 
+type SupplierFormDraft = {
+  form: FormState;
+  editingId: string | null;
+  showForm: boolean;
+  savedAt: string;
+};
+
 function SupplierContent() {
-  const { access } = useAuth();
+  const { access, user } = useAuth();
+  const draftKey = user?.id ? `dahlia:supplier-form-draft:${user.id}` : null;
   const canManage = access?.roles.some((role) => ['director', 'admin', 'purchasing'].includes(role.code) && role.scope === 'company') ?? false;
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,6 +33,41 @@ function SupplierContent() {
   const [showInactive, setShowInactive] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  useEffect(() => {
+    if (!draftKey) return;
+    try {
+      const saved = window.sessionStorage.getItem(draftKey);
+      if (saved) {
+        const draft = JSON.parse(saved) as Partial<SupplierFormDraft>;
+        if (draft.showForm && draft.form && typeof draft.form.name === 'string') {
+          setForm({ ...emptyForm(), ...draft.form });
+          setEditingId(typeof draft.editingId === 'string' ? draft.editingId : null);
+          setShowForm(true);
+          setDraftRestored(true);
+        }
+      }
+    } catch {
+      window.sessionStorage.removeItem(draftKey);
+    }
+  }, [draftKey]);
+
+  function persistDraft(nextForm: FormState, nextEditingId: string | null) {
+    if (!draftKey) return;
+    try {
+      const draft: SupplierFormDraft = {
+        form: nextForm,
+        editingId: nextEditingId,
+        showForm: true,
+        savedAt: new Date().toISOString(),
+      };
+      window.sessionStorage.setItem(draftKey, JSON.stringify(draft));
+    } catch {
+      // Penyimpanan draft bersifat bantuan; kegagalan storage tidak boleh
+      // menghalangi pengguna mengisi atau menyimpan supplier.
+    }
+  }
 
   const load = useCallback(async (refresh = false) => {
     refresh ? setRefreshing(true) : setLoading(true); setError('');
@@ -42,14 +85,34 @@ function SupplierContent() {
       .some((value) => value.toLocaleLowerCase('id').includes(keyword));
   });
 
-  function openNew() { setEditingId(null); setForm(emptyForm()); setShowForm(true); setError(''); }
+  function openNew() {
+    const nextForm = emptyForm();
+    setEditingId(null);
+    setForm(nextForm);
+    setShowForm(true);
+    setDraftRestored(false);
+    setError('');
+    persistDraft(nextForm, null);
+  }
   function openEdit(supplier: Supplier) {
     setEditingId(supplier.id);
     setForm({ supplier_code: supplier.supplier_code ?? '', name: supplier.name, contact_person: supplier.contact_person ?? '', phone: supplier.phone ?? '', email: supplier.email ?? '', address: supplier.address ?? '', notes: supplier.notes ?? '' });
-    setShowForm(true); setError('');
+    setShowForm(true); setDraftRestored(false); setError('');
+    persistDraft({ supplier_code: supplier.supplier_code ?? '', name: supplier.name, contact_person: supplier.contact_person ?? '', phone: supplier.phone ?? '', email: supplier.email ?? '', address: supplier.address ?? '', notes: supplier.notes ?? '' }, supplier.id);
   }
-  function closeForm() { if (saving) return; setShowForm(false); setEditingId(null); setForm(emptyForm()); }
-  function change(field: keyof FormState, value: string) { setForm((current) => ({ ...current, [field]: value })); }
+  function closeForm() {
+    if (saving) return;
+    setShowForm(false);
+    setEditingId(null);
+    setForm(emptyForm());
+    setDraftRestored(false);
+    if (draftKey) window.sessionStorage.removeItem(draftKey);
+  }
+  function change(field: keyof FormState, value: string) {
+    const nextForm = { ...form, [field]: value };
+    setForm(nextForm);
+    persistDraft(nextForm, editingId);
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(''); setSuccess(''); setSaving(true);
@@ -58,6 +121,8 @@ function SupplierContent() {
       await saveSupplier(input, editingId ?? undefined);
       setSuccess(editingId ? 'Data supplier berhasil diperbarui.' : 'Supplier baru berhasil ditambahkan.');
       setShowForm(false); setEditingId(null); setForm(emptyForm());
+      setDraftRestored(false);
+      if (draftKey) window.sessionStorage.removeItem(draftKey);
       await load(true);
     } catch (err) { setError(err instanceof Error ? err.message : 'Data supplier gagal disimpan.'); }
     finally { setSaving(false); }
@@ -75,6 +140,7 @@ function SupplierContent() {
 
   return <div className="space-y-6">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-emerald-700">Pengadaan & Purchasing</p><h1 className="mt-1 text-2xl font-bold text-slate-900">Data Supplier</h1><p className="mt-1 text-sm text-slate-500">Kelola pemasok dan informasi kontak untuk pembelian proyek.</p></div><div className="flex gap-2"><Link href="/pengadaan/purchasing" className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Proses Purchasing</Link><button onClick={openNew} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"><Plus className="h-4 w-4" /> Tambah Supplier</button></div></div>
+    {draftRestored && showForm && <div role="status" className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800">Draft formulir supplier dipulihkan dari penyimpanan sesi browser. Periksa kembali isian sebelum menyimpan.</div>}
     {error && <div role="alert" className="flex gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><AlertCircle className="h-5 w-5 shrink-0" />{error}</div>}{success && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{success}</div>}
     {showForm && <form onSubmit={submit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><h2 className="font-bold text-slate-900">{editingId ? 'Ubah Data Supplier' : 'Supplier Baru'}</h2><p className="text-xs text-slate-500">Nama supplier wajib diisi.</p></div><button type="button" onClick={closeForm} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Tutup"><X className="h-4 w-4" /></button></div>
       <div className="grid gap-4 md:grid-cols-2"><label className="text-sm font-medium text-slate-700">Nama Supplier *<input required maxLength={255} value={form.name} onChange={(e) => change('name', e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm" placeholder="Nama toko/perusahaan" /></label><label className="text-sm font-medium text-slate-700">Kode Supplier<input maxLength={50} value={form.supplier_code} onChange={(e) => change('supplier_code', e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm" placeholder="Opsional dan harus unik" /></label><label className="text-sm font-medium text-slate-700">Nama Kontak<input maxLength={255} value={form.contact_person} onChange={(e) => change('contact_person', e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm" /></label><label className="text-sm font-medium text-slate-700">Nomor Telepon<input maxLength={60} value={form.phone} onChange={(e) => change('phone', e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm" /></label><label className="text-sm font-medium text-slate-700">Email<input type="email" maxLength={255} value={form.email} onChange={(e) => change('email', e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm" /></label><label className="text-sm font-medium text-slate-700">Alamat<textarea rows={2} value={form.address} onChange={(e) => change('address', e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm" /></label><label className="text-sm font-medium text-slate-700 md:col-span-2">Catatan<textarea rows={2} value={form.notes} onChange={(e) => change('notes', e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm" placeholder="Kategori barang, termin pembayaran, informasi tambahan" /></label></div>

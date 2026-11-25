@@ -12,9 +12,11 @@ import {
   Calculator,
   ChevronDown,
   ClipboardCheck,
+  ClipboardList,
   Database,
   FileText,
   FolderKanban,
+  Gauge,
   HardHat,
   Home,
   LogIn,
@@ -54,6 +56,7 @@ const navGroups: NavigationGroup[] = [
   {
     title: 'Beranda',
     items: [
+      { name: 'Pusat Kendali Operasional', href: '/pusat-kendali', icon: Gauge },
       { name: 'Dashboard Perusahaan', href: '/dashboard', icon: Home },
       { name: 'Daftar Proyek', href: '/proyek/daftar', icon: FolderKanban },
       { name: 'Buat Proyek', href: '/proyek/baru', icon: PlusCircle, permission: 'project.manage' },
@@ -63,6 +66,7 @@ const navGroups: NavigationGroup[] = [
     title: 'Operasional Perusahaan',
     items: [
       { name: 'Pengadaan', href: '/pengadaan', icon: ShoppingCart },
+      { name: 'Permintaan Material', href: '/pengadaan/permintaan', icon: ClipboardList, permission: 'procurement.request.review' },
       { name: 'Personalia', href: '/personalia', icon: Users },
       { name: 'Gudang & Persediaan', href: '/gudang', icon: Warehouse },
       { name: 'Keuangan', href: '/keuangan', icon: Wallet },
@@ -125,7 +129,7 @@ export default function Sidebar() {
   const visibleNavGroups = isPortfolioAccount
     ? navGroups.slice(0, 1).map((group) => ({
         ...group,
-        items: group.items.filter((item) => item.href !== '/proyek/baru'),
+        items: group.items.filter((item) => item.href !== '/proyek/baru' && item.href !== '/pusat-kendali'),
       }))
     : navGroups;
   const [signingOut, setSigningOut] = useState(false);
@@ -174,12 +178,12 @@ export default function Sidebar() {
   return (
     <>
       <div className="sticky top-0 z-40 flex h-14 w-full shrink-0 items-center justify-between border-b border-white/10 bg-[#071321] px-4 text-white shadow-sm xl:hidden">
-        <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="flex min-w-0 items-center gap-2.5" aria-label="Buka Dashboard DAHLIA">
+        <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="flex min-w-0 items-center gap-2.5" aria-label="Buka Dashboard JAVAWASTHU MANAGEMENT">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-300 via-teal-500 to-cyan-700">
             <HardHat className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-sm font-black tracking-[0.14em]">DAHLIA</span>
+            <span className="block truncate text-sm font-black tracking-[0.14em]">JAVAWASTHU MANAGEMENT</span>
             <span className="block truncate text-[9px] font-semibold uppercase tracking-[0.16em] text-emerald-300">Construction System</span>
           </span>
         </Link>
@@ -188,7 +192,7 @@ export default function Sidebar() {
           onClick={() => setMobileMenuOpen((open) => !open)}
           aria-label={mobileMenuOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi'}
           aria-expanded={mobileMenuOpen}
-          aria-controls="dahlia-primary-sidebar"
+          aria-controls="javawasthu-primary-sidebar"
           className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-slate-100 transition hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
         >
           {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -205,8 +209,8 @@ export default function Sidebar() {
       )}
 
       <aside
-        id="dahlia-primary-sidebar"
-        aria-label="Menu utama DAHLIA"
+        id="javawasthu-primary-sidebar"
+        aria-label="Menu utama JAVAWASTHU MANAGEMENT"
         className={`fixed bottom-0 left-0 top-14 z-50 flex h-auto w-[min(86vw,300px)] shrink-0 select-none flex-col overflow-hidden border-r border-white/[0.08] bg-[#071321] text-slate-100 shadow-[12px_0_40px_rgba(2,8,23,0.16)] transition-transform duration-300 xl:sticky xl:bottom-auto xl:top-0 xl:h-screen xl:w-[clamp(216px,17vw,280px)] xl:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Ambient glow dekoratif, tidak mengganggu interaksi menu. */}
       <div
@@ -223,7 +227,7 @@ export default function Sidebar() {
         href="/dashboard"
         onClick={() => setMobileMenuOpen(false)}
         className="relative z-10 flex min-h-[112px] items-center gap-4 border-b border-white/[0.08] px-5 py-5 transition-colors hover:bg-white/[0.035]"
-        aria-label="Buka Dashboard Perusahaan DAHLIA"
+        aria-label="Buka Dashboard Perusahaan JAVAWASTHU MANAGEMENT"
       >
         <div className="relative flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[19px] border border-white/20 bg-gradient-to-br from-emerald-300 via-teal-500 to-cyan-700 text-white shadow-[0_8px_24px_rgba(13,148,136,0.28)]">
           <HardHat className="h-8 w-8" strokeWidth={1.8} />
@@ -234,7 +238,7 @@ export default function Sidebar() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="block truncate text-[22px] font-black leading-none tracking-[0.12em] text-white">
-              DAHLIA
+              JAVAWASTHU MANAGEMENT
             </span>
           </div>
           <span className="mt-2 block text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-300">
@@ -466,7 +470,7 @@ export default function Sidebar() {
             </span>
           </div>
           <p className="mt-1.5 text-[9.5px] leading-relaxed text-slate-500">
-            Sistem manajemen proyek DAHLIA Construction
+            Sistem manajemen proyek JAVAWASTHU MANAGEMENT
           </p>
         </div>
       </div>

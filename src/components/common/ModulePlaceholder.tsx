@@ -31,7 +31,7 @@ export default function ModulePlaceholder({
             Kerangka halaman tersedia
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
-            Halaman ini sudah disiapkan sebagai bagian dari DAHLIA Construction.
+            Halaman ini sudah disiapkan sebagai bagian dari JAVAWASTHU MANAGEMENT.
             Formulir, akses pengguna, proses persetujuan, dan koneksi database akan
             diimplementasikan pada tahap pengembangan modul ini.
           </p>
