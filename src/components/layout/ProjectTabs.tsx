@@ -77,7 +77,7 @@ export default function ProjectTabs() {
           </Link>
         </div>
 
-        <nav aria-label="Modul proyek" className="dahlia-horizontal-tabs flex items-center gap-1.5 pb-1 sm:gap-2">
+        <nav aria-label="Modul proyek" className="javawasthu-horizontal-tabs flex items-center gap-1.5 pb-1 sm:gap-2">
           <Link
             href={projectBase}
             aria-current={isPlanning ? 'page' : undefined}
@@ -123,7 +123,7 @@ export default function ProjectTabs() {
         </nav>
 
         {isPlanning ? (
-          <nav aria-label="Menu Perencanaan" className="dahlia-horizontal-tabs mt-2 flex items-center gap-1 border-t border-slate-100 pt-2 sm:mt-3 sm:gap-1.5">
+          <nav aria-label="Menu Perencanaan" className="javawasthu-horizontal-tabs mt-2 flex items-center gap-1 border-t border-slate-100 pt-2 sm:mt-3 sm:gap-1.5">
             {visiblePlanningLinks.map((item) => {
               const href = `${projectBase}${item.suffix}`;
               const isActive = item.suffix
@@ -150,7 +150,7 @@ export default function ProjectTabs() {
         ) : null}
 
         {isExecution ? (
-          <nav aria-label="Menu Pelaksanaan" className="dahlia-horizontal-tabs mt-2 flex items-center gap-1 border-t border-slate-100 pt-2 sm:mt-3 sm:gap-1.5">
+          <nav aria-label="Menu Pelaksanaan" className="javawasthu-horizontal-tabs mt-2 flex items-center gap-1 border-t border-slate-100 pt-2 sm:mt-3 sm:gap-1.5">
             {executionLinks.map((item) => {
               const href = `${projectBase}${item.suffix}`;
               const Icon = item.icon;
