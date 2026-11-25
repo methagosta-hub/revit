@@ -1448,9 +1448,51 @@ function ProjectWorkspaceContent() {
         if (!newDivision?.id) throw new Error('Lokasi salinan tidak memperoleh ID dari database.');
 
         try {
+          // Salin struktur kategori/subkategori sebagai entitas baru per lokasi.
+          // ID baru memastikan perubahan di proyek tujuan tidak memengaruhi sumber.
+          const { data: sourceCategories, error: categoryReadError } = await supabase
+            .from('rab_work_categories')
+            .select('id, name, sort_order, legacy_key, subcategories:rab_work_subcategories(id, name, sort_order, legacy_key)')
+            .eq('division_id', division.id)
+            .order('sort_order', { ascending: true });
+          if (categoryReadError) throw categoryReadError;
+
+          const clonedSubcategoryIds = new Map<string, string>();
+          for (const sourceCategory of sourceCategories ?? []) {
+            const { data: copiedCategory, error: categoryInsertError } = await supabase
+              .from('rab_work_categories')
+              .insert({
+                division_id: newDivision.id,
+                name: sourceCategory.name,
+                sort_order: sourceCategory.sort_order,
+                legacy_key: sourceCategory.legacy_key,
+              })
+              .select('id')
+              .single();
+            if (categoryInsertError) throw categoryInsertError;
+            if (!copiedCategory?.id) throw new Error('Kategori hasil ekspor tidak memperoleh ID.');
+
+            for (const sourceSubcategory of (sourceCategory as any).subcategories ?? []) {
+              const { data: copiedSubcategory, error: subcategoryInsertError } = await supabase
+                .from('rab_work_subcategories')
+                .insert({
+                  division_id: newDivision.id,
+                  category_id: copiedCategory.id,
+                  name: sourceSubcategory.name,
+                  sort_order: sourceSubcategory.sort_order,
+                  legacy_key: sourceSubcategory.legacy_key,
+                })
+                .select('id')
+                .single();
+              if (subcategoryInsertError) throw subcategoryInsertError;
+              if (!copiedSubcategory?.id) throw new Error('Subkategori hasil ekspor tidak memperoleh ID.');
+              clonedSubcategoryIds.set(sourceSubcategory.id, copiedSubcategory.id);
+            }
+          }
+
           const { data: sourceItems, error: itemReadError } = await supabase
             .from('rab_items')
-            .select('id, master_ahsp_id, code, name, unit, volume, unit_price, total_price, components_snapshot, subitems_snapshot, work_group_id, work_group_name, is_volume_from_backup, sort_order')
+            .select('id, master_ahsp_id, code, name, unit, volume, unit_price, total_price, components_snapshot, subitems_snapshot, work_group_id, work_group_name, rab_subcategory_id, is_volume_from_backup, sort_order')
             .eq('division_id', division.id)
             .order('sort_order', { ascending: true });
           if (itemReadError) throw itemReadError;
@@ -1479,6 +1521,9 @@ function ProjectWorkspaceContent() {
                 subitems_snapshot: sourceItem.subitems_snapshot,
                 work_group_id: clonedWorkGroupId,
                 work_group_name: sourceItem.work_group_name,
+                rab_subcategory_id: sourceItem.rab_subcategory_id
+                  ? clonedSubcategoryIds.get(sourceItem.rab_subcategory_id) ?? null
+                  : null,
                 is_volume_from_backup: sourceItem.is_volume_from_backup,
                 sort_order: sourceItem.sort_order,
               })
