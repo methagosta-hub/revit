@@ -251,7 +251,7 @@ class _ProgressTabState extends State<_ProgressTab> {
         const SizedBox(height: 16),
         const _InfoCard(
           message: 'Laporan berstatus submitted. Volume baru menjadi dasar klaim '
-              'setelah diperiksa dan disetujui oleh pihak Dahlia.',
+              'setelah diperiksa dan disetujui oleh pihak JAVAWASTHU MANAGEMENT.',
         ),
       ],
     );
@@ -522,7 +522,7 @@ class _PaymentTabState extends State<_PaymentTab> {
         const SizedBox(height: 14),
         const _InfoCard(
           message: 'Status submitted bukan bukti pembayaran. Persetujuan klaim dan '
-              'pencairan dana tetap mengikuti proses Finance di Dahlia Management.',
+              'pencairan dana tetap mengikuti proses Finance di JAVAWASTHU MANAGEMENT.',
         ),
       ],
     );
