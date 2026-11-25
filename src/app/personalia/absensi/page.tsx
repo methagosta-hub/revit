@@ -280,7 +280,7 @@ function AttendanceContent() {
   // Realtime stream refreshes data without replacing the page or discarding form state. Manual refresh remains available if Realtime is unavailable.
   useEffect(() => {
     const channel = supabase
-      .channel(`dahlia-attendance-${selectedDate}`)
+      .channel(`javawasthu-attendance-${selectedDate}`)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'attendance_records', filter: `attendance_date=eq.${selectedDate}`,
       }, () => { void load(true); })
