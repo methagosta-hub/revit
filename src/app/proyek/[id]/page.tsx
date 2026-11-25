@@ -1145,6 +1145,17 @@ function ProjectWorkspaceContent() {
     }
   };
 
+  const handleMoveItem = async (itemId: string, subcategoryId: string) => {
+    if (!canEditRab) throw new Error('Pemindahan item kategori hanya tersedia pada status RAB yang dapat diedit.');
+    const { error } = await supabase
+      .from('rab_items')
+      .update({ rab_subcategory_id: subcategoryId })
+      .eq('id', itemId);
+    if (error) throw error;
+    await loadData(true);
+    setSuccessMessage('Item berhasil dipindahkan ke subkategori yang dipilih. Nilai, volume, dan snapshot AHSP tidak berubah.');
+  };
+
   const handleUpdateItem = async (itemId: string, changes: RabItemUpdate) => {
     if (!canEditRab) throw new Error('Perubahan item RAB hanya tersedia pada status DRAFT atau REVIEW.');
     try {
@@ -2034,16 +2045,46 @@ function ProjectWorkspaceContent() {
                 </div>
 
                 {isLocationView && displayedItems.length > 0 ? (
-                  <RabCategoryBoard
-                    groups={buildAhspItemGroups(displayedItems)}
-                    onUpdate={handleUpdateItem}
-                    onUpdateComponents={handleUpdateComponents}
-                    onDelete={handleDeleteItem}
-                    onVolumeUpdated={() => loadData(true)}
-                    onReorder={(orderedIds) => handleReorderItems(division.id, orderedIds)}
-                    canReorder={canManageRab && !normalizedRabSearchKeyword}
-                    readOnly={!canEditRab}
-                  />
+                  <>
+                    {canEditRab && (
+                      <div className="flex justify-end px-3 pt-3 sm:px-5">
+                        <button
+                          type="button"
+                          onClick={() => setClassificationManagerDivisionId(division.id)}
+                          className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-800 hover:bg-indigo-100"
+                        >
+                          <Layers className="h-3.5 w-3.5" /> Kelola Kategori & Subkategori
+                        </button>
+                      </div>
+                    )}
+                    <RabCategoryBoard
+                      groups={buildAhspItemGroups(displayedItems, division.workCategories ?? [])}
+                      subcategories={(division.workCategories ?? []).flatMap((category) =>
+                        (category.subcategories ?? []).map((subcategory) => ({
+                          id: subcategory.id,
+                          name: subcategory.name,
+                          categoryName: category.name,
+                        })),
+                      )}
+                      onMoveItem={handleMoveItem}
+                      onUpdate={handleUpdateItem}
+                      onUpdateComponents={handleUpdateComponents}
+                      onDelete={handleDeleteItem}
+                      onVolumeUpdated={() => loadData(true)}
+                      onReorder={(orderedIds) => handleReorderItems(division.id, orderedIds)}
+                      canReorder={canManageRab && !normalizedRabSearchKeyword}
+                      readOnly={!canEditRab}
+                    />
+                    <RabWorkCategoryManager
+                      open={classificationManagerDivisionId === division.id}
+                      divisionId={division.id}
+                      divisionName={division.name}
+                      categories={division.workCategories ?? []}
+                      fields={[...WORK_FIELDS.map((field) => ({ code: field.code, label: field.label })), { code: 'OTHER', label: 'Bidang lainnya' }]}
+                      onClose={() => setClassificationManagerDivisionId(null)}
+                      onChanged={() => loadData(true)}
+                    />
+                  </>
                 ) : isLocationView ? (
                   <div className="px-5 py-8 text-center text-sm text-slate-400">
                     {normalizedRabSearchKeyword
