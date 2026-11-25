@@ -2608,7 +2608,7 @@ function ProjectWorkspaceContent() {
         style={{ fontFamily: PDF_FONTS[pdfFont].css, fontWeight: 400, color: '#1e293b', fontSize: '9pt', lineHeight: 1.35 }}
       >
         <header style={{ display: 'block', width: '100%', textAlign: 'left', borderBottom: `3px solid ${activePdfTheme.accent}`, padding: '0 0 9px', margin: '0 0 12px' }}>
-          <p style={{ margin: 0, textAlign: 'left', fontSize: '8pt', fontWeight: 700, letterSpacing: '1.2px', color: activePdfTheme.accent }}>DAHLIA CONSTRUCTION</p>
+          <p style={{ margin: 0, textAlign: 'left', fontSize: '8pt', fontWeight: 700, letterSpacing: '1.2px', color: activePdfTheme.accent }}>JAVAWASTHU MANAGEMENT</p>
           <h1 style={{ margin: '4px 0 2px', textAlign: 'left', fontSize: '17pt', lineHeight: 1.15, fontWeight: 800, color: activePdfTheme.text }}>RENCANA ANGGARAN BIAYA</h1>
           <p style={{ margin: 0, textAlign: 'left', fontSize: '8pt', color: '#64748b' }}>Rincian Anggaran Biaya Proyek</p>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '6px', fontSize: '7.5pt', color: '#64748b' }}>
