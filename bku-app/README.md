@@ -1,9 +1,9 @@
-# BKU Eksternal — Dahlia
+# BKU Eksternal — JAVAWASTHU MANAGEMENT
 
-Aplikasi mandiri yang dideploy sebagai proyek Vercel terpisah dari Dahlia utama.
+Aplikasi mandiri yang dideploy sebagai proyek Vercel terpisah dari JAVAWASTHU MANAGEMENT utama.
 
 ## Isolasi
-- Tidak mengimpor AuthProvider, Supabase client, tabel, RPC, atau tipe data Dahlia utama.
+- Tidak mengimpor AuthProvider, Supabase client, tabel, RPC, atau tipe data JAVAWASTHU MANAGEMENT utama.
 - Login BKU menggunakan Supabase Auth dari proyek BKU baru.
 - Semua tabel dan file bukti transaksi tersimpan pada proyek Supabase BKU.
 - SQL pada database/setup.sql hanya dijalankan pada proyek Supabase BKU baru.
@@ -13,7 +13,7 @@ Atur di proyek Vercel BKU untuk Production, Preview, dan Development:
 - NEXT_PUBLIC_BKU_SUPABASE_URL
 - NEXT_PUBLIC_BKU_SUPABASE_ANON_KEY
 
-Gunakan URL dan anon/publishable key dari proyek Supabase BKU. Jangan gunakan URL/kunci proyek utama Dahlia, dan jangan pernah menaruh service_role key di browser atau variabel NEXT_PUBLIC_*.
+Gunakan URL dan anon/publishable key dari proyek Supabase BKU. Jangan gunakan URL/kunci proyek utama JAVAWASTHU MANAGEMENT, dan jangan pernah menaruh service_role key di browser atau variabel NEXT_PUBLIC_*.
 
 ## Database
 Jalankan database/setup.sql di SQL Editor pada proyek Supabase BKU baru. File tersebut membuat tabel buku kas, transaksi, RLS, dan bucket privat untuk bukti nota.
@@ -58,7 +58,7 @@ Untuk memperbarui database BKU yang sebelumnya menggunakan periode Senin–Sabtu
 
 - `database/migrations/20261120_payroll_sunday_saturday.sql` — mengubah awal periode menjadi Minggu, akhir periode menjadi Sabtu, menetapkan tanggal pembayaran pada Sabtu, dan menyesuaikan kunci periode historis tanpa menghapus absensi maupun mengubah total HOK/nominal yang sudah tersimpan.
 
-Jalankan migrasi ini hanya pada proyek Supabase BKU. Jangan jalankan pada database utama Dahlia.
+Jalankan migrasi ini hanya pada proyek Supabase BKU. Jangan jalankan pada database utama JAVAWASTHU MANAGEMENT.
 
 
 ## Export PDF terpilih dan pengamanan tanggal
@@ -74,4 +74,4 @@ Setelah laporan difinalkan, atur **Pengamanan laporan berdasarkan tanggal** dan 
 
 Batas penguncian bisa dimundurkan untuk membuka tanggal setelah batas baru, atau gunakan **Buka semua kunci** untuk membuka seluruh tanggal. Penguncian dibatasi per buku kas/proyek.
 
-Untuk database BKU yang sudah berjalan, jalankan satu kali migrasi `database/migrations/20261121_report_export_and_date_lock.sql` pada proyek Supabase BKU. Jangan jalankan pada database utama Dahlia.
+Untuk database BKU yang sudah berjalan, jalankan satu kali migrasi `database/migrations/20261121_report_export_and_date_lock.sql` pada proyek Supabase BKU. Jangan jalankan pada database utama JAVAWASTHU MANAGEMENT.
