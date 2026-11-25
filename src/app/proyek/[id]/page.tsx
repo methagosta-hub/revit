@@ -1608,8 +1608,34 @@ function ProjectWorkspaceContent() {
     setSuccessMessage('');
 
     try {
-      await generateRABExcel(project as unknown as Project);
-      setSuccessMessage('File Excel RAB berhasil disiapkan.');
+      const excelProject = {
+        ...project,
+        divisions: (project.divisions ?? []).map((division) => {
+          const subcategoryById = new Map<string, { name: string; categoryId: string }>();
+          const categoryById = new Map((division.workCategories ?? []).map((category) => [category.id, category]));
+          for (const category of division.workCategories ?? []) {
+            for (const subcategory of category.subcategories ?? []) {
+              subcategoryById.set(subcategory.id, { name: subcategory.name, categoryId: category.id });
+            }
+          }
+          return {
+            ...division,
+            items: (division.items ?? []).map((item) => {
+              const subcategory = item.rab_subcategory_id ? subcategoryById.get(item.rab_subcategory_id) : undefined;
+              const category = subcategory ? categoryById.get(subcategory.categoryId) : undefined;
+              const fallback = getAhspCodeClassification(String(item.code || ''));
+              return {
+                ...item,
+                categoryName: category && subcategory
+                  ? category.name + ' / ' + subcategory.name
+                  : fallback.subdivisionName,
+              };
+            }),
+          };
+        }),
+      };
+      await generateRABExcel(excelProject as unknown as Project);
+      setSuccessMessage('File Excel RAB berhasil disiapkan dengan susunan kategori dan subkategori lokasi.');
     } catch (error) {
       console.error('Gagal mengekspor Excel:', error);
       setErrorMessage(`Gagal mengekspor Excel: ${getErrorMessage(error)}`);
