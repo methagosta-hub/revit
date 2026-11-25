@@ -14,8 +14,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'DAHLIA Construction - Company Hub',
-  description: 'Sistem manajemen perusahaan dan proyek DAHLIA Construction',
+  title: 'JAVAWASTHU MANAGEMENT - Company Hub',
+  description: 'Sistem manajemen perusahaan dan proyek JAVAWASTHU MANAGEMENT',
 };
 
 export default function RootLayout({
