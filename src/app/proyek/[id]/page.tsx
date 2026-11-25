@@ -604,6 +604,7 @@ function ProjectWorkspaceContent() {
   const [rabSearchKeyword, setRabSearchKeyword] = useState('');
   const [activeDivisionId, setActiveDivisionId] = useState<string | null>(null);
   const [activeDivisionName, setActiveDivisionName] = useState('');
+  const [classificationManagerDivisionId, setClassificationManagerDivisionId] = useState<string | null>(null);
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [newLocationName, setNewLocationName] = useState('');
   const [creatingLocation, setCreatingLocation] = useState(false);
@@ -637,7 +638,14 @@ function ProjectWorkspaceContent() {
     setErrorMessage('');
 
     try {
-      const [data, access] = await Promise.all([fetchProjectDetail(projectId), getMyAccess()]);
+      let [data, access] = await Promise.all([fetchProjectDetail(projectId), getMyAccess()]);
+      if (data && hasPermission(access, 'rab.manage', projectId) && ['DRAFT', 'REVIEW'].includes(String(data.status ?? 'DRAFT'))) {
+        let classificationSeeded = false;
+        for (const division of (data.divisions ?? []) as RABDivision[]) {
+          classificationSeeded = (await ensureDivisionWorkCategories(division)) || classificationSeeded;
+        }
+        if (classificationSeeded) data = await fetchProjectDetail(projectId);
+      }
       if (!data) {
         setProject(null);
       } else {
