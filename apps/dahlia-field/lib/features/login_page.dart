@@ -76,7 +76,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         const SizedBox(height: 22),
                         const Text(
-                          'Dahlia Field',
+                          'JAVAWASTHU MANAGEMENT',
                           style: TextStyle(
                             fontSize: 27,
                             fontWeight: FontWeight.w800,
@@ -85,7 +85,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          'Akses kerja lapangan Dahlia Management',
+                          'Akses kerja lapangan JAVAWASTHU MANAGEMENT',
                           style: TextStyle(color: Color(0xFF64756F)),
                         ),
                         const SizedBox(height: 26),
