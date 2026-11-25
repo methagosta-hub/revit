@@ -192,7 +192,7 @@ export default function Sidebar() {
           onClick={() => setMobileMenuOpen((open) => !open)}
           aria-label={mobileMenuOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi'}
           aria-expanded={mobileMenuOpen}
-          aria-controls="dahlia-primary-sidebar"
+          aria-controls="javawasthu-primary-sidebar"
           className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-slate-100 transition hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
         >
           {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -209,7 +209,7 @@ export default function Sidebar() {
       )}
 
       <aside
-        id="dahlia-primary-sidebar"
+        id="javawasthu-primary-sidebar"
         aria-label="Menu utama JAVAWASTHU MANAGEMENT"
         className={`fixed bottom-0 left-0 top-14 z-50 flex h-auto w-[min(86vw,300px)] shrink-0 select-none flex-col overflow-hidden border-r border-white/[0.08] bg-[#071321] text-slate-100 shadow-[12px_0_40px_rgba(2,8,23,0.16)] transition-transform duration-300 xl:sticky xl:bottom-auto xl:top-0 xl:h-screen xl:w-[clamp(216px,17vw,280px)] xl:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Ambient glow dekoratif, tidak mengganggu interaksi menu. */}
