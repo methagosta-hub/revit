@@ -319,7 +319,7 @@ function FinanceDashboardContent() {
         <div className="relative flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-100">
-              <Wallet className="h-3.5 w-3.5" /> Dahlia Management System · Finance
+              <Wallet className="h-3.5 w-3.5" /> JAVAWASTHU MANAGEMENT · Finance
             </div>
             <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Pusat Kendali Keuangan</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/85 sm:text-base">
