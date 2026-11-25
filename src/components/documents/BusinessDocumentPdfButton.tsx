@@ -45,7 +45,7 @@ const REQUIRED_STATUS: Partial<Record<BusinessDocumentType, string[]>> = {
 };
 
 const STYLES = `
-  @page{size:A4 portrait;margin:13mm 13mm 17mm;@bottom-left{content:"DAHLIA MANAGEMENT SYSTEM · ${'${footerCode}'} · R${'${revisionLabel}'}";color:#87928e;font:6.5pt Arial,sans-serif}@bottom-right{content:"Halaman " counter(page) " / " counter(pages);color:#87928e;font:6.5pt Arial,sans-serif}}
+  @page{size:A4 portrait;margin:13mm 13mm 17mm;@bottom-left{content:"JAVAWASTHU MANAGEMENT · ${'${footerCode}'} · R${'${revisionLabel}'}";color:#87928e;font:6.5pt Arial,sans-serif}@bottom-right{content:"Halaman " counter(page) " / " counter(pages);color:#87928e;font:6.5pt Arial,sans-serif}}
   *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   html,body{margin:0;background:#fff;color:#172723;font:9pt/1.45 Arial,Helvetica,sans-serif}
   .pdf-actions{display:flex;align-items:center;gap:8px}
@@ -138,14 +138,14 @@ export function BusinessDocumentPdfButton({
       identity.issuerName ? ['Penerbit', identity.issuerName] : null,
     ].filter((item): item is [string, string] => Boolean(item));
     const body = `<main class="pdf-page">
-      <header class="pdf-brand"><div class="pdf-mark">D</div><div><div class="pdf-brand-name">DAHLIA MANAGEMENT SYSTEM</div><div class="pdf-brand-line">PROJECT · PROCUREMENT · PEOPLE · FINANCIAL CONTROL</div></div><div class="pdf-classification">${escapeDocumentHtml(identity.classification ?? 'Dokumen internal')}<br>${escapeDocumentHtml(definition.domain)}</div></header>
+      <header class="pdf-brand"><div class="pdf-mark">D</div><div><div class="pdf-brand-name">JAVAWASTHU MANAGEMENT</div><div class="pdf-brand-line">PROJECT · PROCUREMENT · PEOPLE · FINANCIAL CONTROL</div></div><div class="pdf-classification">${escapeDocumentHtml(identity.classification ?? 'Dokumen internal')}<br>${escapeDocumentHtml(definition.domain)}</div></header>
       <div class="pdf-heading"><div><div class="pdf-eyebrow">${escapeDocumentHtml(definition.title)}</div><h1 class="pdf-title">${escapeDocumentHtml(identity.title)}</h1><p class="pdf-subtitle">${escapeDocumentHtml(definition.title)} · Salinan berdasarkan status data sumber</p></div><div class="pdf-code"><label>Nomor sumber</label><strong>${escapeDocumentHtml(identity.code)}</strong><small>${safeStatusLabel} · R${revisionLabel}</small></div></div>
       <section class="pdf-meta">${meta.map(([labelText, value]) => `<div><label>${escapeDocumentHtml(labelText)}</label><strong>${escapeDocumentHtml(value)}</strong></div>`).join('')}</section>
       <div class="pdf-notice"><strong>Dasar dan batas kewenangan</strong><br>${escapeDocumentHtml(authorityText)}<br>${escapeDocumentHtml(definition.doesNotAuthorize)}<br><strong>Langkah berikut:</strong> ${escapeDocumentHtml(definition.nextAuthority)}</div>
       ${sections.map(renderSection).join('')}
       <div class="pdf-signatures"><div class="pdf-signature"><label>Dibuat oleh</label><span>Nama dan tanda tangan</span></div><div class="pdf-signature"><label>Diperiksa oleh</label><span>Nama dan tanda tangan</span></div><div class="pdf-signature"><label>Disetujui oleh</label><span>Nama dan tanda tangan</span></div></div>
       <p class="pdf-legal">Cetakan merekam data pada status dan waktu yang tercantum. Kepemilikan file tidak menambahkan permission, persetujuan, hak tagih, atau bukti penerimaan dana.</p>
-      <footer class="pdf-footer"><span>DAHLIA MANAGEMENT SYSTEM · ${escapeDocumentHtml(identity.classification ?? 'Dokumen internal')}</span><span>${escapeDocumentHtml(identity.code)} · R${revisionLabel}</span></footer>
+      <footer class="pdf-footer"><span>JAVAWASTHU MANAGEMENT · ${escapeDocumentHtml(identity.classification ?? 'Dokumen internal')}</span><span>${escapeDocumentHtml(identity.code)} · R${revisionLabel}</span></footer>
     </main>`;
     const popup = window.open('', '_blank', 'width=1100,height=850');
     if (!popup) {
