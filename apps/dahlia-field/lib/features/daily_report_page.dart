@@ -405,7 +405,7 @@ class _DailyReportPageState extends State<DailyReportPage> {
                     ])),
                     const SizedBox(height: 14),
                     if (divisions.isEmpty)
-                      const _Notice(message: 'Proyek belum mempunyai divisi RAB. Buat divisi dan paket pekerjaan di Dahlia Management terlebih dahulu.')
+                      const _Notice(message: 'Proyek belum mempunyai divisi RAB. Buat divisi dan paket pekerjaan di JAVAWASTHU MANAGEMENT terlebih dahulu.')
                     else ...[
                       const Text('Buat laporan aktivitas proyek',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
@@ -476,7 +476,7 @@ class _DailyReportPageState extends State<DailyReportPage> {
                     const SizedBox(height: 8),
                     _archive(),
                     const SizedBox(height: 14),
-                    const _Notice(message: 'Laporan harian hanya merekam aktivitas proyek. Data personel tidak membuat transaksi absensi baru dan pemakaian material tidak mengurangi stok gudang. Verifikasi tetap dilakukan di Dahlia Management.'),
+                    const _Notice(message: 'Laporan harian hanya merekam aktivitas proyek. Data personel tidak membuat transaksi absensi baru dan pemakaian material tidak mengurangi stok gudang. Verifikasi tetap dilakukan di JAVAWASTHU MANAGEMENT.'),
                   ],
                 );
               },
@@ -539,7 +539,7 @@ class _DailyReportPageState extends State<DailyReportPage> {
   Widget _workStep(List<Map<String, dynamic>> items) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const _Notice(compact: true, message: 'Pilih pekerjaan dari paket/RAB proyek agar realisasi harian terhubung ke item yang sama pada Dahlia Management.'),
+      const _Notice(compact: true, message: 'Pilih pekerjaan dari paket/RAB proyek agar realisasi harian terhubung ke item yang sama pada JAVAWASTHU MANAGEMENT.'),
       const SizedBox(height: 10),
       OutlinedButton.icon(onPressed: () => _pickWorkItem(items),
           icon: const Icon(Icons.add), label: const Text('Tambah item pekerjaan')),
@@ -713,7 +713,7 @@ class _DailyReportPageState extends State<DailyReportPage> {
       const SizedBox(height: 5),
       Text(_summary.text.trim().isEmpty ? 'Belum diisi' : _summary.text.trim()),
       const SizedBox(height: 12),
-      const _Notice(compact: true, message: 'Laporan masuk ke proses verifikasi Dahlia Management. Pengajuan tidak mengesahkan absensi, pengeluaran material, ataupun pembayaran secara otomatis.'),
+      const _Notice(compact: true, message: 'Laporan masuk ke proses verifikasi JAVAWASTHU MANAGEMENT. Pengajuan tidak mengesahkan absensi, pengeluaran material, ataupun pembayaran secara otomatis.'),
     ]);
   }
 
