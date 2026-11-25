@@ -101,14 +101,25 @@ type RABItem = {
   sort_order?: number | null;
   work_group_id?: string | null;
   work_group_name?: string | null;
+  rab_subcategory_id?: string | null;
   components_snapshot?: unknown;
   subitems_snapshot?: unknown;
+};
+type RABWorkSubcategory = {
+  id: string;
+  name: string;
+};
+type RABWorkCategory = {
+  id: string;
+  name: string;
+  subcategories?: RABWorkSubcategory[] | null;
 };
 type RABDivision = {
   id: string;
   name: string;
   code?: string | null;
   sort_order?: number | null;
+  workCategories?: RABWorkCategory[] | null;
   items?: RABItem[] | null;
 };
 type RekapProject = Omit<Project, 'divisions'> & {
@@ -209,21 +220,41 @@ type ManualWorkGroup = {
   items: RABItem[];
 };
 
-function groupWorkItemsInManualOrder(items: RABItem[]): ManualWorkGroup[] {
+function groupWorkItemsInManualOrder(
+  items: RABItem[],
+  categories: RABWorkCategory[] = [],
+): ManualWorkGroup[] {
+  const subcategoryById = new Map<string, { category: RABWorkCategory; subcategory: RABWorkSubcategory }>();
+  for (const category of categories) {
+    for (const subcategory of category.subcategories ?? []) {
+      subcategoryById.set(subcategory.id, { category, subcategory });
+    }
+  }
+
   const ordered = [...items].sort(
     (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
   );
-  const groups: ManualWorkGroup[] = [];
+  const groupsByKey = new Map<string, ManualWorkGroup>();
   for (const item of ordered) {
-    const name = getWorkSubcategory(item.code || '');
-    const last = groups[groups.length - 1];
-    if (last?.name === name) {
-      last.items.push(item);
+    const saved = item.rab_subcategory_id
+      ? subcategoryById.get(item.rab_subcategory_id)
+      : undefined;
+    const name = saved
+      ? saved.category.name + ' / ' + saved.subcategory.name
+      : getWorkSubcategory(item.code || '');
+    // Identitas kategori dari RAB diprioritaskan; kode AHSP hanya fallback
+    // untuk item yang belum memiliki subkategori tersimpan.
+    const key = saved
+      ? 'saved:' + saved.subcategory.id
+      : 'ahsp:' + classifyCode(item.code || '');
+    const existing = groupsByKey.get(key);
+    if (existing) {
+      existing.items.push(item);
     } else {
-      groups.push({ key: `${name}-${groups.length}`, name, items: [item] });
+      groupsByKey.set(key, { key, name, items: [item] });
     }
   }
-  return groups;
+  return Array.from(groupsByKey.values());
 }
 
 /**
@@ -598,7 +629,7 @@ export default function RekapRABPage() {
   const grandTotal = totalRAB + taxAmount + profitAmount;
 
   const summaryRows = useMemo(() => orderedDivisions.map((division) => {
-    const rows = groupWorkItemsInManualOrder(division.items ?? []).map((group) => ({
+    const rows = groupWorkItemsInManualOrder(division.items ?? [], division.workCategories ?? []).map((group) => ({
       name: group.name,
       count: group.items.length,
       total: group.items.reduce((sum, item) => sum + numberValue(item.total_price), 0),
@@ -802,7 +833,7 @@ export default function RekapRABPage() {
         {/* 2. REKAPITULASI PEKERJAAN */}
         <section className="report-page">
           <SectionHeading letter="A" title="REKAPITULASI PEKERJAAN" theme={activeTheme} />
-          <p className="report-intro">Rekapitulasi disusun per divisi pekerjaan (misalnya Kelas A dan Kelas B), kemudian dirinci menurut tahapan / subkelompok AHSP yang digunakan pada setiap divisi.</p>
+          <p className="report-intro">Rekapitulasi disusun per lokasi dan mengikuti kategori serta subkategori pekerjaan yang tersimpan pada RAB masing-masing lokasi.</p>
           <table className="report-table">
             <thead><tr><th style={{width:'7%'}}>No.</th><th>Divisi / Tahapan Pekerjaan</th><th style={{width:'18%'}}>Jumlah Item</th><th style={{width:'27%'}}>Jumlah Harga</th></tr></thead>
             <tbody>
@@ -827,7 +858,7 @@ export default function RekapRABPage() {
           <SectionHeading letter="B" title="RINCIAN PEKERJAAN" theme={activeTheme} />
           {orderedDivisions.map((division, divisionIndex) => {
             const rows = division.items ?? [];
-            const groups = groupWorkItemsInManualOrder(rows);
+            const groups = groupWorkItemsInManualOrder(rows, division.workCategories ?? []);
             let itemNumber = 0;
             return <section className="report-subsection" key={division.id}>
               <h3 style={{background:activeTheme.soft,borderColor:activeTheme.border,color:activeTheme.text}}>{divisionIndex + 1}. {division.name}</h3>
