@@ -38,6 +38,7 @@ import {
   type RabComponentsUpdate,
 } from '@/components/rab/RabTable';
 import RabCategoryBoard from '@/components/rab/RabCategoryBoard';
+import RabWorkCategoryManager, { type RabWorkCategoryRecord } from '@/components/rab/RabWorkCategoryManager';
 import { fetchProjectDetail, recalculateProjectTotal } from '@/lib/services/projectService';
 import { generateRABExcel } from '@/lib/excel-generator';
 import { buildLocationRabPdfHtml } from '@/lib/rab-location-pdf';
@@ -52,6 +53,7 @@ type RABDivision = {
   code?: string;
   sort_order?: number | null;
   items?: RabTableItem[] | null;
+  workCategories?: RabWorkCategoryRecord[] | null;
 };
 
 type WorkspaceProject = Omit<Project, 'divisions'> & {
@@ -352,17 +354,50 @@ function getAhspCodeClassification(codeValue: string): AhspCodeClassification {
   };
 }
 
-function buildAhspItemGroups(items: RabTableItem[]): AhspItemGroup[] {
-  // Setiap item ditempatkan pada kombinasi bidang/divisi/subkategori AHSP.
-  // Urutan kategori mengikuti kemunculan pertama pada sort_order, sedangkan
-  // urutan item di dalam kategori tetap mengikuti sort_order tersimpan.
+function buildAhspItemGroups(
+  items: RabTableItem[],
+  categories: RabWorkCategoryRecord[] = [],
+): AhspItemGroup[] {
+  const categoryById = new Map(categories.map((category) => [category.id, category]));
+  const subcategoryById = new Map<string, { category: RabWorkCategoryRecord; subcategory: RabWorkCategoryRecord['subcategories'][number] }>();
+  for (const category of categories) {
+    for (const subcategory of category.subcategories ?? []) {
+      subcategoryById.set(subcategory.id, { category, subcategory });
+    }
+  }
+
   const orderedItems = [...items].sort(
     (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
   );
   const groupsByKey = new Map<string, AhspItemGroup>();
 
   for (const item of orderedItems) {
-    const classification = getAhspCodeClassification(String(item.code || ''));
+    const saved = item.rab_subcategory_id
+      ? subcategoryById.get(item.rab_subcategory_id)
+      : undefined;
+    let classification = getAhspCodeClassification(String(item.code || ''));
+
+    if (saved) {
+      const categoryKey = String(saved.category.legacy_key ?? '');
+      const fieldCode = categoryKey.match(/^field:([^:]+):/)?.[1]
+        || classification.fieldCode
+        || 'OTHER';
+      const field = WORK_FIELDS.find((entry) => entry.code === fieldCode);
+      const subLegacyKey = String(saved.subcategory.legacy_key ?? '');
+      const prefix = subLegacyKey.startsWith('code:') ? subLegacyKey.slice(5) : '';
+      classification = {
+        key: saved.subcategory.id,
+        prefix,
+        fieldCode,
+        fieldLabel: field?.label || (fieldCode === 'OTHER' ? 'Bidang lainnya' : `Bidang ${fieldCode}`),
+        divisionCode: saved.category.id,
+        divisionName: saved.category.name,
+        subdivisionCode: saved.subcategory.id,
+        subdivisionName: saved.subcategory.name,
+        mapped: true,
+      };
+    }
+
     const existing = groupsByKey.get(classification.key);
     if (existing) {
       existing.items.push(item);
@@ -377,6 +412,80 @@ function buildAhspItemGroups(items: RabTableItem[]): AhspItemGroup[] {
   }
 
   return Array.from(groupsByKey.values());
+}
+
+async function ensureDivisionWorkCategories(division: RABDivision): Promise<boolean> {
+  const pendingItems = (division.items ?? []).filter((item) => !item.rab_subcategory_id);
+  if (!pendingItems.length) return false;
+
+  const categories = [...(division.workCategories ?? [])];
+  const categoryByLegacyKey = new Map(categories.map((category) => [String(category.legacy_key ?? ''), category]));
+  const subcategoryByLegacyKey = new Map<string, RabWorkCategoryRecord['subcategories'][number]>();
+  for (const category of categories) {
+    for (const subcategory of category.subcategories ?? []) {
+      subcategoryByLegacyKey.set(category.id + '::' + String(subcategory.legacy_key ?? ''), subcategory);
+    }
+  }
+
+  const assignments = new Map<string, string[]>();
+  for (const item of pendingItems) {
+    const classification = getAhspCodeClassification(String(item.code || ''));
+    const fieldCode = classification.fieldCode || 'OTHER';
+    const divisionCode = classification.divisionCode || '00';
+    const categoryLegacyKey = `field:${fieldCode}:code:${divisionCode}`;
+    let category = categoryByLegacyKey.get(categoryLegacyKey);
+
+    if (!category) {
+      const maxOrder = Math.max(0, ...categories.map((row) => Number(row.sort_order ?? 0)));
+      const { data, error } = await supabase.from('rab_work_categories')
+        .insert({
+          division_id: division.id,
+          name: classification.divisionName,
+          sort_order: maxOrder + 1,
+          legacy_key: categoryLegacyKey,
+        })
+        .select('id, division_id, name, sort_order, legacy_key')
+        .single();
+      if (error) throw error;
+      category = { ...data, subcategories: [] } as RabWorkCategoryRecord;
+      categories.push(category);
+      categoryByLegacyKey.set(categoryLegacyKey, category);
+    }
+
+    const subcategoryLegacyKey = 'code:' + classification.key;
+    const mapKey = category.id + '::' + subcategoryLegacyKey;
+    let subcategory = subcategoryByLegacyKey.get(mapKey);
+    if (!subcategory) {
+      const maxOrder = Math.max(0, ...(category.subcategories ?? []).map((row) => Number(row.sort_order ?? 0)));
+      const { data, error } = await supabase.from('rab_work_subcategories')
+        .insert({
+          division_id: division.id,
+          category_id: category.id,
+          name: classification.subdivisionName,
+          sort_order: maxOrder + 1,
+          legacy_key: subcategoryLegacyKey,
+        })
+        .select('id, division_id, category_id, name, sort_order, legacy_key')
+        .single();
+      if (error) throw error;
+      subcategory = data as RabWorkCategoryRecord['subcategories'][number];
+      category.subcategories = [...(category.subcategories ?? []), subcategory];
+      subcategoryByLegacyKey.set(mapKey, subcategory);
+    }
+
+    const ids = assignments.get(subcategory.id) ?? [];
+    ids.push(item.id);
+    assignments.set(subcategory.id, ids);
+  }
+
+  for (const [subcategoryId, itemIds] of assignments) {
+    const { error } = await supabase.from('rab_items')
+      .update({ rab_subcategory_id: subcategoryId })
+      .eq('division_id', division.id)
+      .in('id', itemIds);
+    if (error) throw error;
+  }
+  return assignments.size > 0;
 }
 
 function getErrorMessage(error: unknown): string {
