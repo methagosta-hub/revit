@@ -10,7 +10,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "BKU Eksternal | Dahlia",
+  title: "BKU Eksternal | JAVAWASTHU MANAGEMENT",
   description: "Buku Kas Umum mandiri untuk pembukuan proyek eksternal.",
 };
 export const viewport: Viewport = {
