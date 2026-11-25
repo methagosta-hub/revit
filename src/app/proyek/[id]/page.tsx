@@ -392,7 +392,7 @@ function buildAhspItemGroups(
         divisionCode: saved.category.id,
         divisionName: saved.category.name,
         subdivisionCode: saved.subcategory.id,
-        subdivisionName: saved.subcategory.name,
+        subdivisionName: saved.category.name + ' / ' + saved.subcategory.name,
         mapped: true,
       };
     }
