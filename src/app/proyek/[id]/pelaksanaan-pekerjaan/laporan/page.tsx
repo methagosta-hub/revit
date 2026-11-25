@@ -1,7 +1,7 @@
 'use client';
 
 /* -------------------------------------------------------------------------- */
-/* Dahlia Management System                                                   */
+/* JAVAWASTHU MANAGEMENT                                                   */
 /* Project Daily Report — Wizard Edition                                     */
 /* -------------------------------------------------------------------------- */
 /*                                                                            */
@@ -1355,7 +1355,7 @@ export default function ProjectDailyReportPage() {
           <div class="topline"></div>
           <header class="brand">
             <div>
-              <small>Dahlia Management System · ${escapeHtml(projectInfo?.title ?? 'Project Management')}</small>
+              <small>JAVAWASTHU MANAGEMENT · ${escapeHtml(projectInfo?.title ?? 'Project Management')}</small>
               <h1>Laporan Pelaksanaan Proyek Harian</h1>
               <p class="sub">Dokumen kontrol pelaksanaan lapangan dan realisasi pekerjaan</p>
             </div>
@@ -1456,7 +1456,7 @@ export default function ProjectDailyReportPage() {
                 <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-400/15 ring-1 ring-emerald-300/20">
                   <ClipboardList className="h-4 w-4" />
                 </span>
-                Dahlia · Project Daily Report
+                JAVAWASTHU MANAGEMENT · Project Daily Report
               </div>
               <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">Laporan Pelaksanaan Harian</h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
