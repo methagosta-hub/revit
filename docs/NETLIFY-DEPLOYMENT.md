@@ -19,3 +19,7 @@ Use the same Supabase project that the application is already configured to use.
 ## Database safety
 
 A Netlify build deploys application code only. It does not authorize or automatically run Supabase migrations. Database changes must remain a separate, explicitly approved operation.
+
+## Latest verified release
+
+The JAVAWASTHU MANAGEMENT application release was promoted from verified Netlify Preview commit `d25356ea75a897a11ac74d431e32281e7b43adc2` to `main`. This documentation update triggers the Netlify Production build; it does not run Supabase migrations.
