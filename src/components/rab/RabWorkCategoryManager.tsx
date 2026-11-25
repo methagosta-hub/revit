@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, X, Check, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export type RabWorkSubcategoryRecord = {
@@ -55,6 +55,7 @@ export default function RabWorkCategoryManager({
   const run = async (key: string, action: () => Promise<unknown>, success: string) => {
     if (busyKey) return;
     setBusyKey(key);
+    void success;
     setError('');
     try {
       const result = await action() as { error?: { message?: string } | null };
