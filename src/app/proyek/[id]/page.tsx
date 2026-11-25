@@ -358,7 +358,6 @@ function buildAhspItemGroups(
   items: RabTableItem[],
   categories: RabWorkCategoryRecord[] = [],
 ): AhspItemGroup[] {
-  const categoryById = new Map(categories.map((category) => [category.id, category]));
   const subcategoryById = new Map<string, { category: RabWorkCategoryRecord; subcategory: RabWorkCategoryRecord['subcategories'][number] }>();
   for (const category of categories) {
     for (const subcategory of category.subcategories ?? []) {
@@ -2643,7 +2642,7 @@ function ProjectWorkspaceContent() {
             // PDF menampilkan setiap AHSP pada level uraian yang sama.
             // work_group_id hanya membantu pengelompokan di layar RAB; tidak
             // membuat baris/tahapan induk tambahan di dokumen cetak.
-            const groups = buildAhspItemGroups(divisionItems);
+            const groups = buildAhspItemGroups(divisionItems, division.workCategories ?? []);
             const divisionTotal = divisionItems.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
             let itemNumber = 0;
             const renderPdfItemRow = (item: RabTableItem) => {
