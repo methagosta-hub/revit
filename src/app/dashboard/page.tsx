@@ -303,7 +303,7 @@ function CompanyDashboardContent() {
           <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-300">
-                <Gauge className="h-4 w-4" /> DAHLIA MANAGEMENT SYSTEM <span className="text-slate-600">/</span> EXECUTIVE OVERVIEW
+                <Gauge className="h-4 w-4" /> JAVAWASTHU MANAGEMENT <span className="text-slate-600">/</span> EXECUTIVE OVERVIEW
               </div>
               <h1 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl xl:text-[2.1rem]">{isPortfolioAccount ? 'Dashboard Portofolio' : 'Dashboard Perusahaan'}</h1>
               <p className="mt-2 max-w-2xl text-xs leading-6 text-slate-300 sm:text-sm">Ringkasan keadaan proyek, pengadaan, persediaan, keuangan dan pelaksanaan dalam satu ruang kendali.</p>
@@ -508,7 +508,7 @@ function CompanyDashboardContent() {
         ) : null}
 
         <footer className="flex flex-col gap-2 border-t border-slate-200/80 py-3 text-[10px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-          <span>DAHLIA MANAGEMENT SYSTEM · EXECUTIVE OVERVIEW</span>
+          <span>JAVAWASTHU MANAGEMENT · EXECUTIVE OVERVIEW</span>
           <span>Ringkasan mengikuti RLS dan permission akun yang sedang aktif.</span>
         </footer>
       </div>
