@@ -102,7 +102,7 @@ export default function ProjectCreatePage() {
     void fetchAppSettings()
       .then((appSettings) => {
         if (!active) return;
-        setCompanyName(appSettings.company_name || 'JAVAWASTHU MANAGEMENT');
+        setCompanyName(/^DAHLIA(?:\s+(?:CONSTRUCTION|MANAGEMENT SYSTEM))?$/i.test(appSettings.company_name.trim()) ? 'JAVAWASTHU MANAGEMENT' : (appSettings.company_name || 'JAVAWASTHU MANAGEMENT'));
         setForm((current) => ({
           ...current,
           tax_rate: String(appSettings.default_tax_rate ?? 11),
