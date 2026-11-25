@@ -802,7 +802,7 @@ export default function RekapRABPage() {
 
         {/* 1. COVER */}
         <section className="report-page cover-page" style={{ fontFamily: PDF_FONTS[pdfFont].css }}>
-          <div className="cover-brand" style={{ color: activeTheme.accent }}>REVIT CONSULTANT MANAGEMENT</div>
+          <div className="cover-brand" style={{ color: activeTheme.accent }}>JAVAWASTHU MANAGEMENT</div>
           <div className="cover-rule" style={{ background: activeTheme.accent }} />
           <div className="cover-kicker">DOKUMEN PERENCANAAN · RENCANA ANGGARAN BIAYA</div>
           <h1 style={{ color: activeTheme.text }}>REKAPITULASI<br/>RENCANA ANGGARAN BIAYA</h1>
@@ -965,7 +965,7 @@ export default function RekapRABPage() {
         </section>
 
         <footer className="report-footer" style={{borderTop:`2px solid ${activeTheme.accent}`}}>
-          <div><strong>REVIT CONSULTANT MANAGEMENT</strong><span>Rekapitulasi Rencana Anggaran Biaya · {project.title}</span></div>
+          <div><strong>JAVAWASTHU MANAGEMENT</strong><span>Rekapitulasi Rencana Anggaran Biaya · {project.title}</span></div>
           <div className={`signature-grid signature-count-${pdfSignatureCount}`}>
             {pdfSigners.slice(0,pdfSignatureCount).map((signer,index) => (
               <div key={index}>
