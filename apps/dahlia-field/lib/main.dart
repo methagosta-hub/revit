@@ -48,7 +48,7 @@ class DahliaFieldApp extends StatelessWidget {
   Widget build(BuildContext context) {
     const primary = Color(0xFF244C45);
     return MaterialApp(
-      title: 'Dahlia Field',
+      title: 'JAVAWASTHU MANAGEMENT',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -140,7 +140,7 @@ class ConfigurationRequiredPage extends StatelessWidget {
                 Icon(Icons.settings_suggest_outlined, size: 54),
                 SizedBox(height: 18),
                 Text(
-                  'Konfigurasi Dahlia Field belum lengkap',
+                  'Konfigurasi JAVAWASTHU MANAGEMENT belum lengkap',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                 ),
