@@ -1,4 +1,4 @@
-# Standar PDF dan Kewenangan Dokumen Dahlia
+# Standar PDF dan Kewenangan Dokumen JAVAWASTHU MANAGEMENT
 
 ## Prinsip penerbitan
 
@@ -35,12 +35,12 @@
 Pola nama file baku:
 
 ```text
-DAHLIA__{NOMOR-SUMBER}__{KODE-PROYEK-OPSIONAL}__{JUDUL}__R{NN}.pdf
+JAVAWASTHU_MANAGEMENT__{NOMOR-SUMBER}__{KODE-PROYEK-OPSIONAL}__{JUDUL}__R{NN}.pdf
 ```
 
 Kode sumber yang sudah disimpan pada tabel transaksi harus digunakan ulang, termasuk PO, GR, HRT, ABS, PAYR/PIT, PKJ, UTM, KON-SUB, SPR, LHP, recap number, dan EXT. Kode baru yang belum tersedia di sumber data ditandai sebagai rekomendasi katalog sampai generator/database code ditambahkan. Kode tidak boleh dibuat dari browser timestamp, karena dapat menggandakan dan tidak dapat dijadikan identitas resmi.
 
-Header standar A4: monogram/identitas Dahlia, jenis dokumen, nomor sumber, status, revisi, proyek, periode, waktu/penerbit, penanda klasifikasi, dan ringkasan dasar/batas kewenangan. Footer mencantumkan nomor dan revisi pada setiap halaman. Dokumen transaksi yang memerlukan pengesahan memiliki blok tanda tangan berdasarkan alur sumber.
+Header standar A4: monogram/identitas JAVAWASTHU MANAGEMENT, jenis dokumen, nomor sumber, status, revisi, proyek, periode, waktu/penerbit, penanda klasifikasi, dan ringkasan dasar/batas kewenangan. Footer mencantumkan nomor dan revisi pada setiap halaman. Dokumen transaksi yang memerlukan pengesahan memiliki blok tanda tangan berdasarkan alur sumber.
 
 ## Cakupan implementasi lokal
 
