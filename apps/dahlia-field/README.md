@@ -1,6 +1,6 @@
-# Dahlia Field
+# JAVAWASTHU MANAGEMENT
 
-A separate Android companion for Dahlia Management System. This app is built as an independent Flutter project inside the existing repository; it does not replace or restructure the Next.js web application.
+A separate Android companion for JAVAWASTHU MANAGEMENT. This app is built as an independent Flutter project inside the existing repository; it does not replace or restructure the Next.js web application.
 
 ## Phase 1 features
 
@@ -9,7 +9,7 @@ A separate Android companion for Dahlia Management System. This app is built as 
 - Offline-first submission queue. Payloads are encrypted with AES-256-GCM; the encryption key is stored in Android secure storage.
 - Idempotent server operations use one UUID per queued operation. Retrying the same payload returns the original server result instead of creating a duplicate.
 - Daily project reports record work quantities, assigned personnel and attendance snapshots, material consumption notes, equipment usage/condition, weather, site conditions, obstacles and follow-up. They reuse the same validated `dahlia_save_daily_report` workflow as the web module and do not create duplicate attendance, warehouse-stock, payroll, or payment transactions.
-- Attendance remains submitted and is verified in Dahlia Management by Personalia.
+- Attendance remains submitted and is verified in JAVAWASTHU MANAGEMENT by Personalia.
 - Material requisitions are PRs only. They never create or approve official Purchase Orders.
 - Progress and claims remain subject to the current Dahlia database validation. Finance still controls payment approval and actual payout.
 
@@ -17,7 +17,7 @@ A separate Android companion for Dahlia Management System. This app is built as 
 
 - Sign-in uses Supabase Auth. The client only contains a Supabase publishable/anon key; never place a service_role key in the APK.
 - User mapping is stored in the non-exposed dahlia_private schema. Administrators link an internal user to an active employee or a subcontractor user to one active subcontractor using the dahlia_field_link_user RPC. A company-level user with an active `director` role is recognized separately and does not need an employee link.
-- Internal access continues to use the existing user_role_assignments and permission checks. The Mandor role already has the project-scoped attendance, execution reporting and procurement request permissions. Director receives a separate read-only monitoring mode for all company projects and their daily-report history; no attendance, reporting, material-request, progress, or payment submission actions are exposed to that role in Dahlia Field.
+- Internal access continues to use the existing user_role_assignments and permission checks. The Mandor role already has the project-scoped attendance, execution reporting and procurement request permissions. Director receives a separate read-only monitoring mode for all company projects and their daily-report history; no attendance, reporting, material-request, progress, or payment submission actions are exposed to that role in JAVAWASTHU MANAGEMENT.
 - Subcontractor reads and writes are filtered by the exact linked subcontractor_id; other subcontractors' contracts and claims are not returned.
 - New PR tables have RLS enabled and direct Data API grants revoked. The app can only use the validated RPC surface.
 - Existing PO, attendance, progress, contract and payment tables are not replaced. The payment RPC receives one additional, narrow authorization path for the exact mapped subcontractor; all existing financial calculation and claim validation remains in place.
@@ -36,7 +36,7 @@ The repository CI creates the Android host in a temporary folder and copies its 
 
 ## Database migration and deployment
 
-Migrations `202611220001` through `202611220006` were applied to the Dahlia Management production Supabase project on 22 November 2026. Do not re-run, rewrite, or reset these applied migrations. Subsequent dashboard/mobile integration changes must use a new forward-only migration, reviewed and applied in sequence.
+Migrations `202611220001` through `202611220006` were applied to the JAVAWASTHU MANAGEMENT production Supabase project on 22 November 2026. Do not re-run, rewrite, or reset these applied migrations. Subsequent dashboard/mobile integration changes must use a new forward-only migration, reviewed and applied in sequence.
 
 Migration `202611220007_dahlia_field_dashboard_workflow.sql` adds the Dashboard account-link lookup APIs, a unique employee-to-Field-account mapping, and an atomic approved Field PR to official Purchase Order conversion. It was applied to the production Supabase project on 22 November 2026. The matching Dashboard code is in the `feat/dahlia-field-dashboard-integration` preview branch and is not yet merged to the production application.
 
@@ -54,7 +54,7 @@ An internal user must also have the appropriate existing project role assignment
 
 ## APK test
 
-GitHub Actions workflow: Dahlia Field Android CI. On a successful run, download dahlia-field-android-apk from the run's Artifacts section. This is an unsigned release APK for internal device testing, not a Play Store release.
+GitHub Actions workflow: JAVAWASTHU MANAGEMENT Android CI. On a successful run, download dahlia-field-android-apk from the run's Artifacts section. This is an unsigned release APK for internal device testing, not a Play Store release.
 
 GitHub Actions repository variables used by the build:
 - DAHLIA_SUPABASE_URL
