@@ -88,7 +88,7 @@ class _FieldHomePageState extends State<FieldHomePage>
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Dahlia Field',
+          'JAVAWASTHU MANAGEMENT',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
