@@ -27,7 +27,7 @@ export function AppHeader({
       <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-700 text-white shadow-sm"><Wallet size={21} /></div>
-          <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[.18em] text-emerald-700">Dahlia Management System</p><h1 className="text-lg font-black leading-tight text-slate-900">Buku Kas Umum</h1></div>
+          <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[.18em] text-emerald-700">JAVAWASTHU MANAGEMENT</p><h1 className="text-lg font-black leading-tight text-slate-900">Buku Kas Umum</h1></div>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           {books.length > 0 && <select aria-label="Pilih buku kas" value={selectedBookId} onChange={(event) => onSelectBook(event.target.value)} className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 sm:max-w-[250px] sm:flex-none"><option value="">Pilih buku kas</option>{books.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}
