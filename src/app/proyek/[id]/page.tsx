@@ -2177,10 +2177,28 @@ function ProjectWorkspaceContent() {
                     />
                   </>
                 ) : isLocationView ? (
-                  <div className="px-5 py-8 text-center text-sm text-slate-400">
-                    {normalizedRabSearchKeyword
-                      ? `Tidak ditemukan item pekerjaan yang cocok dengan kata kunci “${rabSearchKeyword.trim()}”. Coba kata kunci lain atau hapus pencarian.`
-                      : 'Belum ada item AHSP pada lokasi ini. Gunakan tombol Tambah Item Pekerjaan untuk mulai menyusun RAB.'}
+                  <div className="space-y-3 px-5 py-8 text-center">
+                    <p className="text-sm text-slate-400">
+                      {normalizedRabSearchKeyword
+                        ? `Tidak ditemukan item pekerjaan yang cocok dengan kata kunci “${rabSearchKeyword.trim()}”. Coba kata kunci lain atau hapus pencarian.`
+                        : 'Belum ada item AHSP pada lokasi ini. Gunakan tombol Tambah Item Pekerjaan untuk mulai menyusun RAB.'}
+                    </p>
+                    {canEditRab && (
+                      <>
+                        <button type="button" onClick={() => setClassificationManagerDivisionId(division.id)} className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-800 hover:bg-indigo-100">
+                          <Layers className="h-3.5 w-3.5" /> Kelola Kategori & Subkategori
+                        </button>
+                        <RabWorkCategoryManager
+                          open={classificationManagerDivisionId === division.id}
+                          divisionId={division.id}
+                          divisionName={division.name}
+                          categories={division.workCategories ?? []}
+                          fields={[...WORK_FIELDS.map((field) => ({ code: field.code, label: field.label })), { code: 'OTHER', label: 'Bidang lainnya' }]}
+                          onClose={() => setClassificationManagerDivisionId(null)}
+                          onChanged={() => loadData(true)}
+                        />
+                      </>
+                    )}
                   </div>
                 ) : (
                   <Link href={`/proyek/${project.id}?lokasi=${encodeURIComponent(division.id)}`} className="flex items-center justify-between border-t border-slate-100 px-5 py-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50/60">
