@@ -63,7 +63,7 @@ export default function ProjectTabs() {
         <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2 sm:mb-3">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">
-              DAHLIA Construction
+              JAVAWASTHU MANAGEMENT
             </p>
             <h2 className="truncate text-sm font-bold text-slate-900 sm:text-base">
               Ruang Kerja Proyek
