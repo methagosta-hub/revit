@@ -655,6 +655,13 @@ function ProjectWorkspaceContent() {
             .sort((left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0))
             .map((division) => ({
               ...division,
+              workCategories: [...(division.workCategories ?? [])]
+                .sort((left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0))
+                .map((category) => ({
+                  ...category,
+                  subcategories: [...(category.subcategories ?? [])]
+                    .sort((left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0)),
+                })),
               items: [...(division.items ?? [])].sort(
                 (left, right) => Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0),
               ),
