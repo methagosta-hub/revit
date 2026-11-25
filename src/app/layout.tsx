@@ -29,7 +29,7 @@ export default function RootLayout({
         <AuthProvider>
           <div className="flex min-h-screen flex-col xl:flex-row">
             <Sidebar />
-            <main id="dahlia-main" className="flex min-w-0 max-w-full flex-1 flex-col pb-12">{children}</main>
+            <main id="javawasthu-main" className="flex min-w-0 max-w-full flex-1 flex-col pb-12">{children}</main>
           </div>
           <OperationsLiveHub />
         </AuthProvider>
