@@ -319,7 +319,7 @@ function FinanceDashboardContent() {
         <div className="relative flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-100">
-              <Wallet className="h-3.5 w-3.5" /> Dahlia Management System · Finance
+              <Wallet className="h-3.5 w-3.5" /> JAVAWASTHU MANAGEMENT · Finance
             </div>
             <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Pusat Kendali Keuangan</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/85 sm:text-base">
@@ -517,7 +517,7 @@ function FinanceDashboardContent() {
               <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Alur kerja</p>
               <h2 className="mt-1 text-lg font-bold text-slate-950">Langkah kerja staf keuangan</h2>
               <div className="mt-4 space-y-3">
-                <WorkflowStep number="01" title="Periksa komitmen dan kewajiban" description="Cek PO, nominal tersisa, dan tanggal jatuh tempo sebelum menjadwalkan pembayaran." href="/keuangan/rekap" linkLabel="Buka rekap" />
+                <WorkflowStep number="01" title="Periksa komitmen dan kewajiban" description="Cek PO, nominal tersisa, dan tanggal jatuh tempo sebelum menjadwalkan pembayaran." href="/keuangan/pembayaran" linkLabel="Lihat PO yang harus dibayar" />
                 <WorkflowStep number="02" title="Catat pembayaran aktual" description="Pilih kewajiban, masukkan tanggal, metode, nominal, dan referensi bukti pembayaran." href="#pemberitahuan" linkLabel="Lihat tugas di atas" />
                 <WorkflowStep number="03" title="Pastikan kas dan rekap sesuai" description="Setelah pembayaran tercatat, periksa mutasi kas dan ringkasan realisasi proyek." href="/keuangan/kas" linkLabel="Buka kas & operasional" />
               </div>

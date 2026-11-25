@@ -1,4 +1,4 @@
-# Dahlia BKU — Modul Pemecahan Nota, Absensi & Penggajian
+# JAVAWASTHU MANAGEMENT BKU — Modul Pemecahan Nota, Absensi & Penggajian
 
 Paket ini merupakan **overlay untuk proyek lokal** `bku-app`. Paket tidak menyambungkan GitHub, tidak melakukan commit/push, tidak mengubah pengaturan Vercel, dan tidak menjalankan migrasi database secara otomatis.
 
@@ -37,7 +37,7 @@ Paket ini merupakan **overlay untuk proyek lokal** `bku-app`. Paket tidak menyam
 
 ## Migrasi Supabase — wajib sebelum menguji fitur baru
 
-Jalankan migrasi secara berurutan melalui SQL Editor **hanya pada proyek Supabase BKU** (`arqfzltimcehqssxojtz`). Jangan jalankan pada database utama Dahlia.
+Jalankan migrasi secara berurutan melalui SQL Editor **hanya pada proyek Supabase BKU** (`arqfzltimcehqssxojtz`). Jangan jalankan pada database utama JAVAWASTHU MANAGEMENT.
 
 1. `database/migrations/20261119_payroll_split_receipts.sql` — grup nota, master pekerja, absensi, rekap mingguan, RLS, dan RPC penyimpanan upah.
 2. `database/migrations/20261120_payroll_sunday_saturday.sql` — periode kerja Minggu–Sabtu dan pembayaran otomatis pada Sabtu; mempertahankan histori absensi dan nominal.

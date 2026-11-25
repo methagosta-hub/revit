@@ -280,7 +280,7 @@ function AttendanceContent() {
   // Realtime stream refreshes data without replacing the page or discarding form state. Manual refresh remains available if Realtime is unavailable.
   useEffect(() => {
     const channel = supabase
-      .channel(`dahlia-attendance-${selectedDate}`)
+      .channel(`javawasthu-attendance-${selectedDate}`)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'attendance_records', filter: `attendance_date=eq.${selectedDate}`,
       }, () => { void load(true); })
@@ -568,7 +568,7 @@ function AttendanceContent() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `absensi-dahlia-${selectedDate}.csv`;
+    anchor.download = `absensi-javawasthu-${selectedDate}.csv`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();

@@ -1,4 +1,4 @@
-# Dahlia BKU — Multi-select Potong Nota
+# JAVAWASTHU MANAGEMENT BKU — Multi-select Potong Nota
 
 Pembaruan ini mengubah pemotongan rincian menjadi pemilihan banyak baris sekaligus. Semua rincian yang dicentang akan digabung menjadi **satu nota baru**, bukan dibuatkan satu nota untuk setiap baris.
 

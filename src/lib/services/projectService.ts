@@ -143,6 +143,21 @@ export async function fetchProjectDetail(projectId: string) {
       code,
       name,
       sort_order,
+      workCategories:rab_work_categories(
+        id,
+        division_id,
+        name,
+        sort_order,
+        legacy_key,
+        subcategories:rab_work_subcategories(
+          id,
+          division_id,
+          category_id,
+          name,
+          sort_order,
+          legacy_key
+        )
+      ),
       items:rab_items(
         id,
         division_id,
@@ -158,10 +173,12 @@ export async function fetchProjectDetail(projectId: string) {
         subitems_snapshot,
         work_group_id,
         work_group_name,
+        rab_subcategory_id,
         sort_order,
         backupDetails:volume_details(
           id,
           rab_item_id,
+          subitem_path,
           description,
           drawing_ref,
           multiplier,

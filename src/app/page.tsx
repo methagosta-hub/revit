@@ -170,7 +170,7 @@ export default function DashboardPage() {
         <div>
           <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">
             <Layers className="h-4 w-4" aria-hidden="true" />
-            <span>DAHLIA Construction · RAB & Quantity Surveying System</span>
+            <span>JAVAWASTHU MANAGEMENT · RAB & Quantity Surveying System</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             Dashboard Utama

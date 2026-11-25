@@ -58,6 +58,8 @@ type Props = {
   onDelete: (item: RabTableItem) => Promise<void>;
   onVolumeUpdated?: () => void | Promise<void>;
   onReorder: (orderedIds: string[]) => Promise<void>;
+  subcategories?: Array<{ id: string; name: string; categoryName: string }>;
+  onMoveItem?: (itemId: string, subcategoryId: string) => Promise<void>;
   canReorder?: boolean;
   readOnly?: boolean;
 };
@@ -125,6 +127,8 @@ export default function RabCategoryBoard({
   onDelete,
   onVolumeUpdated,
   onReorder,
+  subcategories,
+  onMoveItem,
   canReorder = false,
   readOnly = false,
 }: Props) {
@@ -290,6 +294,8 @@ export default function RabCategoryBoard({
                         onDelete={onDelete}
                         onVolumeUpdated={onVolumeUpdated}
                         onReorder={(orderedIds) => handleItemReorder(subcategory.key, orderedIds)}
+                        subcategories={subcategories}
+                        onMoveItem={onMoveItem}
                         canReorder={canReorder}
                         readOnly={readOnly}
                       />

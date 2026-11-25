@@ -53,7 +53,10 @@ export function useAppAccess(): AppAccessState {
     };
 
     void load();
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      // TOKEN_REFRESHED hanya memperbarui kredensial sesi, bukan hak akses.
+      // Hindari loading ulang yang dapat mengganggu formulir pada halaman master.
+      if (event === 'TOKEN_REFRESHED') return;
       setLoading(true);
       void load();
     });

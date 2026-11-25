@@ -1,4 +1,4 @@
-# Master Data — Database Toko Dahlia BKU
+# Master Data — Database Toko JAVAWASTHU MANAGEMENT BKU
 
 Pembaruan ini menambahkan menu **Master Data → Database Toko**.
 
@@ -15,7 +15,7 @@ Sebelum menggunakan kode ini, jalankan:
 
 `database/migrations/20261120_store_master_management.sql`
 
-Jalankan hanya pada proyek Supabase BKU `arqfzltimcehqssxojtz`, bukan database utama Dahlia.
+Jalankan hanya pada proyek Supabase BKU `arqfzltimcehqssxojtz`, bukan database utama JAVAWASTHU MANAGEMENT.
 
 Migrasi menambah kolom status aktif, menghubungkan transaksi lama yang belum punya `store_id`, dan membuat fungsi atomik `bku_save_store` untuk mengubah master sekaligus nama toko pada histori terkait.
 

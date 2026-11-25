@@ -550,7 +550,7 @@ export default function CurvaSRencanaPage() {
       <div id="curva-s-screen" className="mx-auto max-w-[1600px] space-y-4 print:hidden">
         <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-emerald-800">DAHLIA Construction</div>
+            <div className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-emerald-800">JAVAWASTHU MANAGEMENT</div>
             <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Kurva-S Rencana</h1>
             <p className="mt-1 text-sm text-slate-500">{project.title} · {project.client || project.location || 'Data proyek'}</p>
           </div>
@@ -625,7 +625,7 @@ export default function CurvaSRencanaPage() {
         )}
         <header className="curve-report-heading">
           <div className="curve-report-title">
-            <strong>DAHLIA CONSTRUCTION</strong>
+            <strong>JAVAWASTHU MANAGEMENT</strong>
             <h1>RENCANA WAKTU PELAKSANAAN</h1>
           </div>
           <div className="curve-report-duration">

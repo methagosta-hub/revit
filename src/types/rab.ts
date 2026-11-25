@@ -1,7 +1,7 @@
 export type ProjectStatus = 'DRAFT' | 'REVIEW' | 'FINAL RAB' | 'DIKERJAKAN' | 'SELESAI' | 'DIBATALKAN';
 export type ProjectCategory = 'REGULER' | 'PORTOFOLIO';
 
-export type CalcMode = 'standard' | 'trapezoid' | 'rebar' | 'custom_formula';
+export type CalcMode = 'standard' | 'wall_area' | 'frame_length' | 'glass_area' | 'opening_count' | 'trapezoid' | 'rebar' | 'rebar_structure' | 'custom_builder' | 'custom_formula';
 
 export interface VolumeDetail {
   id: string;
@@ -21,6 +21,7 @@ export interface VolumeDetail {
     diameter?: number;
     length?: number;
     expression?: string;
+    [key: string]: unknown;
   };
   subtotal: number;
 }

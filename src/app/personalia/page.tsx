@@ -144,7 +144,7 @@ function DashboardContent() {
         <div className="pointer-events-none absolute -right-2 -top-10 h-52 w-52 rounded-full border border-white/10" />
         <div className="relative z-10 max-w-3xl">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-200">
-            <UserRoundCog className="h-3.5 w-3.5" /> Dahlia Management System
+            <UserRoundCog className="h-3.5 w-3.5" /> JAVAWASTHU MANAGEMENT
           </div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">Dashboard Personalia</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">

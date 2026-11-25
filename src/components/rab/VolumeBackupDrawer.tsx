@@ -16,12 +16,25 @@ import {
   RotateCcw,
   LockKeyhole,
   Sigma,
+  Copy,
 } from 'lucide-react';
+import VolumeBackupCopyDialog from '@/components/rab/VolumeBackupCopyDialog';
 import { supabase } from '@/lib/supabase';
 import { formatRupiah } from '@/lib/format';
 import { recalculateProjectTotalFromRabItem } from '@/lib/services/projectService';
+import RebarStructureFields from '@/components/rab/RebarStructureFields';
+import CustomFormulaBuilder from '@/components/rab/CustomFormulaBuilder';
+import {
+  calculateStructuredRebar,
+  describeStructuredRebar,
+  calculateCustomBuilder,
+  describeCustomBuilder,
+  defaultRebarStructureParameters,
+  defaultCustomBuilderParameters,
+  type CustomFormulaParameters,
+} from '@/lib/volume-calculation';
 
-type CalcMode = 'standard' | 'wall_area' | 'frame_length' | 'glass_area' | 'opening_count' | 'trapezoid' | 'rebar' | 'custom_formula';
+type CalcMode = 'standard' | 'wall_area' | 'frame_length' | 'glass_area' | 'opening_count' | 'trapezoid' | 'rebar' | 'rebar_structure' | 'custom_builder' | 'custom_formula';
 
 type OpeningDimension = { label?: string; width: number | string; height: number | string; quantity: number | string };
 type FrameSegment = { label?: string; length: number | string; quantity: number | string };
@@ -143,8 +156,10 @@ const MODE_OPTIONS: Array<{ value: CalcMode; label: string; description: string 
   { value: 'glass_area', label: 'Kaca (luas bidang)', description: 'Lebar × tinggi setiap panel kaca × jumlah (m²)' },
   { value: 'opening_count', label: 'Bukaan (unit)', description: 'Jumlah unit pintu, jendela, ventilasi, atau bukaan lainnya' },
   { value: 'trapezoid', label: 'Penampang trapesium', description: 'Untuk galian saluran, talud, dan penampang' },
-  { value: 'rebar', label: 'Berat pembesian', description: 'Berat besi berdasarkan diameter dan panjang' },
-  { value: 'custom_formula', label: 'Rumus khusus', description: 'Masukkan operasi hitung sesuai kebutuhan' },
+  { value: 'rebar', label: 'Berat pembesian (metode lama)', description: 'Berat besi berdasarkan diameter dan panjang; data lama tetap didukung' },
+  { value: 'rebar_structure', label: 'Pembesian struktur otomatis', description: 'Footplat, pedestal, balok/sloof/ring balok, kolom, plat, dan tangga; hitung kg dan batang' },
+  { value: 'custom_builder', label: 'Rumus kustom bertingkat', description: 'Kategori, sub-kategori, dan operator hitung yang dapat disusun sendiri' },
+  { value: 'custom_formula', label: 'Rumus khusus (metode lama)', description: 'Rumus aritmetika sederhana; tetap kompatibel dengan data lama' },
 ];
 
 function defaultParametersForMode(mode: CalcMode): VolumeParameters {
@@ -156,6 +171,8 @@ function defaultParametersForMode(mode: CalcMode): VolumeParameters {
     case 'opening_count': return { opening_units: [{ label: 'Unit pintu/jendela', quantity: '1' }] };
     case 'trapezoid': return { top_width: '1', bottom_width: '1', depth: '1', length: '1', quantity: '1' };
     case 'rebar': return { diameter: '10', bar_length: '1', bars: '1' };
+    case 'rebar_structure': return defaultRebarStructureParameters('beam') as VolumeParameters;
+    case 'custom_builder': return defaultCustomBuilderParameters() as unknown as VolumeParameters;
     case 'custom_formula': return { formula: '' };
   }
 }
@@ -323,11 +340,57 @@ function calculateBase(mode: CalcMode, parameters: VolumeParameters): number {
     // Rumus pendekatan berat teoritis besi: d² / 162 kg per meter (d dalam mm).
     return ((diameter * diameter) / 162) * barLength * bars;
   }
+  if (mode === 'rebar_structure') {
+    return calculateStructuredRebar(parameters as Record<string, unknown>).totalWeightKg;
+  }
+  if (mode === 'custom_builder') {
+    return calculateCustomBuilder(parameters as unknown as CustomFormulaParameters);
+  }
   return safeExpression(String(parameters.formula ?? ''));
 }
 
 function normalizeParameters(mode: CalcMode, parameters: VolumeParameters): VolumeParameters {
   if (mode === 'custom_formula') return { formula: String(parameters.formula ?? '').trim() };
+  if (mode === 'custom_builder') {
+    const normalizeNode = (node: any): any => ({
+      id: String(node.id ?? ''), label: String(node.label ?? '').trim(), kind: node.kind === 'group' ? 'group' : 'value',
+      operator: ['+', '-', '*', '/'].includes(node.operator) ? node.operator : '+',
+      value: node.kind === 'group' ? undefined : (String(node.value ?? '').trim() === '' ? '' : Number(node.value)),
+      unit: String(node.unit ?? '').trim(),
+      children: node.kind === 'group' ? (Array.isArray(node.children) ? node.children.map(normalizeNode) : []) : undefined,
+    });
+    const groups = Array.isArray(parameters.groups) ? parameters.groups : [];
+    return { groups: groups.map(normalizeNode) } as unknown as VolumeParameters;
+  }
+  if (mode === 'rebar_structure') {
+    const normalized: Record<string, unknown> = { ...parameters, structure_type: String(parameters.structure_type || 'beam') };
+    const numericKeys = [
+      'stock_length_m', 'waste_pct', 'member_length_m', 'member_count', 'cover_mm', 'tie_diameter_mm',
+      'tie_width_mm', 'tie_depth_mm', 'tie_spacing_mm', 'tie_support_zone_m', 'tie_support_spacing_mm', 'tie_cover_mm', 'tie_hook_mm', 'tie_end_offset_mm',
+      'flat_length_m', 'flat_width_m', 'layers', 'spacing_x_mm', 'spacing_y_mm', 'diameter_x_mm', 'diameter_y_mm',
+      'lap_allowance_mm', 'step_count', 'tread_width_m', 'riser_height_m', 'stair_width_m', 'flight_count',
+      'stair_main_diameter_mm', 'stair_main_spacing_mm', 'stair_main_layers', 'stair_main_anchor_mm',
+      'stair_distribution_diameter_mm', 'stair_distribution_spacing_mm', 'stair_distribution_layers',
+      'stair_distribution_extra_mm', 'landing_count', 'landing_length_m', 'landing_width_m', 'landing_layers',
+      'landing_diameter_x_mm', 'landing_diameter_y_mm', 'landing_spacing_x_mm', 'landing_spacing_y_mm', 'landing_lap_allowance_mm',
+    ];
+    numericKeys.forEach((key) => {
+      const raw = normalized[key];
+      if (raw !== undefined && raw !== null && String(raw).trim() !== '') normalized[key] = Number(raw);
+    });
+    if (Array.isArray(parameters.longitudinal_groups)) {
+      normalized.longitudinal_groups = parameters.longitudinal_groups.map((group: any) => ({
+        ...group,
+        label: String(group.label ?? '').trim(),
+        diameter_mm: String(group.diameter_mm ?? '').trim() === '' ? '' : Number(group.diameter_mm),
+        bars_per_member: String(group.bars_per_member ?? '').trim() === '' ? '' : Number(group.bars_per_member),
+        positions_per_member: String(group.positions_per_member ?? '').trim() === '' ? 1 : Number(group.positions_per_member),
+        fixed_length_m: String(group.fixed_length_m ?? '').trim() === '' ? '' : Number(group.fixed_length_m),
+        extra_length_m: String(group.extra_length_m ?? '').trim() === '' ? 0 : Number(group.extra_length_m),
+      }));
+    }
+    return normalized as VolumeParameters;
+  }
   if (mode === 'wall_area') {
     const openings = Array.isArray(parameters.openings) ? parameters.openings : [];
     return {
@@ -414,6 +477,10 @@ function calculationExpression(row: VolumeDetail, unit: string): string {
     expression = `((${value('top_width', 0)} m + ${value('bottom_width', 0)} m) ÷ 2) × ${value('depth', 0)} m × ${value('length', 0)} m × ${value('quantity')} kali`;
   } else if (mode === 'rebar') {
     expression = `(Ø${value('diameter', 0)}² ÷ 162) × ${value('bar_length', 0)} m × ${value('bars', 0)} batang`;
+  } else if (mode === 'rebar_structure') {
+    expression = describeStructuredRebar(parameters as Record<string, unknown>);
+  } else if (mode === 'custom_builder') {
+    expression = describeCustomBuilder(parameters as unknown as CustomFormulaParameters);
   } else {
     expression = String(parameters.formula ?? '').trim() || 'Rumus khusus belum tercatat';
   }
@@ -530,6 +597,7 @@ export default function VolumeBackupDrawer({ open, item, onClose, onSaved }: Pro
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [copyOpen, setCopyOpen] = useState(false);
   const isSubitemTarget = isSubitemBackupTarget(item);
 
   const loadDetails = useCallback(async (): Promise<VolumeDetail[]> => {
@@ -889,9 +957,21 @@ export default function VolumeBackupDrawer({ open, item, onClose, onSaved }: Pro
             <p className="mt-1 font-mono text-xs text-slate-500">{item.code}</p>
             <p className="mt-0.5 max-w-xl text-sm font-semibold leading-5 text-slate-800">{item.name}</p>
           </div>
-          <button type="button" onClick={onClose} disabled={saving} aria-label="Tutup backup volume" className="ml-3 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 disabled:opacity-50">
-            <X className="h-5 w-5" />
-          </button>
+          <div className="ml-3 flex shrink-0 items-center gap-2">
+            {details.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setCopyOpen(true)}
+                disabled={saving || loading}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-40"
+              >
+                <Copy className="h-3.5 w-3.5" /> Salin backup
+              </button>
+            )}
+            <button type="button" onClick={onClose} disabled={saving} aria-label="Tutup backup volume" className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 disabled:opacity-50">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </header>
 
         <div className="shrink-0 border-b border-slate-200 bg-white px-5 py-3 sm:px-6">
@@ -1138,6 +1218,49 @@ export default function VolumeBackupDrawer({ open, item, onClose, onSaved }: Pro
                   </div>
                 )}
 
+                {form.calcMode === 'rebar_structure' && (
+                  <>
+                    <RebarStructureFields
+                      value={form.parameters as Record<string, unknown>}
+                      onChange={(parameters) => setForm((current) => ({ ...current, parameters: parameters as VolumeParameters }))}
+                    />
+                    {(() => {
+                      try {
+                        const result = calculateStructuredRebar(
+                          form.parameters as Record<string, unknown>,
+                          Number(form.multiplier || 1),
+                        );
+                        return (
+                          <div className="rounded-xl border border-emerald-200 bg-white p-3">
+                            <div className="grid gap-2 sm:grid-cols-3">
+                              <div><p className="text-[9px] font-semibold uppercase text-slate-500">Total panjang tulangan</p><p className="text-base font-bold tabular-nums text-slate-900">{formatNumber(result.totalLengthM, 3)} m</p></div>
+                              <div><p className="text-[9px] font-semibold uppercase text-slate-500">Berat kebutuhan</p><p className="text-base font-bold tabular-nums text-emerald-800">{formatNumber(result.totalWeightKg, 3)} kg</p></div>
+                              <div><p className="text-[9px] font-semibold uppercase text-slate-500">Estimasi batang stok</p><p className="text-base font-bold tabular-nums text-slate-900">{formatNumber(result.totalStockBars, 0)} batang</p></div>
+                            </div>
+                            <div className="mt-3 overflow-x-auto">
+                              <table className="w-full min-w-[430px] text-[10px]">
+                                <thead><tr className="border-b border-slate-100 text-left text-slate-500"><th className="py-2">Diameter</th><th className="py-2 text-right">Panjang</th><th className="py-2 text-right">Berat perlu</th><th className="py-2 text-right">Batang {formatNumber(result.stockLengthM, 2)} m</th></tr></thead>
+                                <tbody>{result.diameterSummary.map((row) => (
+                                  <tr key={row.diameter} className="border-b border-slate-50 text-slate-700"><td className="py-1.5 font-semibold">Ø{formatNumber(row.diameter, 0)}</td><td className="py-1.5 text-right tabular-nums">{formatNumber(row.totalLengthM, 3)} m</td><td className="py-1.5 text-right tabular-nums">{formatNumber(row.requiredWeightKg, 3)} kg</td><td className="py-1.5 text-right tabular-nums">{formatNumber(row.stockBars, 0)} batang</td></tr>
+                                ))}</tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      } catch {
+                        return <p className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-[10px] text-slate-500">Isi dimensi, jumlah tulangan, diameter, serta jarak untuk melihat estimasi kg dan batang besi per diameter.</p>;
+                      }
+                    })()}
+                  </>
+                )}
+
+                {form.calcMode === 'custom_builder' && (
+                  <CustomFormulaBuilder
+                    value={form.parameters as unknown as CustomFormulaParameters}
+                    onChange={(next) => setForm((current) => ({ ...current, parameters: { ...current.parameters, ...next } }))}
+                  />
+                )}
+
                 {form.calcMode === 'custom_formula' && (
                   <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
                     <label className="text-xs font-semibold text-slate-700">Rumus aritmetika
@@ -1247,6 +1370,16 @@ export default function VolumeBackupDrawer({ open, item, onClose, onSaved }: Pro
           <button type="button" onClick={onClose} disabled={saving} className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Tutup</button>
         </footer>
       </aside>
+      <VolumeBackupCopyDialog
+        open={copyOpen}
+        sourceItem={item}
+        sourceDetailsCount={details.length}
+        onClose={() => setCopyOpen(false)}
+        onCopied={async () => {
+          setSuccess('Backup volume berhasil disalin ke AHSP tujuan.');
+          await onSaved?.(totalVolume);
+        }}
+      />
     </div>
   );
 }

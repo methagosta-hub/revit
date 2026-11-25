@@ -52,8 +52,15 @@ export async function generateRABExcel(project: Project): Promise<void> {
     });
     divRow.font = { bold: true };
 
-    // Baris Item Pekerjaan
+    // Baris item dikelompokkan sesuai kategori/subkategori tersimpan pada RAB lokasi.
+    let lastCategoryName = '';
     div.items.forEach((item, itemIdx) => {
+      const categoryName = String((item as typeof item & { categoryName?: string }).categoryName ?? '').trim();
+      if (categoryName && categoryName !== lastCategoryName) {
+        const categoryRow = wsRAB.addRow({ no: '', code: '', name: categoryName.toUpperCase() });
+        categoryRow.font = { bold: true, color: { argb: 'FF3730A3' } };
+        lastCategoryName = categoryName;
+      }
       const r = wsRAB.addRow({
         no: itemIdx + 1,
         code: item.code,
