@@ -889,7 +889,27 @@ function ProjectWorkspaceContent() {
     const planner = pdfSigners[0];
     if (!planner || !planner.name.trim()) { setErrorMessage('Nama Perencana wajib diisi pada Pengaturan Tanda Tangan PDF sebelum mengekspor dokumen lokasi.'); return; }
     const exportDate = new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date());
-    const categorizedDivision = { ...division, items: (division.items ?? []).map((item) => ({ ...item, categoryName: getAhspCodeClassification(String(item.code || '')).subdivisionName })) };
+    const categoryById = new Map((division.workCategories ?? []).map((category) => [category.id, category]));
+    const subcategoryById = new Map<string, { name: string; categoryId: string }>();
+    for (const category of division.workCategories ?? []) {
+      for (const subcategory of category.subcategories ?? []) {
+        subcategoryById.set(subcategory.id, { name: subcategory.name, categoryId: category.id });
+      }
+    }
+    const categorizedDivision = {
+      ...division,
+      items: (division.items ?? []).map((item) => {
+        const subcategory = item.rab_subcategory_id ? subcategoryById.get(item.rab_subcategory_id) : undefined;
+        const category = subcategory ? categoryById.get(subcategory.categoryId) : undefined;
+        const fallback = getAhspCodeClassification(String(item.code || ''));
+        return {
+          ...item,
+          categoryName: category && subcategory
+            ? category.name + ' / ' + subcategory.name
+            : fallback.subdivisionName,
+        };
+      }),
+    };
     const html = buildLocationRabPdfHtml({ project, division: categorizedDivision, divisions: project.divisions ?? [], accent: activePdfTheme.accent, soft: activePdfTheme.soft, border: activePdfTheme.border, text: activePdfTheme.text, font: PDF_FONTS[pdfFont].css, bold: pdfBoldWeight, signers: pdfSigners.slice(0, pdfSignatureCount), date: exportDate });
     let url = ''; let printWindow: Window | null = null;
     try {
