@@ -69,9 +69,13 @@ export function buildLocationRabPdfHtml(input: Input): string {
   const items=[...(division.items||[])].sort((a:any,b:any)=>Number(a.sort_order||0)-Number(b.sort_order||0));
   const locTotal=items.reduce((s:number,r:any)=>s+Number(r.total_price||0),0);
   const categoryKey=(item:any)=>{
+    const savedId=String(item.rab_subcategory_id||'').trim();
+    if(savedId) return savedId;
+    const savedName=String(item.categoryName||item.category_name||'').trim();
+    if(savedName) return savedName;
     const code=String(item.code||'').trim().toUpperCase();
     const prefix=code.split('.').filter(Boolean).slice(0,3).join('.');
-    return prefix || String(item.categoryName||item.category_name||item.work_group_name||'TANPA-KATEGORI');
+    return prefix || String(item.work_group_name||'TANPA-KATEGORI');
   };
   const categories=new Map<string,{name:string,total:number}>();
   for(const item of items){
