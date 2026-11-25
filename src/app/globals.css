@@ -28,12 +28,12 @@ body {
   overflow-x: hidden;
 }
 
-#dahlia-main {
+#javawasthu-main {
   min-width: 0;
   max-width: 100%;
 }
 
-#dahlia-main > main {
+#javawasthu-main > main {
   width: 100%;
   max-width: min(100%, 112rem);
   margin-inline: auto;
@@ -41,7 +41,7 @@ body {
 
 /* Horizontal project tabs stay accessible on touch screens and hide their
    scrollbar without disabling swipe / trackpad scrolling. */
-.dahlia-horizontal-tabs {
+.javawasthu-horizontal-tabs {
   min-width: 0;
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -49,7 +49,7 @@ body {
   -ms-overflow-style: none;
 }
 
-.dahlia-horizontal-tabs::-webkit-scrollbar {
+.javawasthu-horizontal-tabs::-webkit-scrollbar {
   display: none;
 }
 
