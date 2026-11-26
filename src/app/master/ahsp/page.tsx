@@ -783,17 +783,34 @@ export default function MasterAhspPage() {
       // Halaman hanya mengambil data AHSP dan rincian komponennya.
       // Master Bahan/Upah/Alat dicari langsung dari Supabase saat pengguna mengetik,
       // sehingga ribuan baris katalog tidak diunduh sekaligus ke browser.
-      const [ahspResult, componentResult, subitemResult] = await Promise.all([
+      const [ahspResult, subitemResult] = await Promise.all([
         supabase.from('master_ahsp').select('*').order('code', { ascending: true }),
-        supabase.from('master_ahsp_components').select('*').order('sort_order', { ascending: true }),
         supabase.from('master_ahsp_subitems').select('*').order('sort_order', { ascending: true }),
       ]);
 
       if (ahspResult.error) throw ahspResult.error;
-      if (componentResult.error) throw componentResult.error;
       if (subitemResult.error) throw subitemResult.error;
 
-      const componentRows = (componentResult.data ?? []) as AhspComponentDbRow[];
+      // Supabase membatasi jumlah baris per respons (umumnya 1.000).
+      // Ambil seluruh komponen secara bertahap agar biaya Upah/Bahan/Alat
+      // tidak terpotong saat jumlah master komponen melewati batas tersebut.
+      const componentPageSize = 1000;
+      const componentRows: AhspComponentDbRow[] = [];
+      for (let from = 0; ; from += componentPageSize) {
+        const { data, error } = await supabase
+          .from('master_ahsp_components')
+          .select('*')
+          .order('sort_order', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, from + componentPageSize - 1);
+
+        if (error) throw error;
+
+        const pageRows = (data ?? []) as AhspComponentDbRow[];
+        componentRows.push(...pageRows);
+
+        if (pageRows.length < componentPageSize) break;
+      }
       const baseAhsp = ((ahspResult.data ?? []) as MasterAhspItem[]).map((ahsp) => {
         const relationalComponents = componentRows
           .filter((component) => component.ahsp_id === ahsp.id)
