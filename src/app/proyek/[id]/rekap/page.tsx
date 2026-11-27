@@ -968,6 +968,8 @@ export default function RekapRABPage() {
   const recommendedWorkerCount = targetDurationDays > 0 ? Math.ceil(workerHok / targetDurationDays) : 0;
   const recommendedMasonCount = targetDurationDays > 0 ? Math.ceil(masonHok / targetDurationDays) : 0;
   const crewDayDifference = Math.abs(workerDays - masonDays);
+  const balancedMasonCount = workerDays > 0 && masonHok > 0 ? Math.max(1, Math.round(masonHok / workerDays)) : 0;
+  const balancedWorkerCount = masonDays > 0 && workerHok > 0 ? Math.max(1, Math.round(workerHok / masonDays)) : 0;
 
   const rebarReviewRows = useMemo<ItemRebarReview[]>(() => allItems.map((item) => {
     const components = parseRabItemComponents(item);
@@ -1207,6 +1209,9 @@ export default function RekapRABPage() {
               <span className="ml-2 text-slate-500">{crewDayDifference <= 1 ? 'Relatif seimbang' : 'Ubah jumlah pekerja/tukang agar durasinya mendekati sama'}</span>
             </div>
             <p className="mt-2 text-[10px] text-slate-500">Estimasi waktu tim mengikuti durasi terlama: <strong>{formatNumber(estimatedCrewDays, 1)} hari kerja</strong>.</p>
+            <div className="mt-2 rounded-lg bg-indigo-50 p-2 text-[10px] text-indigo-900">
+              Agar mendekati durasi sama: dengan {workerCount} pekerja, gunakan sekitar <strong>{balancedMasonCount} tukang</strong>; atau dengan {masonCount} tukang, gunakan sekitar <strong>{balancedWorkerCount} pekerja</strong>.
+            </div>
           </div>
           <div className="rounded-xl border border-slate-200 p-3">
             <p className="text-xs font-bold text-slate-800">Kebijakan mandor</p>
