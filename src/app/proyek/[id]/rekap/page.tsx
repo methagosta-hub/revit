@@ -945,23 +945,31 @@ export default function RekapRABPage() {
       ? Math.max(0, foremanDays)
       : baseMandorHok;
 
+  const laborReductionFactor = 1 - laborReductionPercent / 100;
   const plannedLaborRows = useMemo(() => laborRows.map((row) => {
     const plannedVolume = row.role === 'mandor' && row.isHok
       ? (baseMandorHok > 0 ? row.volume * effectiveMandorHok / baseMandorHok : 0)
       : row.volume;
+    const netVolume = plannedVolume * laborReductionFactor;
     const grossAmount = plannedVolume * row.unitPrice;
     return {
       ...row,
       plannedVolume,
+      netVolume,
       grossAmount,
-      netAmount: grossAmount * (1 - laborReductionPercent / 100),
+      netAmount: netVolume * row.unitPrice,
     };
-  }), [laborRows, baseMandorHok, effectiveMandorHok, laborReductionPercent]);
+  }), [laborRows, baseMandorHok, effectiveMandorHok, laborReductionFactor]);
 
   const laborGrossTotal = plannedLaborRows.reduce((sum, row) => sum + row.grossAmount, 0);
   const laborNetTotal = plannedLaborRows.reduce((sum, row) => sum + row.netAmount, 0);
-  const workerHok = laborHokByRole.pekerja + laborHokByRole.lainnya;
-  const masonHok = laborHokByRole.tukang;
+  const workerHokBase = laborHokByRole.pekerja + laborHokByRole.lainnya;
+  const masonHokBase = laborHokByRole.tukang;
+  const kepalaTukangHokBase = laborHokByRole.kepala_tukang;
+  const workerHok = workerHokBase * laborReductionFactor;
+  const masonHok = masonHokBase * laborReductionFactor;
+  const kepalaTukangHokNet = kepalaTukangHokBase * laborReductionFactor;
+  const effectiveMandorHokNet = effectiveMandorHok * laborReductionFactor;
   const workerDays = workerCount > 0 ? workerHok / workerCount : 0;
   const masonDays = masonCount > 0 ? masonHok / masonCount : 0;
   const estimatedCrewDays = Math.max(workerDays, masonDays);
@@ -1175,24 +1183,26 @@ export default function RekapRABPage() {
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl bg-slate-50 p-3">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">HOK pekerja</p>
-            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(workerHok, 2)}</p>
-            <p className="text-[10px] text-slate-500">Pekerja {formatNumber(laborHokByRole.pekerja, 2)} + tenaga lainnya {formatNumber(laborHokByRole.lainnya, 2)} HOK.</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(workerHok, 2)} HOK bersih</p>
+            <p className="text-[10px] text-slate-500">Dasar {formatNumber(workerHokBase, 2)} HOK: pekerja {formatNumber(laborHokByRole.pekerja, 2)} + lainnya {formatNumber(laborHokByRole.lainnya, 2)}.</p>
             <p className="text-[10px] text-slate-500">Rencana {formatNumber(workerDays, 1)} hari · rekomendasi {recommendedWorkerCount} orang</p>
           </div>
           <div className="rounded-xl bg-slate-50 p-3">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">HOK tukang</p>
-            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(masonHok, 2)}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(masonHok, 2)} HOK bersih</p>
+            <p className="text-[10px] text-slate-500">HOK dasar {formatNumber(masonHokBase, 2)} sebelum pengurang upah.</p>
             <p className="text-[10px] text-slate-500">Rencana {formatNumber(masonDays, 1)} hari · rekomendasi {recommendedMasonCount} orang</p>
           </div>
           <div className="rounded-xl bg-slate-50 p-3">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">HOK kepala tukang</p>
-            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(laborHokByRole.kepala_tukang, 2)}</p>
-            <p className="text-[10px] text-slate-500">Ditampilkan sebagai HOK; formasi 1 orang.</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(kepalaTukangHokNet, 2)} HOK bersih</p>
+            <p className="text-[10px] text-slate-500">HOK dasar {formatNumber(kepalaTukangHokBase, 2)}; formasi 1 orang.</p>
           </div>
           <div className="rounded-xl bg-slate-50 p-3">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">HOK mandor</p>
-            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(baseMandorHok, 2)}</p>
-            <p className="text-[10px] text-slate-500">{foremanMode === 'none' ? 'Tidak dialokasikan' : foremanMode === 'custom' ? 'Rencana hadir ' + formatNumber(effectiveMandorHok, 2) + ' hari' : 'Mengikuti total HOK AHSP'}.</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(effectiveMandorHokNet, 2)} HOK bersih</p>
+            <p className="text-[10px] text-slate-500">HOK dasar {formatNumber(baseMandorHok, 2)} · setelah kebijakan {formatNumber(effectiveMandorHok, 2)}.</p>
+            <p className="text-[10px] text-slate-500">{foremanMode === 'none' ? 'Tidak dialokasikan' : foremanMode === 'custom' ? 'Mandor hadir ' + formatNumber(effectiveMandorHok, 2) + ' hari sebelum override' : 'Mengikuti total HOK AHSP'}.</p>
           </div>
         </div>
 
@@ -1273,7 +1283,7 @@ export default function RekapRABPage() {
             <input type="number" min={0} max={99} step={0.5} value={laborReductionPercent}
               onChange={(event) => setLaborReductionPercent(Math.max(0, Math.min(99, Number(event.target.value) || 0)))}
               className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-            <span className="mt-1 block text-[10px] font-normal text-slate-400">Diterapkan pada nilai upah simulasi; HOK penjadwalan tetap memakai HOK dasar.</span>
+            <span className="mt-1 block text-[10px] font-normal text-slate-400">Mengurangi kuantitas/HOK estimasi dan nilai upah bersih; HOK dasar AHSP tetap ditampilkan.</span>
           </label>
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -1601,15 +1611,15 @@ export default function RekapRABPage() {
         <section className="report-page">
           <SectionHeading letter="G" title="RENCANA FORMASI TENAGA KERJA DAN DURASI" theme={activeTheme} />
           <p className="report-intro">
-            HOK dasar dihitung dari koefisien upah pada snapshot AHSP × volume RAB semua lokasi. Durasi per formasi = HOK ÷ jumlah orang. Target rencana: {targetDurationDays} hari kerja. Estimasi waktu tim mengikuti durasi terlama antara kelompok pekerja dan tukang.
+            HOK dasar dihitung dari koefisien upah pada snapshot AHSP × volume RAB semua lokasi. HOK bersih setelah override upah {formatNumber(laborReductionPercent, 2)}% digunakan untuk estimasi durasi dan formasi. Target rencana: {targetDurationDays} hari kerja.
           </p>
-          <table className="report-table">
-            <thead><tr><th>Kelompok</th><th style={{width:'15%'}}>HOK dasar</th><th style={{width:'15%'}}>HOK rencana</th><th style={{width:'13%'}}>Orang</th><th style={{width:'17%'}}>Durasi</th><th style={{width:'18%'}}>Rekomendasi untuk target</th></tr></thead>
+          <table className="report-table compact">
+            <thead><tr><th>Kelompok</th><th style={{width:'13%'}}>HOK dasar</th><th style={{width:'14%'}}>Setelah kebijakan</th><th style={{width:'14%'}}>Setelah override</th><th style={{width:'8%'}}>Orang</th><th style={{width:'13%'}}>Durasi</th><th style={{width:'18%'}}>Rekomendasi</th></tr></thead>
             <tbody>
-              <tr><td>Mandor</td><td className="number">{formatNumber(baseMandorHok, 2)}</td><td className="number">{formatNumber(effectiveMandorHok, 2)}</td><td className="number">{foremanMode === 'none' ? '0' : '1'}</td><td className="number">{formatNumber(effectiveMandorHok, 1)} hari kehadiran</td><td>{foremanMode === 'none' ? 'Tidak dialokasikan' : 'Mengikuti HOK / pengaturan mandor'}</td></tr>
-              <tr><td>Kepala Tukang</td><td className="number">{formatNumber(laborHokByRole.kepala_tukang, 2)}</td><td className="number">{formatNumber(laborHokByRole.kepala_tukang, 2)}</td><td className="number">1</td><td className="number">{formatNumber(laborHokByRole.kepala_tukang, 1)} hari</td><td>1 orang · sesuai HOK</td></tr>
-              <tr><td>Tukang</td><td className="number">{formatNumber(masonHok, 2)}</td><td className="number">{formatNumber(masonHok, 2)}</td><td className="number">{masonCount}</td><td className="number">{formatNumber(masonDays, 1)} hari</td><td>{recommendedMasonCount} orang untuk target</td></tr>
-              <tr><td>Pekerja + tenaga kerja lainnya</td><td className="number">{formatNumber(workerHok, 2)}</td><td className="number">{formatNumber(workerHok, 2)}</td><td className="number">{workerCount}</td><td className="number">{formatNumber(workerDays, 1)} hari</td><td>{recommendedWorkerCount} orang untuk target</td></tr>
+              <tr><td>Mandor</td><td className="number">{formatNumber(baseMandorHok, 2)}</td><td className="number">{formatNumber(effectiveMandorHok, 2)}</td><td className="number">{formatNumber(effectiveMandorHokNet, 2)}</td><td className="number">{foremanMode === 'none' ? '0' : '1'}</td><td className="number">{formatNumber(effectiveMandorHokNet, 1)} hari hadir</td><td>{foremanMode === 'none' ? 'Tidak dialokasikan' : 'Sesuai kebijakan'}</td></tr>
+              <tr><td>Kepala Tukang</td><td className="number">{formatNumber(kepalaTukangHokBase, 2)}</td><td className="number">{formatNumber(kepalaTukangHokBase, 2)}</td><td className="number">{formatNumber(kepalaTukangHokNet, 2)}</td><td className="number">1</td><td className="number">{formatNumber(kepalaTukangHokNet, 1)} hari</td><td>1 orang · sesuai HOK</td></tr>
+              <tr><td>Tukang</td><td className="number">{formatNumber(masonHokBase, 2)}</td><td className="number">{formatNumber(masonHokBase, 2)}</td><td className="number">{formatNumber(masonHok, 2)}</td><td className="number">{masonCount}</td><td className="number">{formatNumber(masonDays, 1)} hari</td><td>{recommendedMasonCount} orang untuk target</td></tr>
+              <tr><td>Pekerja + tenaga kerja lainnya</td><td className="number">{formatNumber(workerHokBase, 2)}</td><td className="number">{formatNumber(workerHokBase, 2)}</td><td className="number">{formatNumber(workerHok, 2)}</td><td className="number">{workerCount}</td><td className="number">{formatNumber(workerDays, 1)} hari</td><td>{recommendedWorkerCount} orang untuk target</td></tr>
             </tbody>
           </table>
           <div className="report-totals">
@@ -1625,10 +1635,10 @@ export default function RekapRABPage() {
         <section className="report-page">
           <SectionHeading letter="H" title="RINCIAN UPAH DAN OVERRIDE TENAGA KERJA" theme={activeTheme} />
           <p className="report-intro">
-            Nilai dihitung dari koefisien AHSP × volume RAB. Kebijakan mandor: {foremanMode === 'none' ? 'tanpa mandor' : foremanMode === 'custom' ? 'mandor hadir ' + formatNumber(effectiveMandorHok, 2) + ' hari' : 'mengikuti HOK AHSP'}. Pengurang upah: {formatNumber(laborReductionPercent, 2)}%. HOK dasar untuk penjadwalan tidak dikurangi oleh persentase override upah.
+            Nilai dihitung dari koefisien AHSP × volume RAB. Kebijakan mandor: {foremanMode === 'none' ? 'tanpa mandor' : foremanMode === 'custom' ? 'mandor hadir ' + formatNumber(effectiveMandorHok, 2) + ' hari' : 'mengikuti HOK AHSP'}. Pengurang upah: {formatNumber(laborReductionPercent, 2)}% diterapkan pada kuantitas/HOK estimasi dan nilai uang; HOK dasar tetap tersedia sebagai pembanding.
           </p>
-          <table className="report-table">
-            <thead><tr><th style={{width:'5%'}}>No.</th><th>Uraian Tenaga Kerja</th><th style={{width:'8%'}}>Sat.</th><th style={{width:'11%'}}>HOK/Qty Dasar</th><th style={{width:'11%'}}>HOK/Qty Rencana</th><th style={{width:'16%'}}>Harga Satuan</th><th style={{width:'17%'}}>Nilai Dasar</th><th style={{width:'17%'}}>Nilai Bersih</th></tr></thead>
+          <table className="report-table compact">
+            <thead><tr><th style={{width:'4%'}}>No.</th><th>Uraian Tenaga Kerja</th><th style={{width:'7%'}}>Sat.</th><th style={{width:'10%'}}>Dasar</th><th style={{width:'10%'}}>Setelah kebijakan</th><th style={{width:'10%'}}>Setelah override</th><th style={{width:'14%'}}>Harga Satuan</th><th style={{width:'16%'}}>Nilai Dasar</th><th style={{width:'16%'}}>Nilai Bersih</th></tr></thead>
             <tbody>
               {plannedLaborRows.map((row, index) => (
                 <tr key={(row.upahId || row.name) + '-' + row.unit}>
@@ -1637,15 +1647,16 @@ export default function RekapRABPage() {
                   <td className="center">{row.unit}</td>
                   <td className="number">{formatNumber(row.volume, 4)}</td>
                   <td className="number">{formatNumber(row.plannedVolume, 4)}</td>
+                  <td className="number">{formatNumber(row.netVolume, 4)}</td>
                   <td className="number">{formatRupiah(row.unitPrice)}</td>
                   <td className="number">{formatRupiah(row.grossAmount)}</td>
                   <td className="number">{formatRupiah(row.netAmount)}</td>
                 </tr>
               ))}
-              {plannedLaborRows.length === 0 && <tr><td colSpan={8} className="center">Tidak ditemukan komponen upah pada snapshot AHSP RAB.</td></tr>}
+              {plannedLaborRows.length === 0 && <tr><td colSpan={9} className="center">Tidak ditemukan komponen upah pada snapshot AHSP RAB.</td></tr>}
             </tbody>
             <tfoot>
-              <tr><th colSpan={6}>TOTAL NILAI UPAH</th><th className="number">{formatRupiah(laborGrossTotal)}</th><th className="number">{formatRupiah(laborNetTotal)}</th></tr>
+              <tr><th colSpan={7}>TOTAL NILAI UPAH</th><th className="number">{formatRupiah(laborGrossTotal)}</th><th className="number">{formatRupiah(laborNetTotal)}</th></tr>
             </tfoot>
           </table>
         </section>
