@@ -379,7 +379,7 @@ function parseRabItemComponents(item: RABItem): SnapshotComponent[] {
 }
 
 function normalizeUnit(value: string) {
-  return value.trim().toLowerCase().replace(/[.\\s_-]+/g, '');
+  return value.trim().toLowerCase().replace(/[.\s_-]+/g, '');
 }
 
 function isHokUnit(unit: string) {
@@ -388,10 +388,10 @@ function isHokUnit(unit: string) {
 
 function classifyLaborRole(name: string): 'mandor' | 'kepala_tukang' | 'tukang' | 'pekerja' | 'lainnya' {
   const label = name.toLocaleLowerCase('id-ID');
-  if (/\\bmandor\\b/.test(label)) return 'mandor';
-  if (/\\bkepala\\s+tukang\\b/.test(label)) return 'kepala_tukang';
-  if (/\\btukang\\b/.test(label)) return 'tukang';
-  if (/\\b(pekerja|buruh|helper)\\b/.test(label)) return 'pekerja';
+  if (/\bmandor\b/.test(label)) return 'mandor';
+  if (/\bkepala\s+tukang\b/.test(label)) return 'kepala_tukang';
+  if (/\btukang\b/.test(label)) return 'tukang';
+  if (/\b(pekerja|buruh|helper)\b/.test(label)) return 'pekerja';
   return 'lainnya';
 }
 
@@ -406,7 +406,7 @@ function laborRoleLabel(role: ReturnType<typeof classifyLaborRole>) {
 function isRebarAhspMaterial(component: SnapshotComponent) {
   const label = component.name.toLocaleLowerCase('id-ID');
   return normalizeUnit(component.unit) === 'kg'
-    && /\\b(besi|tulangan|wiremesh|rebar)\\b/.test(label);
+    && /\b(besi|tulangan|wiremesh|rebar)\b/.test(label);
 }
 
 function calculateBackupRebar(item: RABItem): { diameterRows: RebarDiameterUsage[]; weightKg: number; issues: string[] } {
