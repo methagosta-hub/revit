@@ -28,7 +28,6 @@ import {
   calculateStructuredRebar,
   describeStructuredRebar,
   calculateCustomBuilder,
-  describeCustomBuilder,
   traceCustomBuilder,
   defaultRebarStructureParameters,
   defaultCustomBuilderParameters,
