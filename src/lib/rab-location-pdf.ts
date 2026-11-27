@@ -59,7 +59,7 @@ function rebarBreakdown(row: any): string {
     return '<p class="muted">Rincian pembesian tidak dapat dibaca: '+e(error instanceof Error ? error.message : 'parameter tidak valid')+'</p>';
   }
 }
-function customBuilderBreakdown(row: any): string {
+function customBuilderBreakdown(row: any, unit: string): string {
   try {
     const trace = traceCustomBuilder(row.parameters || {});
     const multiplier = Number(row.multiplier ?? 1);
@@ -73,7 +73,7 @@ function customBuilderBreakdown(row: any): string {
       (steps || '<p class="muted">Tidak ada operasi antar-subkategori.</p>')+
       '<p><b>Hasil rumus dasar:</b> '+num(trace.result,4)+'</p>'+
       '<p><b>Faktor pengali:</b> '+num(multiplier,2)+'</p>'+
-      '<p class="formula-final"><b>Subtotal detail:</b> '+num(subtotal,4)+' '+e(row.unit||'')+'</p>'+
+      '<p class="formula-final"><b>Subtotal detail:</b> '+num(subtotal,4)+' '+e(unit||'')+'</p>'+
       '</div>';
   } catch (error) {
     return '<p class="muted">Tahapan rumus kustom tidak dapat dibaca: '+e(error instanceof Error ? error.message : 'parameter tidak valid')+'</p>';
@@ -83,7 +83,7 @@ function backup(item: any, rows: any[], index: number) {
   const body=rows.length?rows.map((r:any,i:number)=>{
     const custom = r.calc_mode === 'custom_builder';
     const calculation = custom
-      ? '<p>'+e(calc(r))+'</p>'+customBuilderBreakdown(r)
+      ? '<p>'+e(calc(r))+'</p>'+customBuilderBreakdown(r, item.unit)
       : '<p>'+e(calc(r))+' × faktor '+num(r.multiplier,2)+'</p>'+rebarBreakdown(r);
     return '<tr><td class="center">'+(i+1)+'</td><td><b>'+e(r.description||item.name)+'</b>'+calculation+'</td><td class="right">'+num(r.subtotal,2)+'</td><td class="center">'+e(item.unit)+'</td></tr>';
   }).join(''):
