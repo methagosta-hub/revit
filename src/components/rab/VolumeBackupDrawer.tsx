@@ -452,7 +452,7 @@ function calculationExpression(row: VolumeDetail, unit: string): string {
     const steps = trace.steps.length
       ? trace.steps.map((step, index) =>
           `  ${index + 1}. ${step.expression} = ${formatNumber(step.result, 4)}`,
-        ).join('\\n')
+        ).join('\n')
       : '  Tidak ada operasi antar-subkategori.';
     return [
       `Struktur: ${trace.expression}`,
@@ -462,7 +462,7 @@ function calculationExpression(row: VolumeDetail, unit: string): string {
       `Hasil rumus dasar: ${formatNumber(trace.result, 4)} ${unit}`,
       `Faktor pengali: ${multiplier}`,
       `Subtotal tersimpan: ${subtotal} ${unit}`,
-    ].join('\\n');
+    ].join('\n');
   }
 
   let expression = '';
