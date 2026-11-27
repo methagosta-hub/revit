@@ -327,35 +327,99 @@ export function describeStructuredRebar(parameters: Record<string, any>, multipl
     '; berat ekuivalen stok ' + shown(result.totalStockWeightKg, 3) + ' kg.';
 }
 
-function evaluateNode(node: CustomFormulaNode): number {
-  if (node.kind === 'group') return evaluateCustomFormulaNodes(node.children || []);
-  const raw = Number(node.value);
-  if (String(node.value ?? '').trim() === '' || !Number.isFinite(raw)) {
-    throw new Error('Nilai pada sub-kategori "' + (node.label || 'tanpa nama') + '" belum valid.');
+export type CustomFormulaCalculationStep = {
+  /** Kedalaman kelompok; dipakai untuk indentasi pada pratinjau dan PDF. */
+  depth: number;
+  expression: string;
+  result: number;
+};
+
+export type CustomFormulaCalculationTrace = {
+  expression: string;
+  numericExpression: string;
+  steps: CustomFormulaCalculationStep[];
+  result: number;
+};
+
+const formatCustomFormulaNumber = (value: number) =>
+  value.toLocaleString('id-ID', { maximumFractionDigits: 4 });
+
+const customOperatorSymbol = (operator: ArithmeticOperator) => {
+  if (operator === '*') return '×';
+  if (operator === '/') return '÷';
+  if (operator === '-') return '−';
+  return '+';
+};
+
+function evaluateCustomNodesWithTrace(
+  nodes: CustomFormulaNode[],
+  steps: CustomFormulaCalculationStep[],
+  depth: number,
+): { value: number; expression: string } {
+  if (!nodes.length) throw new Error('Tambahkan minimal satu sub-kategori pada setiap kelompok.');
+
+  const operands = nodes.map((node) => {
+    if (node.kind === 'group') {
+      const nested = evaluateCustomNodesWithTrace(node.children || [], steps, depth + 1);
+      return { value: nested.value, expression: '(' + nested.expression + ')' };
+    }
+
+    const raw = Number(node.value);
+    if (String(node.value ?? '').trim() === '' || !Number.isFinite(raw)) {
+      throw new Error('Nilai pada sub-kategori "' + (node.label || 'tanpa nama') + '" belum valid.');
+    }
+    return { value: raw, expression: formatCustomFormulaNumber(raw) };
+  });
+
+  const operators = nodes.slice(1).map((node) => node.operator || '+');
+  const expression = operands.map((operand, index) =>
+    (index ? ' ' + customOperatorSymbol(operators[index - 1]) + ' ' : '') + operand.expression,
+  ).join('');
+
+  // Samakan urutan operasi dengan mesin hitung lama: kali/bagi lebih dahulu,
+  // kemudian tambah/kurang dari kiri ke kanan. Kelompok dievaluasi rekursif.
+  const values = operands.map((operand) => operand.value);
+  let index = 0;
+  while (index < operators.length) {
+    const operator = operators[index];
+    if (operator === '*' || operator === '/') {
+      const left = values[index];
+      const right = values[index + 1];
+      if (operator === '/' && right === 0) {
+        throw new Error('Pembagian dengan nol tidak diperbolehkan.');
+      }
+      const result = operator === '*' ? left * right : left / right;
+      steps.push({
+        depth,
+        expression: formatCustomFormulaNumber(left) + ' ' + customOperatorSymbol(operator) + ' ' + formatCustomFormulaNumber(right),
+        result,
+      });
+      values.splice(index, 2, result);
+      operators.splice(index, 1);
+    } else {
+      index += 1;
+    }
   }
-  return raw;
+
+  let total = values[0];
+  for (let stepIndex = 0; stepIndex < operators.length; stepIndex += 1) {
+    const operator = operators[stepIndex];
+    const right = values[stepIndex + 1];
+    total = operator === '-' ? total - right : total + right;
+    steps.push({
+      depth,
+      expression: formatCustomFormulaNumber(total - (operator === '-' ? -right : right)) +
+        ' ' + customOperatorSymbol(operator) + ' ' + formatCustomFormulaNumber(right),
+      result: total,
+    });
+  }
+
+  if (!Number.isFinite(total)) throw new Error('Hasil rumus bertingkat tidak valid.');
+  return { value: total, expression };
 }
 
 export function evaluateCustomFormulaNodes(nodes: CustomFormulaNode[]): number {
-  if (!nodes.length) throw new Error('Tambahkan minimal satu sub-kategori pada setiap kategori.');
-  const terms: number[] = [];
-  let current = evaluateNode(nodes[0]);
-  for (let index = 1; index < nodes.length; index += 1) {
-    const operator = nodes[index].operator || '+';
-    const next = evaluateNode(nodes[index]);
-    if (operator === '*') current *= next;
-    else if (operator === '/') {
-      if (next === 0) throw new Error('Pembagian dengan nol tidak diperbolehkan.');
-      current /= next;
-    } else {
-      terms.push(current * (operator === '-' ? -1 : 1));
-      current = next;
-    }
-  }
-  terms.push(current);
-  const total = terms.reduce((sum, value) => sum + value, 0);
-  if (!Number.isFinite(total)) throw new Error('Hasil rumus bertingkat tidak valid.');
-  return total;
+  return evaluateCustomNodesWithTrace(nodes, [], 0).value;
 }
 
 export function calculateCustomBuilder(parameters: CustomFormulaParameters): number {
@@ -378,6 +442,23 @@ export function describeCustomBuilder(parameters: CustomFormulaParameters): stri
   return groups.map((group, index) =>
     (index ? ' ' + (group.operator || '+') + ' ' : '') + describeCustomNode(group),
   ).join(' ');
+}
+
+/**
+ * Membentuk satu sumber rincian perhitungan untuk pratinjau aplikasi dan PDF.
+ * Fungsi ini hanya membaca parameters yang sudah tersimpan; tidak mengubah payload.
+ */
+export function traceCustomBuilder(parameters: CustomFormulaParameters): CustomFormulaCalculationTrace {
+  const groups = parameters.groups || [];
+  if (!groups.length) throw new Error('Tambahkan minimal satu kategori perhitungan.');
+  const steps: CustomFormulaCalculationStep[] = [];
+  const evaluated = evaluateCustomNodesWithTrace(groups, steps, 0);
+  return {
+    expression: describeCustomBuilder(parameters),
+    numericExpression: evaluated.expression,
+    steps,
+    result: evaluated.value,
+  };
 }
 
 export function defaultRebarStructureParameters(kind: RebarStructureKind = 'beam') {
