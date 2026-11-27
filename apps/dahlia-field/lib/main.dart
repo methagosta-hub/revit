@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/offline/secure_outbox.dart';
+import 'core/theme/javawasthu_theme.dart';
 import 'features/field_home_page.dart';
 import 'features/login_page.dart';
 
@@ -46,56 +47,10 @@ class DahliaFieldApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primary = Color(0xFF244C45);
     return MaterialApp(
-      title: 'Dahlia Field',
+      title: 'Javawasthu Management',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: primary,
-          brightness: Brightness.light,
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF5F7F6),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFF5F7F6),
-          foregroundColor: Color(0xFF18352F),
-          centerTitle: false,
-          elevation: 0,
-        ),
-        cardTheme: CardThemeData(
-          color: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: const BorderSide(color: Color(0xFFE5ECE9)),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFFF8FAF9),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFDCE5E1)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFDCE5E1)),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 13,
-          ),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-      ),
+      theme: JavawasthuTheme.light,
       home: isConfigured
           ? AuthGate(outbox: outbox)
           : const ConfigurationRequiredPage(),
@@ -129,29 +84,58 @@ class ConfigurationRequiredPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.settings_suggest_outlined, size: 54),
-                SizedBox(height: 18),
-                Text(
-                  'Konfigurasi Dahlia Field belum lengkap',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 68,
+                        height: 68,
+                        decoration: BoxDecoration(
+                          color: JavawasthuPalette.goldLight,
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        child: const Icon(
+                          Icons.apartment_rounded,
+                          color: JavawasthuPalette.deepTeal,
+                          size: 34,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Javawasthu Management',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Konfigurasi aplikasi belum lengkap',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 18),
+                      const Text(
+                        'Build APK memerlukan DAHLIA_SUPABASE_URL dan '
+                        'DAHLIA_SUPABASE_PUBLISHABLE_KEY. Jangan pernah '
+                        'menyimpan service_role key di dalam aplikasi.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: JavawasthuPalette.muted,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                SizedBox(height: 10),
-                Text(
-                  'Build APK perlu DAHLIA_SUPABASE_URL dan '
-                  'DAHLIA_SUPABASE_ANON_KEY (publishable key). '
-                  'Jangan gunakan service_role key di aplikasi.',
-                  textAlign: TextAlign.center,
-                ),
-              ],
+              ),
             ),
           ),
         ),
