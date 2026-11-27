@@ -3,7 +3,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import {
-  describeCustomBuilder,
   traceCustomBuilder,
   type CustomFormulaNode,
   type CustomFormulaParameters,
@@ -166,7 +165,7 @@ export default function CustomFormulaBuilder({ value, onChange }: Props) {
   return (
     <section className="space-y-3 rounded-xl border border-violet-200 bg-violet-50/40 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div><p className="text-[11px] font-bold uppercase tracking-wide text-slate-700">Rumus kustom bertingkat</p><p className="text-[9px] text-slate-500">Bentuk kategori, sub-kategori, dan sub-sub kategori. Operator antarbaris dapat dipilih sendiri.</p></div>
+        <div><p className="text-[11px] font-bold uppercase tracking-wide text-slate-700">Rumus kustom bertingkat</p><p className="text-[9px] text-slate-500">Pilih beberapa baris berurutan untuk mengikatnya dalam tanda kurung. Kelompok dapat dibuat bertingkat dan operator antarbaris dapat dipilih.</p></div>
         <button type="button" onClick={() => replace([...groups, newGroup('Kategori ' + String.fromCharCode(65 + groups.length))])} className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2.5 py-2 text-[10px] font-semibold text-violet-700"><Plus className="h-3.5 w-3.5" /> Tambah kategori</button>
       </div>
       {groups.map((group, index) => renderNode(group, [index], 0, index))}
