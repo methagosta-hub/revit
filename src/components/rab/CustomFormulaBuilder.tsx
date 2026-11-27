@@ -4,7 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
   describeCustomBuilder,
-  calculateCustomBuilder,
+  traceCustomBuilder,
   type CustomFormulaNode,
   type CustomFormulaParameters,
   type ArithmeticOperator,
@@ -26,7 +26,7 @@ const makeId = () => 'node-' + Date.now().toString(36) + '-' + Math.random().toS
 const newValue = (label = 'Sub-kategori'): CustomFormulaNode => ({
   id: makeId(), label, kind: 'value', value: '', unit: '', operator: '+',
 });
-const newGroup = (label = 'Kategori'): CustomFormulaNode => ({
+const newGroup = (label = 'Kelompok perhitungan'): CustomFormulaNode => ({
   id: makeId(), label, kind: 'group', operator: '+', children: [newValue('Sub-kategori 1')],
 });
 
@@ -58,7 +58,7 @@ export default function CustomFormulaBuilder({ value, onChange }: Props) {
     return (
       <div key={node.id} className={depth === 0 ? 'rounded-xl border border-violet-200 bg-white p-3' : 'rounded-lg border border-slate-200 bg-slate-50 p-2'}>
         <div className="grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_150px_36px]">
-          <label className="text-[10px] font-semibold text-slate-600">{depth === 0 ? 'Nama kategori' : group ? 'Nama sub-kategori / kelompok' : 'Identitas sub-kategori'}
+          <label className="text-[10px] font-semibold text-slate-600">{depth === 0 ? 'Nama kategori' : group ? 'Nama kelompok (tanda kurung)' : 'Identitas sub-kategori'}
             <input value={node.label} onChange={(event) => updateNode(path, (current) => ({ ...current, label: event.target.value }))} className={INPUT} placeholder={group ? 'Kategori A' : 'Luas bersih'} />
           </label>
           {index > 0 ? (
@@ -85,7 +85,7 @@ export default function CustomFormulaBuilder({ value, onChange }: Props) {
             {(node.children || []).map((child, childIndex) => renderNode(child, [...path, childIndex], depth + 1, childIndex))}
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => appendNode(path, newValue('Sub-kategori ' + ((node.children || []).length + 1)))} className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2.5 py-2 text-[10px] font-semibold text-violet-700"><Plus className="h-3 w-3" /> Tambah sub-kategori</button>
-              {depth < 3 ? <button type="button" onClick={() => appendNode(path, newGroup('Sub-kategori bertingkat'))} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[10px] font-semibold text-slate-600"><Plus className="h-3 w-3" /> Tambah sub-sub kategori</button> : null}
+              {depth < 12 ? <button type="button" onClick={() => appendNode(path, newGroup('Kelompok dalam kurung'))} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[10px] font-semibold text-slate-600"><Plus className="h-3 w-3" /> Tambah kelompok ( )</button> : null}
             </div>
           </div>
         )}
@@ -93,10 +93,10 @@ export default function CustomFormulaBuilder({ value, onChange }: Props) {
     );
   };
 
-  let preview = '';
+  let preview: ReturnType<typeof traceCustomBuilder> | null = null;
   let previewError = '';
   try {
-    preview = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 4 }).format(calculateCustomBuilder(value));
+    preview = traceCustomBuilder(value);
   } catch (error) {
     previewError = error instanceof Error ? error.message : 'Lengkapi struktur rumus.';
   }
@@ -108,15 +108,43 @@ export default function CustomFormulaBuilder({ value, onChange }: Props) {
         <button type="button" onClick={() => replace([...groups, newGroup('Kategori ' + String.fromCharCode(65 + groups.length))])} className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2.5 py-2 text-[10px] font-semibold text-violet-700"><Plus className="h-3.5 w-3.5" /> Tambah kategori</button>
       </div>
       {groups.map((group, index) => renderNode(group, [index], 0, index))}
-      <div className="rounded-lg border border-violet-200 bg-white px-3 py-2">
-        <p className="text-[9px] font-bold uppercase tracking-wide text-violet-700">Pratinjau ekspresi</p>
-        <p className="mt-1 break-words text-[10px] leading-5 text-slate-700">{describeCustomBuilder(value) || 'Belum ada rumus'}</p>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
-          <span className="text-[9px] text-slate-500">{previewError || 'Hasil sementara'}</span>
-          <strong className="text-sm tabular-nums text-violet-900">{previewError ? '—' : preview}</strong>
-        </div>
+      <div className="rounded-lg border border-violet-200 bg-white px-3 py-3">
+        <p className="text-[9px] font-bold uppercase tracking-wide text-violet-700">Pratinjau cara perhitungan</p>
+        {previewError ? (
+          <p className="mt-2 text-[10px] leading-5 text-rose-600">{previewError}</p>
+        ) : preview ? (
+          <div className="mt-2 space-y-3">
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Struktur berdasarkan kategori</p>
+              <p className="mt-1 break-words text-[10px] leading-5 text-slate-700">{preview.expression}</p>
+            </div>
+            <div className="rounded-md bg-slate-50 px-2.5 py-2">
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Substitusi angka</p>
+              <p className="mt-1 break-words font-mono text-[11px] font-semibold leading-5 text-slate-800">{preview.numericExpression}</p>
+            </div>
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Tahapan operasional</p>
+              {preview.steps.length ? (
+                <ol className="mt-1 space-y-1">
+                  {preview.steps.map((step, index) => (
+                    <li key={index} className="flex items-start gap-2 text-[10px] leading-5 text-slate-700" style={{ paddingLeft: Math.min(step.depth, 8) * 10 }}>
+                      <span className="shrink-0 font-semibold text-violet-700">{index + 1}.</span>
+                      <span className="font-mono">{step.expression} = {new Intl.NumberFormat('id-ID', { maximumFractionDigits: 4 }).format(step.result)}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="mt-1 text-[10px] text-slate-500">Belum ada operasi antar-subkategori.</p>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
+              <span className="text-[9px] text-slate-500">Hasil akhir rumus dasar</span>
+              <strong className="text-sm tabular-nums text-violet-900">{new Intl.NumberFormat('id-ID', { maximumFractionDigits: 4 }).format(preview.result)}</strong>
+            </div>
+          </div>
+        ) : null}
       </div>
-      <p className="text-[9px] leading-4 text-slate-500">Perkalian dan pembagian dievaluasi lebih dahulu daripada penjumlahan dan pengurangan. Rumus bertingkat disimpan bersama label kategori sehingga dapat dibaca kembali pada PDF backup volume.</p>
+      <p className="text-[9px] leading-4 text-slate-500">Tombol “Tambah kelompok ( )” membuat kelompok operasi yang dihitung lebih dahulu. Kelompok dapat dibuat bertingkat, dan urutan langkah ini juga digunakan saat menampilkan Backup Volume di PDF.</p>
     </section>
   );
 }
