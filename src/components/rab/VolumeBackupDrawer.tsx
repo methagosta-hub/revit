@@ -454,7 +454,7 @@ function calculationExpression(row: VolumeDetail, unit: string): string {
       ...result.operationalSteps.map((step, index) => (index + 1) + '. ' + step),
       'Faktor pengali: ' + multiplier,
       'Subtotal tersimpan: ' + subtotal + ' ' + unit,
-    ].join('\\n');
+    ].join(String.fromCharCode(10));
   }
 
   if (mode === 'custom_builder') {
