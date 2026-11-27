@@ -411,6 +411,7 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>, m
   const operationalSteps = [
     ...setupNotes,
     ...parameterSteps,
+    'Faktor pengali Backup Volume = ' + shown(multiplier, 2) + '.',
     ...lines.flatMap((line) => [
       line.label + ' — jumlah potongan: ' + shown(line.pieces, 0) + ' potong.',
       'Panjang total: ' + shown(line.pieces, 0) + ' × ' + shown(line.cutLengthM, 3) +
@@ -454,7 +455,7 @@ export function describeStructuredRebar(parameters: Record<string, any>, multipl
     'Jenis struktur: ' + result.structureLabel,
     'Tahapan operasional:',
     ...result.operationalSteps.map((step, index) => (index + 1) + '. ' + step),
-  ].join('\\n');
+  ].join('\n');
 }
 
 export type CustomFormulaCalculationStep = {
