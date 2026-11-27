@@ -38,6 +38,8 @@ export type RebarCalculationResult = {
   breakdown: RebarBreakdownLine[];
   diameterSummary: RebarDiameterSummary[];
   formulas: string[];
+  /** Tahapan operasional dari parameter geometris sampai rekap kebutuhan. */
+  operationalSteps: string[];
 };
 
 const SNI_NOMINAL_WEIGHT_KG_PER_M: Record<number, number> = {
@@ -301,6 +303,32 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>, m
     ' m = ' + shown(line.totalLengthM, 3) + ' m; Ø' + shown(line.diameter, 0) +
     ' (' + shown(line.weightPerMeter, 3) + ' kg/m) = ' + shown(line.weightKg, 3) + ' kg',
   )];
+
+  const operationalSteps = [
+    ...setupNotes,
+    ...lines.flatMap((line) => [
+      line.label + ' — jumlah potongan: ' + shown(line.pieces, 0) + ' potong.',
+      'Panjang total: ' + shown(line.pieces, 0) + ' × ' + shown(line.cutLengthM, 3) +
+        ' m = ' + shown(line.totalLengthM, 3) + ' m.',
+      'Berat teoritis: ' + shown(line.totalLengthM, 3) + ' m × ' +
+        shown(line.weightPerMeter, 3) + ' kg/m = ' + shown(line.weightKg, 3) + ' kg.',
+    ]),
+    ...diameterSummary.flatMap((row) => [
+      'Ø' + shown(row.diameter, 0) + ' — panjang setelah faktor pengali: ' +
+        shown(row.totalLengthM, 3) + ' m; berat kebutuhan: ' + shown(row.requiredWeightKg, 3) + ' kg.',
+      'Estimasi batang stok Ø' + shown(row.diameter, 0) + ': ceil((' +
+        shown(row.totalLengthM, 3) + ' m × (1 + ' + shown(wastePct, 2) +
+        '%)) ÷ ' + shown(stockLengthM, 2) + ' m) = ' + shown(row.stockBars, 0) + ' batang.',
+      'Berat stok ekuivalen Ø' + shown(row.diameter, 0) + ': ' +
+        shown(row.stockBars, 0) + ' × ' + shown(stockLengthM, 2) + ' m × ' +
+        shown(row.weightPerMeter, 3) + ' kg/m = ' + shown(row.stockWeightKg, 3) + ' kg.',
+    ]),
+    'Total panjang seluruh kelompok: ' + shown(totalLengthM, 3) + ' m.',
+    'Total berat kebutuhan teoritis: ' + shown(totalWeightKg, 3) + ' kg.',
+    'Total estimasi batang stok: ' + shown(totalStockBars, 0) + ' batang.',
+    'Total berat ekuivalen stok: ' + shown(totalStockWeightKg, 3) + ' kg.',
+  ];
+
   return {
     structureLabel: LABELS[structure],
     totalLengthM,
@@ -311,20 +339,17 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>, m
     breakdown: lines,
     diameterSummary,
     formulas,
+    operationalSteps,
   };
 }
 
 export function describeStructuredRebar(parameters: Record<string, any>, multiplier = 1): string {
   const result = calculateStructuredRebar(parameters, multiplier);
-  const summary = result.diameterSummary.map((row) =>
-    'Ø' + shown(row.diameter, 0) + ': ' + shown(row.totalLengthM, 3) + ' m / ' +
-    shown(row.requiredWeightKg, 3) + ' kg / ' + row.stockBars + ' batang stok ' +
-    shown(result.stockLengthM, 2) + ' m',
-  ).join('; ');
-  return result.structureLabel + '. ' + result.formulas.join(' | ') +
-    '. TOTAL: ' + shown(result.totalLengthM, 3) + ' m; berat kebutuhan ' +
-    shown(result.totalWeightKg, 3) + ' kg; estimasi stok ' + summary +
-    '; berat ekuivalen stok ' + shown(result.totalStockWeightKg, 3) + ' kg.';
+  return [
+    'Jenis struktur: ' + result.structureLabel,
+    'Tahapan operasional:',
+    ...result.operationalSteps.map((step, index) => (index + 1) + '. ' + step),
+  ].join('\\n');
 }
 
 export type CustomFormulaCalculationStep = {
