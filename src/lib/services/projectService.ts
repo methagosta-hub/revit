@@ -121,7 +121,10 @@ export async function fetchProjects(includeCancelled = false) {
 }
 
 // Ambil detail proyek beserta divisi, item RAB, dan backup volume.
-export async function fetchProjectDetail(projectId: string) {
+export async function fetchProjectDetail(
+  projectId: string,
+  options: { syncTotalValue?: boolean } = {},
+) {
   const { data: project, error: projError } = await supabase
     .from('projects')
     .select('*')
@@ -210,7 +213,9 @@ export async function fetchProjectDetail(projectId: string) {
     ).toFixed(2),
   );
 
-  if (Math.abs(calculatedTotal - Number(project.total_value ?? 0)) >= 0.005) {
+  // Layar ekspor dapat meminta mode read-only agar perhitungan sementara
+  // tidak memicu penulisan ke tabel projects.
+  if (options.syncTotalValue !== false && Math.abs(calculatedTotal - Number(project.total_value ?? 0)) >= 0.005) {
     const { error: syncError } = await supabase
       .from('projects')
       .update({ total_value: calculatedTotal, updated_at: new Date().toISOString() })
