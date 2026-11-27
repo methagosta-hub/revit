@@ -1,7 +1,7 @@
 'use client';
 
 import { Plus, Trash2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   describeCustomBuilder,
   traceCustomBuilder,
@@ -45,7 +45,18 @@ function removeAtPath(nodes: CustomFormulaNode[], path: number[]): CustomFormula
 }
 
 export default function CustomFormulaBuilder({ value, onChange }: Props) {
+  const [selectedByParent, setSelectedByParent] = useState<Record<string, string[]>>({});
+  const [groupNotice, setGroupNotice] = useState('');
   const groups = value.groups || [];
+  const parentKeyForPath = (path: number[]) => path.join('.');
+  const toggleSelection = (parentKey: string, nodeId: string, checked: boolean) => {
+    setSelectedByParent((current) => {
+      const selected = new Set(current[parentKey] || []);
+      if (checked) selected.add(nodeId);
+      else selected.delete(nodeId);
+      return { ...current, [parentKey]: Array.from(selected) };
+    });
+  };
   const replace = (next: CustomFormulaNode[]) => onChange({ ...value, groups: next });
   const updateNode = (path: number[], change: (node: CustomFormulaNode) => CustomFormulaNode) =>
     replace(updateAtPath(groups, path, change));
@@ -53,11 +64,56 @@ export default function CustomFormulaBuilder({ value, onChange }: Props) {
   const appendNode = (path: number[], node: CustomFormulaNode) =>
     updateNode(path, (current) => ({ ...current, children: [...(current.children || []), node] }));
 
+  const wrapSelectedChildren = (path: number[], children: CustomFormulaNode[]) => {
+    const key = parentKeyForPath(path);
+    const selectedIds = selectedByParent[key] || [];
+    const selectedIndexes = children
+      .map((child, childIndex) => selectedIds.includes(child.id) ? childIndex : -1)
+      .filter((childIndex) => childIndex >= 0);
+
+    if (selectedIndexes.length < 2) {
+      setGroupNotice('Pilih minimal dua sub-kategori untuk membuat tanda kurung.');
+      return;
+    }
+    const first = selectedIndexes[0];
+    const last = selectedIndexes[selectedIndexes.length - 1];
+    if (last - first + 1 !== selectedIndexes.length) {
+      setGroupNotice('Pilih baris yang berurutan agar urutan operasi tetap terjaga.');
+      return;
+    }
+
+    const selectedNodes = children.slice(first, last + 1);
+    const wrapped = newGroup('Kelompok (...)');
+    wrapped.operator = selectedNodes[0].operator || '+';
+    wrapped.children = selectedNodes.map((child, childIndex) =>
+      childIndex === 0 ? { ...child, operator: '+' } : child,
+    );
+    const nextChildren = [
+      ...children.slice(0, first),
+      wrapped,
+      ...children.slice(last + 1),
+    ];
+    updateNode(path, (current) => ({ ...current, children: nextChildren }));
+    setSelectedByParent((current) => ({ ...current, [key]: [] }));
+    setGroupNotice('');
+  };
+
   const renderNode = (node: CustomFormulaNode, path: number[], depth: number, index: number): ReactNode => {
     const group = node.kind === 'group';
+    const parentKey = parentKeyForPath(path.slice(0, -1));
+    const selected = (selectedByParent[parentKey] || []).includes(node.id);
     return (
       <div key={node.id} className={depth === 0 ? 'rounded-xl border border-violet-200 bg-white p-3' : 'rounded-lg border border-slate-200 bg-slate-50 p-2'}>
-        <div className="grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_150px_36px]">
+        <div className="grid items-end gap-2 sm:grid-cols-[18px_minmax(0,1fr)_150px_36px]">
+          {depth > 0 ? (
+            <input
+              type="checkbox"
+              aria-label="Pilih baris untuk dikelompokkan"
+              checked={selected}
+              onChange={(event) => toggleSelection(parentKey, node.id, event.target.checked)}
+              className="mb-2 h-4 w-4 accent-violet-600"
+            />
+          ) : <span />}
           <label className="text-[10px] font-semibold text-slate-600">{depth === 0 ? 'Nama kategori' : group ? 'Nama kelompok (tanda kurung)' : 'Identitas sub-kategori'}
             <input value={node.label} onChange={(event) => updateNode(path, (current) => ({ ...current, label: event.target.value }))} className={INPUT} placeholder={group ? 'Kategori A' : 'Luas bersih'} />
           </label>
@@ -83,10 +139,16 @@ export default function CustomFormulaBuilder({ value, onChange }: Props) {
         ) : (
           <div className="mt-3 space-y-2 border-l-2 border-violet-200 pl-3">
             {(node.children || []).map((child, childIndex) => renderNode(child, [...path, childIndex], depth + 1, childIndex))}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button type="button" onClick={() => appendNode(path, newValue('Sub-kategori ' + ((node.children || []).length + 1)))} className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2.5 py-2 text-[10px] font-semibold text-violet-700"><Plus className="h-3 w-3" /> Tambah sub-kategori</button>
               {depth < 12 ? <button type="button" onClick={() => appendNode(path, newGroup('Kelompok dalam kurung'))} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[10px] font-semibold text-slate-600"><Plus className="h-3 w-3" /> Tambah kelompok ( )</button> : null}
+              {(selectedByParent[parentKeyForPath(path)] || []).length > 0 ? (
+                <button type="button" onClick={() => wrapSelectedChildren(path, node.children || [])} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[10px] font-semibold text-emerald-700">
+                  Kelompokkan baris terpilih ({(selectedByParent[parentKeyForPath(path)] || []).length})
+                </button>
+              ) : null}
             </div>
+            {groupNotice ? <p className="text-[9px] text-amber-700">{groupNotice}</p> : null}
           </div>
         )}
       </div>
