@@ -26,9 +26,8 @@ import RebarStructureFields from '@/components/rab/RebarStructureFields';
 import CustomFormulaBuilder from '@/components/rab/CustomFormulaBuilder';
 import {
   calculateStructuredRebar,
-  describeStructuredRebar,
   calculateCustomBuilder,
-  describeCustomBuilder,
+  traceCustomBuilder,
   defaultRebarStructureParameters,
   defaultCustomBuilderParameters,
   type CustomFormulaParameters,
@@ -447,6 +446,35 @@ function calculationExpression(row: VolumeDetail, unit: string): string {
   const subtotal = formatNumber(toNumber(row.subtotal), 4);
   const mode = row.calc_mode ?? 'standard';
 
+  if (mode === 'rebar_structure') {
+    const result = calculateStructuredRebar(parameters as Record<string, unknown>, toNumber(row.multiplier, 1));
+    return [
+      'Jenis struktur: ' + result.structureLabel,
+      'Tahapan operasional:',
+      ...result.operationalSteps.map((step, index) => (index + 1) + '. ' + step),
+      'Faktor pengali: ' + multiplier,
+      'Subtotal tersimpan: ' + subtotal + ' ' + unit,
+    ].join(String.fromCharCode(10));
+  }
+
+  if (mode === 'custom_builder') {
+    const trace = traceCustomBuilder(parameters as unknown as CustomFormulaParameters);
+    const steps = trace.steps.length
+      ? trace.steps.map((step, index) =>
+          `  ${index + 1}. ${step.expression} = ${formatNumber(step.result, 4)}`,
+        ).join('\n')
+      : '  Tidak ada operasi antar-subkategori.';
+    return [
+      `Struktur: ${trace.expression}`,
+      `Substitusi angka: ${trace.numericExpression}`,
+      'Tahapan operasional:',
+      steps,
+      `Hasil rumus dasar: ${formatNumber(trace.result, 4)} ${unit}`,
+      `Faktor pengali: ${multiplier}`,
+      `Subtotal tersimpan: ${subtotal} ${unit}`,
+    ].join('\n');
+  }
+
   let expression = '';
   if (mode === 'standard') {
     expression = `${value('length')} m × ${value('width')} m × ${value('height')} m × ${value('quantity')} kali`;
@@ -477,10 +505,6 @@ function calculationExpression(row: VolumeDetail, unit: string): string {
     expression = `((${value('top_width', 0)} m + ${value('bottom_width', 0)} m) ÷ 2) × ${value('depth', 0)} m × ${value('length', 0)} m × ${value('quantity')} kali`;
   } else if (mode === 'rebar') {
     expression = `(Ø${value('diameter', 0)}² ÷ 162) × ${value('bar_length', 0)} m × ${value('bars', 0)} batang`;
-  } else if (mode === 'rebar_structure') {
-    expression = describeStructuredRebar(parameters as Record<string, unknown>);
-  } else if (mode === 'custom_builder') {
-    expression = describeCustomBuilder(parameters as unknown as CustomFormulaParameters);
   } else {
     expression = String(parameters.formula ?? '').trim() || 'Rumus khusus belum tercatat';
   }
@@ -1222,6 +1246,7 @@ export default function VolumeBackupDrawer({ open, item, onClose, onSaved }: Pro
                   <>
                     <RebarStructureFields
                       value={form.parameters as Record<string, unknown>}
+                      multiplier={Number(form.multiplier || 1)}
                       onChange={(parameters) => setForm((current) => ({ ...current, parameters: parameters as VolumeParameters }))}
                     />
                     {(() => {
@@ -1324,7 +1349,7 @@ export default function VolumeBackupDrawer({ open, item, onClose, onSaved }: Pro
                           <p className="mt-1.5 text-xs font-semibold leading-5 text-slate-900">{row.description}</p>
                           <div className="mt-2 rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2">
                             <p className="text-[9px] font-bold uppercase tracking-wide text-blue-700">Rumus dan hasil perhitungan</p>
-                            <p className="mt-1 break-words text-[11px] font-medium leading-5 text-slate-700">
+                            <p className="mt-1 whitespace-pre-line break-words text-[11px] font-medium leading-5 text-slate-700">
                               {calculationExpression(row, item.unit)}
                             </p>
                           </div>
