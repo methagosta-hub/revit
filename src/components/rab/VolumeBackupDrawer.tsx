@@ -26,7 +26,6 @@ import RebarStructureFields from '@/components/rab/RebarStructureFields';
 import CustomFormulaBuilder from '@/components/rab/CustomFormulaBuilder';
 import {
   calculateStructuredRebar,
-  describeStructuredRebar,
   calculateCustomBuilder,
   traceCustomBuilder,
   defaultRebarStructureParameters,
@@ -447,6 +446,17 @@ function calculationExpression(row: VolumeDetail, unit: string): string {
   const subtotal = formatNumber(toNumber(row.subtotal), 4);
   const mode = row.calc_mode ?? 'standard';
 
+  if (mode === 'rebar_structure') {
+    const result = calculateStructuredRebar(parameters as Record<string, unknown>, toNumber(row.multiplier, 1));
+    return [
+      'Jenis struktur: ' + result.structureLabel,
+      'Tahapan operasional:',
+      ...result.operationalSteps.map((step, index) => (index + 1) + '. ' + step),
+      'Faktor pengali: ' + multiplier,
+      'Subtotal tersimpan: ' + subtotal + ' ' + unit,
+    ].join('\\n');
+  }
+
   if (mode === 'custom_builder') {
     const trace = traceCustomBuilder(parameters as unknown as CustomFormulaParameters);
     const steps = trace.steps.length
@@ -495,8 +505,6 @@ function calculationExpression(row: VolumeDetail, unit: string): string {
     expression = `((${value('top_width', 0)} m + ${value('bottom_width', 0)} m) ÷ 2) × ${value('depth', 0)} m × ${value('length', 0)} m × ${value('quantity')} kali`;
   } else if (mode === 'rebar') {
     expression = `(Ø${value('diameter', 0)}² ÷ 162) × ${value('bar_length', 0)} m × ${value('bars', 0)} batang`;
-  } else if (mode === 'rebar_structure') {
-    expression = describeStructuredRebar(parameters as Record<string, unknown>);
   } else {
     expression = String(parameters.formula ?? '').trim() || 'Rumus khusus belum tercatat';
   }
