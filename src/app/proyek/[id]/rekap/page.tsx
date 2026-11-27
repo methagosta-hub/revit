@@ -364,13 +364,18 @@ function parseRabItemComponents(item: RABItem): SnapshotComponent[] {
 
     const unitPrice = numberValue(firstValue(row, ['unit_price', 'unitPrice', 'price', 'harga_satuan'], 0));
     if (unitPrice <= 0 || lineMultiplier <= 0) return [];
+    const leafName = pathNames.join(' / ');
     return [{
-      name: pathNames.join(' / '),
+      name: leafName,
       unit: textValue(firstValue(row, ['unit', 'unit_name', 'satuan']), '-'),
       coefficient: lineMultiplier,
       unitPrice,
       subtotal: lineMultiplier * unitPrice,
-      type: 'other' as const,
+      type: normalizeType(firstValue(row, ['type', 'category', 'jenis', 'component_type', 'item_type']), leafName, row),
+      materialId: row.material_id ? String(row.material_id) : null,
+      materialCode: textValue(firstValue(row, ['material_code', 'code', 'item_code']), ''),
+      upahId: row.upah_id ? String(row.upah_id) : null,
+      alatId: row.alat_id ? String(row.alat_id) : null,
       raw: row,
     }];
   });
@@ -383,7 +388,7 @@ function normalizeUnit(value: string) {
 }
 
 function isHokUnit(unit: string) {
-  return ['oh', 'hok', 'oranghari', 'hariorang', 'hari'].includes(normalizeUnit(unit));
+  return ['oh', 'hok', 'oranghari', 'hariorang', 'hari', 'harikerja'].includes(normalizeUnit(unit));
 }
 
 function classifyLaborRole(name: string): 'mandor' | 'kepala_tukang' | 'tukang' | 'pekerja' | 'lainnya' {
