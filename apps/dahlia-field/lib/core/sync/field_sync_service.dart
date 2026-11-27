@@ -70,7 +70,7 @@ class FieldSyncService extends ChangeNotifier {
           } else if (result is Map && result['message'] is String) {
             _lastMessage = result['message']! as String;
           } else {
-            _lastMessage = 'Data berhasil dikirim ke Dahlia Management.';
+            _lastMessage = 'Data berhasil dikirim ke Javawasthu Management.';
           }
         } catch (error) {
           failed++;
