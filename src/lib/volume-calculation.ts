@@ -376,40 +376,48 @@ function evaluateCustomNodesWithTrace(
     (index ? ' ' + customOperatorSymbol(operators[index - 1]) + ' ' : '') + operand.expression,
   ).join('');
 
-  // Samakan urutan operasi dengan mesin hitung lama: kali/bagi lebih dahulu,
-  // kemudian tambah/kurang dari kiri ke kanan. Kelompok dievaluasi rekursif.
-  const values = operands.map((operand) => operand.value);
-  let index = 0;
-  while (index < operators.length) {
-    const operator = operators[index];
-    if (operator === '*' || operator === '/') {
-      const left = values[index];
-      const right = values[index + 1];
-      if (operator === '/' && right === 0) {
-        throw new Error('Pembagian dengan nol tidak diperbolehkan.');
-      }
-      const result = operator === '*' ? left * right : left / right;
+  // Pertahankan persis perilaku evaluator yang sudah dipakai data lama:
+  // kali/bagi dihitung di dalam satu term, lalu term dijumlahkan.
+  // Pada evaluator lama tanda '-' memberi tanda negatif pada term sebelumnya.
+  const terms: number[] = [];
+  let current = operands[0].value;
+
+  for (let index = 1; index < operands.length; index += 1) {
+    const operator = operators[index - 1];
+    const next = operands[index].value;
+
+    if (operator === '*') {
+      const left = current;
+      current *= next;
       steps.push({
         depth,
-        expression: formatCustomFormulaNumber(left) + ' ' + customOperatorSymbol(operator) + ' ' + formatCustomFormulaNumber(right),
-        result,
+        expression: formatCustomFormulaNumber(left) + ' × ' + formatCustomFormulaNumber(next),
+        result: current,
       });
-      values.splice(index, 2, result);
-      operators.splice(index, 1);
+    } else if (operator === '/') {
+      if (next === 0) throw new Error('Pembagian dengan nol tidak diperbolehkan.');
+      const left = current;
+      current /= next;
+      steps.push({
+        depth,
+        expression: formatCustomFormulaNumber(left) + ' ÷ ' + formatCustomFormulaNumber(next),
+        result: current,
+      });
     } else {
-      index += 1;
+      terms.push(current * (operator === '-' ? -1 : 1));
+      current = next;
     }
   }
+  terms.push(current);
 
-  let total = values[0];
-  for (let stepIndex = 0; stepIndex < operators.length; stepIndex += 1) {
-    const operator = operators[stepIndex];
+  let total = terms[0];
+  for (let index = 1; index < terms.length; index += 1) {
     const left = total;
-    const right = values[stepIndex + 1];
-    total = operator === '-' ? left - right : left + right;
+    const right = terms[index];
+    total += right;
     steps.push({
       depth,
-      expression: formatCustomFormulaNumber(left) + ' ' + customOperatorSymbol(operator) + ' ' + formatCustomFormulaNumber(right),
+      expression: formatCustomFormulaNumber(left) + ' + ' + formatCustomFormulaNumber(right),
       result: total,
     });
   }
