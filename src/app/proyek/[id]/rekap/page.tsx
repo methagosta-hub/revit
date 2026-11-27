@@ -395,8 +395,8 @@ function classifyLaborRole(name: string): 'mandor' | 'kepala_tukang' | 'tukang' 
   const label = name.toLocaleLowerCase('id-ID');
   if (/\bmandor\b/.test(label)) return 'mandor';
   if (/\bkepala\s+tukang\b/.test(label)) return 'kepala_tukang';
+  if (/\b(pembantu|asisten|helper|pekerja|buruh)\b/.test(label)) return 'pekerja';
   if (/\btukang\b/.test(label)) return 'tukang';
-  if (/\b(pekerja|buruh|helper)\b/.test(label)) return 'pekerja';
   return 'lainnya';
 }
 
