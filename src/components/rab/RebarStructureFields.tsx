@@ -1,11 +1,12 @@
 'use client';
 
 import { Plus, Trash2 } from 'lucide-react';
-import { defaultRebarStructureParameters, type RebarStructureKind } from '@/lib/volume-calculation';
+import { calculateStructuredRebar, defaultRebarStructureParameters, type RebarStructureKind } from '@/lib/volume-calculation';
 
 type Props = {
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
+  multiplier?: number;
 };
 
 const INPUT = 'mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10';
@@ -20,7 +21,7 @@ const STRUCTURES: Array<{ value: RebarStructureKind; label: string }> = [
   { value: 'stair', label: 'Tangga dan bordes' },
 ];
 
-export default function RebarStructureFields({ value, onChange }: Props) {
+export default function RebarStructureFields({ value, onChange, multiplier = 1 }: Props) {
   const structure = String(value.structure_type || 'beam') as RebarStructureKind;
   const set = (key: string, next: unknown) => onChange({ ...value, [key]: next });
   const read = (key: string, fallback = '') => String(value[key] ?? fallback);
@@ -46,6 +47,13 @@ export default function RebarStructureFields({ value, onChange }: Props) {
   const isLinear = ['beam', 'column', 'pedestal'].includes(structure);
   const isFlat = structure === 'footplat' || structure === 'slab';
   const lengthLabel = structure === 'beam' ? 'Panjang keseluruhan balok' : structure === 'column' ? 'Tinggi kolom' : 'Kedalaman pedestal';
+  let structuredPreview: ReturnType<typeof calculateStructuredRebar> | null = null;
+  let structuredPreviewError = '';
+  try {
+    structuredPreview = calculateStructuredRebar(value, multiplier);
+  } catch (error) {
+    structuredPreviewError = error instanceof Error ? error.message : 'Lengkapi parameter pembesian.';
+  }
 
   return (
     <section className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
@@ -214,6 +222,34 @@ export default function RebarStructureFields({ value, onChange }: Props) {
       <p className="rounded-lg bg-amber-50 px-3 py-2 text-[9px] leading-4 text-amber-900">
         Kalkulator ini adalah estimasi kuantitas / bar bending take-off menggunakan tabel berat nominal SNI 2052:2024, bukan pemeriksaan kapasitas atau desain struktur. Panjang kait, penyaluran, sambungan lewatan, selimut, dan detail penempatan harus mengikuti gambar struktur serta verifikasi perencana. Default panjang stok 12 m (pilihan panjang standar juga dapat diubah menjadi 10 m).
       </p>
+
+      <div className="rounded-xl border border-emerald-200 bg-white p-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-800">Pratinjau operasionalisasi pembesian</p>
+            <p className="mt-0.5 text-[9px] text-slate-500">Tahapan dihitung dari parameter di atas. Pratinjau ini tidak mengubah nilai input.</p>
+          </div>
+          {structuredPreview ? <span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-semibold text-emerald-700">Perhitungan valid</span> : null}
+        </div>
+        {structuredPreview ? (
+          <div className="mt-3 space-y-3">
+            <div className="rounded-lg bg-slate-50 p-2.5">
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Dasar perhitungan</p>
+              <ol className="mt-1 space-y-1">
+                {structuredPreview.operationalSteps.map((step, index) => (
+                  <li key={index} className="flex items-start gap-2 text-[10px] leading-5 text-slate-700">
+                    <span className="shrink-0 font-semibold text-emerald-700">{index + 1}.</span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <p className="text-[9px] text-slate-500">Faktor pengali yang sedang digunakan telah diperhitungkan pada tahapan rekap. Ringkasan jumlah panjang, berat, dan batang stok tetap tersedia pada panel hasil Backup Volume.</p>
+          </div>
+        ) : (
+          <p className="mt-2 text-[10px] leading-5 text-amber-700">{structuredPreviewError || 'Isi parameter pembesian untuk menampilkan proses perhitungan.'}</p>
+        )}
+      </div>
     </section>
   );
 }
