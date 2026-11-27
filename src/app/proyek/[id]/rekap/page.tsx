@@ -717,6 +717,16 @@ export default function RekapRABPage() {
     { role: 'Mengetahui', name: '', identifier: '' },
     { role: 'Menyetujui', name: '', identifier: '' },
   ]);
+
+  // Semua nilai berikut hanya hidup di halaman ini dan tidak pernah disimpan ke Supabase.
+  const [targetDurationDays, setTargetDurationDays] = useState(66);
+  const [workerCount, setWorkerCount] = useState(5);
+  const [masonCount, setMasonCount] = useState(6);
+  const [foremanMode, setForemanMode] = useState<ForemanMode>('ahsp');
+  const [foremanDays, setForemanDays] = useState(0);
+  const [materialReductionPercent, setMaterialReductionPercent] = useState(0);
+  const [laborReductionPercent, setLaborReductionPercent] = useState(0);
+
   const activeTheme = PDF_THEMES[pdfTheme];
 
   const loadData = useCallback(async (refresh = false) => {
@@ -799,38 +809,210 @@ export default function RekapRABPage() {
     };
   }).filter((division) => division.rows.length > 0), [orderedDivisions]);
 
-  const materialRows = useMemo(() => {
-    const map = new Map<string, { name: string; units: Set<string>; volume: number; total: number; unitPrice: number }>();
-    allItems.forEach((item) => parseRabItemComponents(item).filter((c) => c.type === 'material').forEach((component) => {
-      // Satu nama material hanya satu baris walaupun digunakan di banyak pekerjaan.
-      const key = component.name.trim().toLocaleLowerCase('id-ID');
-      const current = map.get(key) ?? { name: component.name.trim(), units: new Set<string>(), volume: 0, total: 0, unitPrice: component.unitPrice };
-      current.units.add(component.unit);
-      const requiredQuantity = component.coefficient * numberValue(item.volume);
-      current.volume += requiredQuantity;
-      current.total += requiredQuantity * component.unitPrice;
-      if (current.volume > 0) current.unitPrice = current.total / current.volume;
-      map.set(key, current);
-    }));
-    return Array.from(map.values()).map((row) => ({
-      ...row,
-      unit: row.units.size > 1 ? Array.from(row.units).join(' / ') : (Array.from(row.units)[0] || '-'),
-    })).sort((a, b) => a.name.localeCompare(b.name, 'id'));
-  }, [allItems]);
+  const materialMatrixData = useMemo(() => {
+    const summary = new Map<string, {
+      key: string; materialId: string | null; materialCode: string | null; name: string;
+      unit: string; itemIds: Set<string>; quantity: number; amount: number;
+    }>();
+    const usages = new Map<string, MaterialUsageRow>();
+
+    for (const item of allItems) {
+      for (const component of parseRabItemComponents(item).filter((row) => row.type === 'material')) {
+        const materialName = textValue(
+          firstValue(component.raw, ['material_name', 'name', 'item_name', 'description']),
+          component.name,
+        );
+        const unitKey = normalizeUnit(component.unit);
+        // material_id menjadi identitas utama; komponen lama tanpa ID tetap ditampilkan
+        // dengan kunci nama+satuan agar tidak hilang dari rekap.
+        const identity = component.materialId
+          ? 'id:' + component.materialId + '|' + unitKey
+          : 'legacy:' + materialName.trim().toLocaleLowerCase('id-ID') + '|' + unitKey;
+        const quantity = component.coefficient * numberValue(item.volume);
+        const amount = quantity * component.unitPrice;
+        const current = summary.get(identity) ?? {
+          key: identity,
+          materialId: component.materialId,
+          materialCode: component.materialCode,
+          name: materialName,
+          unit: component.unit,
+          itemIds: new Set<string>(),
+          quantity: 0,
+          amount: 0,
+        };
+        current.itemIds.add(item.id);
+        current.quantity += quantity;
+        current.amount += amount;
+        if (!current.materialCode && component.materialCode) current.materialCode = component.materialCode;
+        summary.set(identity, current);
+
+        const usageKey = item.id + '|' + identity;
+        const usage = usages.get(usageKey) ?? {
+          key: usageKey,
+          divisionName: String((item as RABItem & { divisionName?: string }).divisionName || '-'),
+          itemCode: String(item.code || ''),
+          itemName: item.name,
+          materialId: component.materialId,
+          materialCode: component.materialCode,
+          materialName,
+          unit: component.unit,
+          coefficient: 0,
+          rabVolume: numberValue(item.volume),
+          quantity: 0,
+          netQuantity: 0,
+        };
+        usage.coefficient += component.coefficient;
+        usage.quantity += quantity;
+        usages.set(usageKey, usage);
+      }
+    }
+
+    return {
+      summary: Array.from(summary.values()).map((row) => ({
+        key: row.key,
+        materialId: row.materialId,
+        materialCode: row.materialCode,
+        name: row.name,
+        unit: row.unit,
+        itemCount: row.itemIds.size,
+        quantity: row.quantity,
+        amount: row.amount,
+        netQuantity: row.quantity * (1 - materialReductionPercent / 100),
+        netAmount: row.amount * (1 - materialReductionPercent / 100),
+      })).sort((a, b) => a.name.localeCompare(b.name, 'id')),
+      usages: Array.from(usages.values()).map((row) => ({
+        ...row,
+        netQuantity: row.quantity * (1 - materialReductionPercent / 100),
+      })).sort((a, b) => a.divisionName.localeCompare(b.divisionName, 'id') || a.itemName.localeCompare(b.itemName, 'id') || a.materialName.localeCompare(b.materialName, 'id')),
+    };
+  }, [allItems, materialReductionPercent]);
+
+  const materialRows = materialMatrixData.summary;
+  const materialUsageRows = materialMatrixData.usages;
+  const unlinkedMaterialCount = materialRows.filter((row) => !row.materialId).length;
 
   const laborRows = useMemo(() => {
-    const map = new Map<string, { name: string; unit: string; coefficient: number; volume: number; unitPrice: number; total: number }>();
-    allItems.forEach((item) => parseRabItemComponents(item).filter((c) => c.type === 'labor').forEach((component) => {
-      const key = `${component.name.toLowerCase()}|${component.unit.toLowerCase()}`;
-      const current = map.get(key) ?? { name: component.name, unit: component.unit, coefficient: 0, volume: 0, unitPrice: component.unitPrice, total: 0 };
+    const map = new Map<string, {
+      upahId: string | null; name: string; unit: string; coefficient: number; volume: number;
+      unitPrice: number; total: number; role: ReturnType<typeof classifyLaborRole>; isHok: boolean;
+    }>();
+    allItems.forEach((item) => parseRabItemComponents(item).filter((component) => component.type === 'labor').forEach((component) => {
+      const role = classifyLaborRole(component.name);
+      const key = component.upahId
+        ? 'id:' + component.upahId + '|' + normalizeUnit(component.unit)
+        : component.name.trim().toLowerCase() + '|' + normalizeUnit(component.unit);
+      const current = map.get(key) ?? {
+        upahId: component.upahId,
+        name: component.name,
+        unit: component.unit,
+        coefficient: 0,
+        volume: 0,
+        unitPrice: component.unitPrice,
+        total: 0,
+        role,
+        isHok: isHokUnit(component.unit),
+      };
       current.coefficient += component.coefficient;
       current.volume += component.coefficient * numberValue(item.volume);
       current.total += component.coefficient * numberValue(item.volume) * component.unitPrice;
       if (!current.unitPrice) current.unitPrice = component.unitPrice;
       map.set(key, current);
     }));
-    return Array.from(map.values()).map((row) => ({ ...row, unitPrice: row.volume > 0 ? row.total / row.volume : row.unitPrice })).sort((a, b) => a.name.localeCompare(b.name, 'id'));
+    return Array.from(map.values()).map((row) => ({
+      ...row,
+      unitPrice: row.volume > 0 ? row.total / row.volume : row.unitPrice,
+    })).sort((a, b) => a.name.localeCompare(b.name, 'id'));
   }, [allItems]);
+
+  const laborHokByRole = useMemo(() => {
+    const totals = { mandor: 0, kepala_tukang: 0, tukang: 0, pekerja: 0, lainnya: 0 };
+    laborRows.forEach((row) => {
+      if (!row.isHok) return;
+      totals[row.role] += row.volume;
+    });
+    return totals;
+  }, [laborRows]);
+
+  const baseMandorHok = laborHokByRole.mandor;
+  const effectiveMandorHok = foremanMode === 'none'
+    ? 0
+    : foremanMode === 'custom'
+      ? Math.max(0, foremanDays)
+      : baseMandorHok;
+
+  const plannedLaborRows = useMemo(() => laborRows.map((row) => {
+    const plannedVolume = row.role === 'mandor' && row.isHok
+      ? (baseMandorHok > 0 ? row.volume * effectiveMandorHok / baseMandorHok : 0)
+      : row.volume;
+    const grossAmount = plannedVolume * row.unitPrice;
+    return {
+      ...row,
+      plannedVolume,
+      grossAmount,
+      netAmount: grossAmount * (1 - laborReductionPercent / 100),
+    };
+  }), [laborRows, baseMandorHok, effectiveMandorHok, laborReductionPercent]);
+
+  const laborGrossTotal = plannedLaborRows.reduce((sum, row) => sum + row.grossAmount, 0);
+  const laborNetTotal = plannedLaborRows.reduce((sum, row) => sum + row.netAmount, 0);
+  const workerHok = laborHokByRole.pekerja + laborHokByRole.lainnya;
+  const masonHok = laborHokByRole.tukang;
+  const workerDays = workerCount > 0 ? workerHok / workerCount : 0;
+  const masonDays = masonCount > 0 ? masonHok / masonCount : 0;
+  const estimatedCrewDays = Math.max(workerDays, masonDays);
+  const recommendedWorkerCount = targetDurationDays > 0 ? Math.ceil(workerHok / targetDurationDays) : 0;
+  const recommendedMasonCount = targetDurationDays > 0 ? Math.ceil(masonHok / targetDurationDays) : 0;
+  const crewDayDifference = Math.abs(workerDays - masonDays);
+
+  const rebarReviewRows = useMemo<ItemRebarReview[]>(() => allItems.map((item) => {
+    const components = parseRabItemComponents(item);
+    const ahspWeightKg = components
+      .filter(isRebarAhspMaterial)
+      .reduce((sum, component) => sum + component.coefficient * numberValue(item.volume), 0);
+    const backup = calculateBackupRebar(item);
+    const backupWeightKg = backup.weightKg;
+    const tolerance = Math.max(0.5, ahspWeightKg * 0.01);
+    let status: ItemRebarReview['status'] = 'sesuai';
+    if (backup.issues.length > 0) status = 'parameter_error';
+    else if (ahspWeightKg <= 0 && backupWeightKg > 0) status = 'backup_saja';
+    else if (ahspWeightKg > 0 && backupWeightKg <= 0) status = 'belum_backup';
+    else if (backupWeightKg < ahspWeightKg - tolerance) status = 'belum_lengkap';
+    else if (backupWeightKg > ahspWeightKg + tolerance) status = 'lebih_backup';
+
+    return {
+      itemId: item.id,
+      divisionName: String((item as RABItem & { divisionName?: string }).divisionName || '-'),
+      code: String(item.code || ''),
+      name: item.name,
+      ahspWeightKg,
+      backupWeightKg,
+      differenceKg: backupWeightKg - ahspWeightKg,
+      coveragePercent: ahspWeightKg > 0 ? backupWeightKg / ahspWeightKg * 100 : (backupWeightKg > 0 ? 100 : 0),
+      status,
+      diameterRows: backup.diameterRows,
+      issues: backup.issues,
+    };
+  }).filter((row) => row.ahspWeightKg > 0 || row.backupWeightKg > 0 || row.issues.length > 0), [allItems]);
+
+  const rebarTotals = useMemo(() => {
+    const byDiameter = new Map<number, RebarDiameterUsage>();
+    rebarReviewRows.forEach((item) => item.diameterRows.forEach((row) => {
+      const current = byDiameter.get(row.diameter) ?? {
+        diameter: row.diameter, totalLengthM: 0, requiredWeightKg: 0, sourceDetails: 0,
+      };
+      current.totalLengthM += row.totalLengthM;
+      current.requiredWeightKg += row.requiredWeightKg;
+      current.sourceDetails += row.sourceDetails;
+      byDiameter.set(row.diameter, current);
+    }));
+    return Array.from(byDiameter.values()).sort((a, b) => a.diameter - b.diameter);
+  }, [rebarReviewRows]);
+
+  const totalAhspRebarKg = rebarReviewRows.reduce((sum, row) => sum + row.ahspWeightKg, 0);
+  const totalBackupRebarKg = rebarReviewRows.reduce((sum, row) => sum + row.backupWeightKg, 0);
+  const uncoveredRebarKg = rebarReviewRows.reduce((sum, row) => sum + Math.max(0, row.ahspWeightKg - row.backupWeightKg), 0);
+
+
 
   const printDocument = () => window.print();
 
