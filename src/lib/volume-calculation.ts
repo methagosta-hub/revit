@@ -404,12 +404,12 @@ function evaluateCustomNodesWithTrace(
   let total = values[0];
   for (let stepIndex = 0; stepIndex < operators.length; stepIndex += 1) {
     const operator = operators[stepIndex];
+    const left = total;
     const right = values[stepIndex + 1];
-    total = operator === '-' ? total - right : total + right;
+    total = operator === '-' ? left - right : left + right;
     steps.push({
       depth,
-      expression: formatCustomFormulaNumber(total - (operator === '-' ? -right : right)) +
-        ' ' + customOperatorSymbol(operator) + ' ' + formatCustomFormulaNumber(right),
+      expression: formatCustomFormulaNumber(left) + ' ' + customOperatorSymbol(operator) + ' ' + formatCustomFormulaNumber(right),
       result: total,
     });
   }
