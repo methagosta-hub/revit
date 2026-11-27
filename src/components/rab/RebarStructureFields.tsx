@@ -6,6 +6,7 @@ import { calculateStructuredRebar, defaultRebarStructureParameters, type RebarSt
 type Props = {
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
+  multiplier?: number;
 };
 
 const INPUT = 'mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10';
@@ -20,7 +21,7 @@ const STRUCTURES: Array<{ value: RebarStructureKind; label: string }> = [
   { value: 'stair', label: 'Tangga dan bordes' },
 ];
 
-export default function RebarStructureFields({ value, onChange }: Props) {
+export default function RebarStructureFields({ value, onChange, multiplier = 1 }: Props) {
   const structure = String(value.structure_type || 'beam') as RebarStructureKind;
   const set = (key: string, next: unknown) => onChange({ ...value, [key]: next });
   const read = (key: string, fallback = '') => String(value[key] ?? fallback);
@@ -49,7 +50,7 @@ export default function RebarStructureFields({ value, onChange }: Props) {
   let structuredPreview: ReturnType<typeof calculateStructuredRebar> | null = null;
   let structuredPreviewError = '';
   try {
-    structuredPreview = calculateStructuredRebar(value);
+    structuredPreview = calculateStructuredRebar(value, multiplier);
   } catch (error) {
     structuredPreviewError = error instanceof Error ? error.message : 'Lengkapi parameter pembesian.';
   }
@@ -243,35 +244,7 @@ export default function RebarStructureFields({ value, onChange }: Props) {
                 ))}
               </ol>
             </div>
-            <div className="overflow-x-auto">
-              <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Rekap kebutuhan per diameter</p>
-              <table className="w-full min-w-[520px] border-collapse text-[9px]">
-                <thead><tr className="bg-emerald-50 text-left text-emerald-900">
-                  <th className="border border-emerald-100 px-2 py-1.5">Diameter</th>
-                  <th className="border border-emerald-100 px-2 py-1.5 text-right">Panjang</th>
-                  <th className="border border-emerald-100 px-2 py-1.5 text-right">Berat perlu</th>
-                  <th className="border border-emerald-100 px-2 py-1.5 text-right">Batang stok</th>
-                  <th className="border border-emerald-100 px-2 py-1.5 text-right">Berat stok</th>
-                </tr></thead>
-                <tbody>
-                  {structuredPreview.diameterSummary.map((row) => (
-                    <tr key={row.diameter}>
-                      <td className="border border-slate-200 px-2 py-1.5">Ø{row.diameter}</td>
-                      <td className="border border-slate-200 px-2 py-1.5 text-right">{row.totalLengthM.toLocaleString('id-ID', { maximumFractionDigits: 3 })} m</td>
-                      <td className="border border-slate-200 px-2 py-1.5 text-right">{row.requiredWeightKg.toLocaleString('id-ID', { maximumFractionDigits: 3 })} kg</td>
-                      <td className="border border-slate-200 px-2 py-1.5 text-right">{row.stockBars.toLocaleString('id-ID')} btg</td>
-                      <td className="border border-slate-200 px-2 py-1.5 text-right">{row.stockWeightKg.toLocaleString('id-ID', { maximumFractionDigits: 3 })} kg</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="rounded-lg bg-slate-50 p-2"><p className="text-[9px] text-slate-500">Total panjang</p><p className="text-sm font-bold text-slate-900">{structuredPreview.totalLengthM.toLocaleString('id-ID', { maximumFractionDigits: 3 })} m</p></div>
-              <div className="rounded-lg bg-slate-50 p-2"><p className="text-[9px] text-slate-500">Berat kebutuhan</p><p className="text-sm font-bold text-slate-900">{structuredPreview.totalWeightKg.toLocaleString('id-ID', { maximumFractionDigits: 3 })} kg</p></div>
-              <div className="rounded-lg bg-slate-50 p-2"><p className="text-[9px] text-slate-500">Batang stok</p><p className="text-sm font-bold text-slate-900">{structuredPreview.totalStockBars.toLocaleString('id-ID')} btg</p></div>
-              <div className="rounded-lg bg-slate-50 p-2"><p className="text-[9px] text-slate-500">Berat stok ekuivalen</p><p className="text-sm font-bold text-slate-900">{structuredPreview.totalStockWeightKg.toLocaleString('id-ID', { maximumFractionDigits: 3 })} kg</p></div>
-            </div>
+            <p className="text-[9px] text-slate-500">Faktor pengali yang sedang digunakan telah diperhitungkan pada tahapan rekap. Ringkasan jumlah panjang, berat, dan batang stok tetap tersedia pada panel hasil Backup Volume.</p>
           </div>
         ) : (
           <p className="mt-2 text-[10px] leading-5 text-amber-700">{structuredPreviewError || 'Isi parameter pembesian untuk menampilkan proses perhitungan.'}</p>
