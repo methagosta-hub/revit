@@ -455,7 +455,7 @@ export function describeStructuredRebar(parameters: Record<string, any>, multipl
     'Jenis struktur: ' + result.structureLabel,
     'Tahapan operasional:',
     ...result.operationalSteps.map((step, index) => (index + 1) + '. ' + step),
-  ].join('\n');
+  ].join(String.fromCharCode(10));
 }
 
 export type CustomFormulaCalculationStep = {
