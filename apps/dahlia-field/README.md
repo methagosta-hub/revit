@@ -1,6 +1,6 @@
-# Dahlia Field
+# Javawasthu Management
 
-A separate Android companion for Dahlia Management System. This app is built as an independent Flutter project inside the existing repository; it does not replace or restructure the Next.js web application.
+A dedicated Android workspace for Javawasthu Management. This app is built as an independent Flutter project inside the existing repository; it does not replace or restructure the Next.js web application.
 
 ## Phase 1 features
 
@@ -54,7 +54,7 @@ An internal user must also have the appropriate existing project role assignment
 
 ## APK test
 
-GitHub Actions workflow: Dahlia Field Android CI. On a successful run, download dahlia-field-android-apk from the run's Artifacts section. This is an unsigned release APK for internal device testing, not a Play Store release.
+GitHub Actions workflow: Javawasthu Management Android CI. On a successful run, download javawasthu-management-android-apk from the run's Artifacts section. This is an unsigned release APK for internal device testing, not a Play Store release.
 
 GitHub Actions repository variables used by the build:
 - DAHLIA_SUPABASE_URL
