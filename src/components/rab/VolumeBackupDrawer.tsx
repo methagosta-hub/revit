@@ -1246,6 +1246,7 @@ export default function VolumeBackupDrawer({ open, item, onClose, onSaved }: Pro
                   <>
                     <RebarStructureFields
                       value={form.parameters as Record<string, unknown>}
+                      multiplier={Number(form.multiplier || 1)}
                       onChange={(parameters) => setForm((current) => ({ ...current, parameters: parameters as VolumeParameters }))}
                     />
                     {(() => {
