@@ -202,9 +202,29 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>, m
   if (wastePct > 30) throw new Error('Waste dibatasi maksimal 30%.');
   const lines: RebarBreakdownLine[] = [];
   const setupNotes: string[] = [];
+  const parameterSteps: string[] = [];
 
   if (structure === 'footplat' || structure === 'slab') {
     addFlatGrid(parameters, lines, structure === 'footplat' ? 'Footplat' : 'Plat');
+    const flatLength = numeric(parameters.flat_length_m);
+    const flatWidth = numeric(parameters.flat_width_m);
+    const memberCount = numeric(parameters.member_count || 1);
+    const layers = numeric(parameters.layers);
+    const cover = numeric(parameters.cover_mm);
+    const lap = numeric(parameters.lap_allowance_mm || 0);
+    const clearLength = flatLength * 1000 - 2 * cover;
+    const clearWidth = flatWidth * 1000 - 2 * cover;
+    const barsAlongX = Math.ceil(clearWidth / numeric(parameters.spacing_y_mm)) + 1;
+    const barsAlongY = Math.ceil(clearLength / numeric(parameters.spacing_x_mm)) + 1;
+    parameterSteps.push(
+      'Dimensi bersih arah panjang = (' + shown(flatLength, 3) + ' m × 1.000) − (2 × ' + shown(cover, 0) + ' mm) = ' + shown(clearLength, 0) + ' mm.',
+      'Dimensi bersih arah lebar = (' + shown(flatWidth, 3) + ' m × 1.000) − (2 × ' + shown(cover, 0) + ' mm) = ' + shown(clearWidth, 0) + ' mm.',
+      'Jumlah batang arah X = ceil(' + shown(clearWidth, 0) + ' ÷ ' + shown(numeric(parameters.spacing_y_mm), 0) + ') + 1 = ' + shown(barsAlongX, 0) + ' batang per layer/bidang.',
+      'Jumlah batang arah Y = ceil(' + shown(clearLength, 0) + ' ÷ ' + shown(numeric(parameters.spacing_x_mm), 0) + ') + 1 = ' + shown(barsAlongY, 0) + ' batang per layer/bidang.',
+      'Jumlah batang total dikalikan jumlah bidang ' + shown(memberCount, 0) + ' dan layer ' + shown(layers, 0) + '.',
+      'Panjang potong arah X = (' + shown(clearLength, 0) + ' + allowance ' + shown(lap, 0) + ') ÷ 1.000 = ' + shown((clearLength + lap) / 1000, 3) + ' m.',
+      'Panjang potong arah Y = (' + shown(clearWidth, 0) + ' + allowance ' + shown(lap, 0) + ') ÷ 1.000 = ' + shown((clearWidth + lap) / 1000, 3) + ' m.',
+    );
     setupNotes.push(LABELS[structure] + ': bidang ' + shown(numeric(parameters.flat_length_m), 3) + ' × ' + shown(numeric(parameters.flat_width_m), 3) + ' m; jumlah ' + shown(numeric(parameters.member_count || 1), 0) + '; ' + shown(numeric(parameters.layers), 0) + ' layer; selimut ' + shown(numeric(parameters.cover_mm), 0) + ' mm; arah X Ø' + shown(numeric(parameters.diameter_x_mm), 0) + '@' + shown(numeric(parameters.spacing_x_mm), 0) + ' mm; arah Y Ø' + shown(numeric(parameters.diameter_y_mm), 0) + '@' + shown(numeric(parameters.spacing_y_mm), 0) + ' mm.');
   } else if (structure === 'stair') {
     const steps = integerPositive(numeric(parameters.step_count), 'Jumlah anak tangga');
@@ -214,6 +234,11 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>, m
     const flights = integerPositive(numeric(parameters.flight_count || 1), 'Jumlah bidang/flight tangga');
     const cover = positive(numeric(parameters.cover_mm), 'Selimut beton tangga');
     const slopeLength = Math.sqrt((steps * tread) ** 2 + (steps * riser) ** 2);
+    parameterSteps.push(
+      'Panjang horizontal tangga = ' + shown(steps, 0) + ' × ' + shown(tread, 3) + ' m = ' + shown(steps * tread, 3) + ' m.',
+      'Tinggi total tangga = ' + shown(steps, 0) + ' × ' + shown(riser, 3) + ' m = ' + shown(steps * riser, 3) + ' m.',
+      'Panjang bidang miring = √((' + shown(steps * tread, 3) + ' m)² + (' + shown(steps * riser, 3) + ' m)²) = ' + shown(slopeLength, 3) + ' m.',
+    );
     setupNotes.push('Tangga: ' + steps + ' anak tangga; injakan ' + shown(tread, 3) + ' m; tanjakan ' + shown(riser, 3) + ' m; lebar ' + shown(stairWidth, 3) + ' m; panjang bidang miring estimasi ' + shown(slopeLength, 3) + ' m; jumlah flight ' + flights + '; tulangan utama Ø' + shown(numeric(parameters.stair_main_diameter_mm), 0) + '@' + shown(numeric(parameters.stair_main_spacing_mm), 0) + ' mm; tulangan pembagi Ø' + shown(numeric(parameters.stair_distribution_diameter_mm), 0) + '@' + shown(numeric(parameters.stair_distribution_spacing_mm), 0) + ' mm; bordes ' + shown(numeric(parameters.landing_count || 0), 0) + ' bidang.');
     const mainDiameter = positive(numeric(parameters.stair_main_diameter_mm), 'Diameter tulangan utama tangga');
     const mainSpacing = positive(numeric(parameters.stair_main_spacing_mm), 'Jarak tulangan utama tangga');
@@ -221,6 +246,11 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>, m
     const mainLayers = integerPositive(numeric(parameters.stair_main_layers || 1), 'Layer tulangan utama tangga');
     const mainAnchor = nonNegative(numeric(parameters.stair_main_anchor_mm || 0), 'Tambahan penyaluran tulangan utama tangga');
     const mainCount = Math.ceil(stairClearWidth / mainSpacing) + 1;
+    parameterSteps.push(
+      'Lebar bersih tangga = (' + shown(stairWidth, 3) + ' m × 1.000) − (2 × ' + shown(cover, 0) + ' mm) = ' + shown(stairClearWidth, 0) + ' mm.',
+      'Jumlah tulangan utama per layer/flight = ceil(' + shown(stairClearWidth, 0) + ' ÷ ' + shown(mainSpacing, 0) + ') + 1 = ' + shown(mainCount, 0) + ' batang.',
+      'Panjang potong tulangan utama = panjang bidang miring ' + shown(slopeLength, 3) + ' m + penyaluran ' + shown(mainAnchor, 0) + ' mm ÷ 1.000 = ' + shown(slopeLength + mainAnchor / 1000, 3) + ' m.',
+    );
     lines.push(makeLine(
       'Tangga · tulangan utama mengikuti bidang miring',
       mainDiameter,
@@ -232,6 +262,10 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>, m
     const distributionLayers = integerPositive(numeric(parameters.stair_distribution_layers || 1), 'Layer tulangan pembagi tangga');
     const distributionExtra = nonNegative(numeric(parameters.stair_distribution_extra_mm || 0), 'Tambahan panjang tulangan pembagi tangga');
     const barsAlongSlope = Math.ceil((slopeLength * 1000) / distributionSpacing) + 1;
+    parameterSteps.push(
+      'Jumlah tulangan pembagi per layer/flight = ceil((' + shown(slopeLength, 3) + ' m × 1.000) ÷ ' + shown(distributionSpacing, 0) + ' mm) + 1 = ' + shown(barsAlongSlope, 0) + ' batang.',
+      'Panjang potong tulangan pembagi = (lebar bersih ' + shown(stairClearWidth, 0) + ' mm + tambahan ' + shown(distributionExtra, 0) + ' mm) ÷ 1.000 = ' + shown((stairClearWidth + distributionExtra) / 1000, 3) + ' m.',
+    );
     lines.push(makeLine(
       'Tangga · tulangan pembagi melintang',
       distributionDiameter,
@@ -253,6 +287,14 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>, m
       const landingLap = nonNegative(numeric(parameters.landing_lap_allowance_mm || 0), 'Tambahan sambungan tulangan bordes');
       positive(clearLandingLength, 'Panjang bersih bordes');
       positive(clearLandingWidth, 'Lebar bersih bordes');
+      const landingBarsX = Math.ceil(clearLandingWidth / landingSpacingY) + 1;
+      const landingBarsY = Math.ceil(clearLandingLength / landingSpacingX) + 1;
+      parameterSteps.push(
+        'Bordes: jumlah batang arah X = ceil(' + shown(clearLandingWidth, 0) + ' ÷ ' + shown(landingSpacingY, 0) + ') + 1 = ' + shown(landingBarsX, 0) + ' batang per layer/bordes.',
+        'Bordes: jumlah batang arah Y = ceil(' + shown(clearLandingLength, 0) + ' ÷ ' + shown(landingSpacingX, 0) + ') + 1 = ' + shown(landingBarsY, 0) + ' batang per layer/bordes.',
+        'Panjang potong bordes arah X = (' + shown(clearLandingLength, 0) + ' + ' + shown(landingLap, 0) + ') ÷ 1.000 = ' + shown((clearLandingLength + landingLap) / 1000, 3) + ' m.',
+        'Panjang potong bordes arah Y = (' + shown(clearLandingWidth, 0) + ' + ' + shown(landingLap, 0) + ') ÷ 1.000 = ' + shown((clearLandingWidth + landingLap) / 1000, 3) + ' m.',
+      );
       lines.push(makeLine(
         'Bordes · tulangan arah X',
         landingDiameterX,
@@ -271,8 +313,70 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>, m
     const memberCount = integerPositive(numeric(parameters.member_count || 1), 'Jumlah elemen');
     setupNotes.push(LABELS[structure] + ': panjang/tinggi/kedalaman ' + shown(memberLength, 3) + ' m; jumlah elemen ' + memberCount + '; selimut beton ' + shown(numeric(parameters.cover_mm), 0) + ' mm.');
     if (numeric(parameters.tie_diameter_mm) > 0) setupNotes.push('Sengkang: penampang beton ' + shown(numeric(parameters.tie_width_mm), 0) + ' × ' + shown(numeric(parameters.tie_depth_mm), 0) + ' mm; Ø' + shown(numeric(parameters.tie_diameter_mm), 0) + '; selimut ' + shown(numeric(parameters.tie_cover_mm), 0) + ' mm; kait ' + shown(numeric(parameters.tie_hook_mm), 0) + ' mm tiap ujung; jarak lapangan ' + shown(numeric(parameters.tie_spacing_mm), 0) + ' mm' + (numeric(parameters.tie_support_zone_m) > 0 ? '; zona tumpuan ' + shown(numeric(parameters.tie_support_zone_m), 3) + ' m pada masing-masing ujung @' + shown(numeric(parameters.tie_support_spacing_mm), 0) + ' mm' : '') + '.');
+    const cover = numeric(parameters.cover_mm);
+    (Array.isArray(parameters.longitudinal_groups) ? parameters.longitudinal_groups : []).forEach((group: Record<string, any>, index: number) => {
+      const label = String(group.label || 'Tulangan memanjang ' + (index + 1));
+      const barsPerMember = numeric(group.bars_per_member);
+      const positions = numeric(group.positions_per_member || 1);
+      const extra = numeric(group.extra_length_m || 0);
+      const fixed = numeric(group.fixed_length_m);
+      const started = [group.diameter_mm, group.bars_per_member, group.fixed_length_m, group.extra_length_m]
+        .some((value, fieldIndex) => fieldIndex < 3 && value !== undefined && value !== null && String(value).trim() !== '');
+      if (!started) return;
+      const baseLength = group.length_mode === 'fixed' ? fixed : memberLength - (2 * cover) / 1000;
+      const cutLength = baseLength + extra;
+      const pieces = barsPerMember * positions * memberCount;
+      parameterSteps.push(
+        label + ': jumlah potongan = ' + shown(barsPerMember, 0) + ' batang/elemen × ' + shown(positions, 0) + ' posisi × ' + shown(memberCount, 0) + ' elemen = ' + shown(pieces, 0) + ' potong.',
+        group.length_mode === 'fixed'
+          ? label + ': panjang potong dasar ditetapkan ' + shown(fixed, 3) + ' m.'
+          : label + ': panjang bersih = ' + shown(memberLength, 3) + ' m − (2 × ' + shown(cover, 0) + ' mm ÷ 1.000) = ' + shown(baseLength, 3) + ' m.',
+        label + ': panjang potong akhir = ' + shown(baseLength, 3) + ' m + tambahan ' + shown(extra, 3) + ' m = ' + shown(cutLength, 3) + ' m.',
+      );
+    });
     addOptionalLinearBars(parameters, memberLength, memberCount, lines);
     addOptionalTies(parameters, memberLength, memberCount, lines);
+
+    if (numeric(parameters.tie_diameter_mm) > 0) {
+      const tieDiameter = numeric(parameters.tie_diameter_mm);
+      const tieWidth = numeric(parameters.tie_width_mm);
+      const tieDepth = numeric(parameters.tie_depth_mm);
+      const tieSpacing = numeric(parameters.tie_spacing_mm);
+      const tieCover = numeric(parameters.tie_cover_mm);
+      const hook = numeric(parameters.tie_hook_mm);
+      const endOffset = numeric(parameters.tie_end_offset_mm || 0);
+      const available = memberLength * 1000 - 2 * endOffset;
+      const centerlineWidth = tieWidth - 2 * tieCover - tieDiameter;
+      const centerlineDepth = tieDepth - 2 * tieCover - tieDiameter;
+      const supportZone = numeric(parameters.tie_support_zone_m || 0) * 1000;
+      const supportSpacing = numeric(parameters.tie_support_spacing_mm || 0);
+      let tiesPerMember = 0;
+      if (supportZone > 0 || supportSpacing > 0) {
+        const supportIntervals = Math.ceil(supportZone / supportSpacing);
+        const middleLength = available - 2 * supportZone;
+        const middleInterior = middleLength > 0 ? Math.max(Math.ceil(middleLength / tieSpacing) - 1, 0) : 0;
+        tiesPerMember = 2 * (supportIntervals + 1) + middleInterior;
+        parameterSteps.push(
+          'Panjang efektif sengkang = (' + shown(memberLength, 3) + ' m × 1.000) − (2 × ' + shown(endOffset, 0) + ' mm) = ' + shown(available, 0) + ' mm.',
+          'Interval tiap zona tumpuan = ceil(' + shown(supportZone, 0) + ' ÷ ' + shown(supportSpacing, 0) + ') = ' + shown(supportIntervals, 0) + ' interval.',
+          'Panjang zona lapangan = ' + shown(available, 0) + ' − (2 × ' + shown(supportZone, 0) + ') = ' + shown(middleLength, 0) + ' mm; sengkang interior lapangan = ' + shown(middleInterior, 0) + '.',
+          'Jumlah sengkang per elemen = 2 × (' + shown(supportIntervals, 0) + ' + 1) + ' + shown(middleInterior, 0) + ' = ' + shown(tiesPerMember, 0) + ' buah.',
+        );
+      } else {
+        tiesPerMember = Math.ceil(available / tieSpacing) + 1;
+        parameterSteps.push(
+          'Panjang efektif sengkang = (' + shown(memberLength, 3) + ' m × 1.000) − (2 × ' + shown(endOffset, 0) + ' mm) = ' + shown(available, 0) + ' mm.',
+          'Jumlah sengkang per elemen = ceil(' + shown(available, 0) + ' ÷ ' + shown(tieSpacing, 0) + ') + 1 = ' + shown(tiesPerMember, 0) + ' buah.',
+        );
+      }
+      const cutLength = (2 * (centerlineWidth + centerlineDepth) + 2 * hook) / 1000;
+      parameterSteps.push(
+        'Lebar garis tengah sengkang = ' + shown(tieWidth, 0) + ' − (2 × ' + shown(tieCover, 0) + ') − ' + shown(tieDiameter, 0) + ' = ' + shown(centerlineWidth, 0) + ' mm.',
+        'Tinggi garis tengah sengkang = ' + shown(tieDepth, 0) + ' − (2 × ' + shown(tieCover, 0) + ') − ' + shown(tieDiameter, 0) + ' = ' + shown(centerlineDepth, 0) + ' mm.',
+        'Panjang potong sengkang = [2 × (' + shown(centerlineWidth, 0) + ' + ' + shown(centerlineDepth, 0) + ') + (2 × ' + shown(hook, 0) + ')] ÷ 1.000 = ' + shown(cutLength, 3) + ' m.',
+        'Jumlah sengkang seluruh elemen = ' + shown(tiesPerMember, 0) + ' × ' + shown(memberCount, 0) + ' = ' + shown(tiesPerMember * memberCount, 0) + ' buah.',
+      );
+    }
   }
 
   if (!lines.length) throw new Error('Isi minimal satu kelompok tulangan dengan diameter, jumlah, jarak/panjang yang lengkap.');
@@ -306,6 +410,7 @@ export function calculateStructuredRebar(parametersValue: Record<string, any>, m
 
   const operationalSteps = [
     ...setupNotes,
+    ...parameterSteps,
     ...lines.flatMap((line) => [
       line.label + ' — jumlah potongan: ' + shown(line.pieces, 0) + ' potong.',
       'Panjang total: ' + shown(line.pieces, 0) + ' × ' + shown(line.cutLengthM, 3) +
