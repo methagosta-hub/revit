@@ -1130,6 +1130,148 @@ export default function RekapRABPage() {
         </div>
       </section>
 
+      <section className="no-print rounded-2xl border border-indigo-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">1. Perencanaan Kebutuhan Tenaga Kerja</h2>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">
+              HOK dihitung dari koefisien AHSP × volume RAB seluruh lokasi. Masukkan target hari kerja sesuai rencana Kurva-S, lalu ubah jumlah pekerja dan tukang untuk membandingkan durasinya.
+            </p>
+          </div>
+          <span className="rounded-full bg-indigo-50 px-3 py-1 text-[10px] font-bold text-indigo-700">Simulasi proyek · semua lokasi</span>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <label className="text-xs font-semibold text-slate-600">
+            Target durasi Kurva-S (hari kerja)
+            <input type="number" min={1} max={365} step={1} value={targetDurationDays}
+              onChange={(event) => setTargetDurationDays(Math.max(1, Math.min(365, Math.round(Number(event.target.value) || 1))))}
+              className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <span className="mt-1 block text-[10px] font-normal text-slate-400">Nilai sementara; ubah mengikuti rencana durasi Kurva-S proyek.</span>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Jumlah pekerja
+            <input type="number" min={1} max={500} step={1} value={workerCount}
+              onChange={(event) => setWorkerCount(Math.max(1, Math.min(500, Math.round(Number(event.target.value) || 1))))}
+              className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <span className="mt-1 block text-[10px] font-normal text-slate-400">HOK pekerja ÷ jumlah pekerja = hari kerja.</span>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Jumlah tukang
+            <input type="number" min={1} max={500} step={1} value={masonCount}
+              onChange={(event) => setMasonCount(Math.max(1, Math.min(500, Math.round(Number(event.target.value) || 1))))}
+              className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <span className="mt-1 block text-[10px] font-normal text-slate-400">HOK tukang ÷ jumlah tukang = hari kerja.</span>
+          </label>
+        </div>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl bg-slate-50 p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">HOK pekerja</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(laborHokByRole.pekerja, 2)}</p>
+            <p className="text-[10px] text-slate-500">Rencana {formatNumber(workerDays, 1)} hari · rekomendasi {recommendedWorkerCount} orang</p>
+          </div>
+          <div className="rounded-xl bg-slate-50 p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">HOK tukang</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(masonHok, 2)}</p>
+            <p className="text-[10px] text-slate-500">Rencana {formatNumber(masonDays, 1)} hari · rekomendasi {recommendedMasonCount} orang</p>
+          </div>
+          <div className="rounded-xl bg-slate-50 p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">HOK kepala tukang</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(laborHokByRole.kepala_tukang, 2)}</p>
+            <p className="text-[10px] text-slate-500">Ditampilkan sebagai HOK; formasi 1 orang.</p>
+          </div>
+          <div className="rounded-xl bg-slate-50 p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">HOK mandor</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(baseMandorHok, 2)}</p>
+            <p className="text-[10px] text-slate-500">{foremanMode === 'none' ? 'Tidak dialokasikan' : foremanMode === 'custom' ? 'Rencana hadir ' + formatNumber(effectiveMandorHok, 2) + ' hari' : 'Mengikuti total HOK AHSP'}.</p>
+          </div>
+        </div>
+
+        <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr]">
+          <div className="rounded-xl border border-indigo-100 p-3">
+            <p className="text-xs font-bold text-slate-800">Keseimbangan durasi tenaga</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div><span className="text-[10px] text-slate-500">Durasi pekerja</span><p className="text-lg font-bold tabular-nums">{formatNumber(workerDays, 1)} hari</p></div>
+              <div><span className="text-[10px] text-slate-500">Durasi tukang</span><p className="text-lg font-bold tabular-nums">{formatNumber(masonDays, 1)} hari</p></div>
+            </div>
+            <div className="mt-2 border-t border-slate-100 pt-2 text-xs">
+              <span className="text-slate-500">Selisih durasi:</span>{' '}
+              <strong className={crewDayDifference <= 1 ? 'text-emerald-700' : 'text-amber-700'}>{formatNumber(crewDayDifference, 1)} hari</strong>
+              <span className="ml-2 text-slate-500">{crewDayDifference <= 1 ? 'Relatif seimbang' : 'Ubah jumlah pekerja/tukang agar durasinya mendekati sama'}</span>
+            </div>
+            <p className="mt-2 text-[10px] text-slate-500">Estimasi waktu tim mengikuti durasi terlama: <strong>{formatNumber(estimatedCrewDays, 1)} hari kerja</strong>.</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 p-3">
+            <p className="text-xs font-bold text-slate-800">Kebijakan mandor</p>
+            <label className="mt-2 block text-xs font-semibold text-slate-600">
+              Alokasi mandor
+              <select value={foremanMode} onChange={(event) => {
+                const next = event.target.value as ForemanMode;
+                setForemanMode(next);
+                if (next === 'custom') setForemanDays(baseMandorHok);
+              }} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                <option value="ahsp">Ikuti HOK dari AHSP</option>
+                <option value="custom">Atur jumlah hari hadir mandor</option>
+                <option value="none">Tanpa mandor</option>
+              </select>
+            </label>
+            {foremanMode === 'custom' ? (
+              <label className="mt-2 block text-xs font-semibold text-slate-600">
+                Hari hadir mandor
+                <input type="number" min={0} max={365} step={0.5} value={foremanDays}
+                  onChange={(event) => setForemanDays(Math.max(0, Math.min(365, Number(event.target.value) || 0)))}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+            ) : null}
+            <p className="mt-2 text-[10px] leading-4 text-slate-500">
+              Kepala tukang tetap ditampilkan sesuai HOK AHSP. Pengaturan mandor di atas hanya memengaruhi simulasi upah dan PDF, bukan snapshot AHSP asli.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="no-print rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">2. Pemeriksaan Material dan Pembesian</h2>
+            <p className="mt-1 text-xs text-slate-500">Ringkasan dihitung dari snapshot AHSP semua lokasi. Rincian PDF menyertakan jejak per item pekerjaan.</p>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] text-slate-500">Jenis material</p><p className="text-xl font-bold">{materialRows.length}</p><p className="text-[10px] text-slate-500">{unlinkedMaterialCount} belum memiliki material_id</p></div>
+          <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] text-slate-500">Baris penggunaan material</p><p className="text-xl font-bold">{materialUsageRows.length}</p><p className="text-[10px] text-slate-500">Per item RAB dan lokasi</p></div>
+          <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] text-slate-500">Besi AHSP</p><p className="text-xl font-bold">{formatNumber(totalAhspRebarKg, 2)} kg</p><p className="text-[10px] text-slate-500">Berdasarkan komponen material bersatuan kg</p></div>
+          <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] text-slate-500">Besi dari Backup Volume</p><p className="text-xl font-bold">{formatNumber(totalBackupRebarKg, 2)} kg</p><p className="text-[10px] text-slate-500">Selisih belum ter-backup: {formatNumber(uncoveredRebarKg, 2)} kg</p></div>
+        </div>
+      </section>
+
+      <section className="no-print rounded-2xl border border-amber-200 bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-bold text-slate-900">3. Override Pengurang Kebutuhan</h2>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Persentase pengurang hanya diterapkan pada rekap kebutuhan dan nilai estimasi PDF. Tidak mengubah koefisien, volume RAB, snapshot AHSP, atau data tersimpan.</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="text-xs font-semibold text-slate-600">
+            Pengurang material (%)
+            <input type="number" min={0} max={99} step={0.5} value={materialReductionPercent}
+              onChange={(event) => setMaterialReductionPercent(Math.max(0, Math.min(99, Number(event.target.value) || 0)))}
+              className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <span className="mt-1 block text-[10px] font-normal text-slate-400">Diterapkan pada volume kebutuhan dan nilai material.</span>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Pengurang upah (%)
+            <input type="number" min={0} max={99} step={0.5} value={laborReductionPercent}
+              onChange={(event) => setLaborReductionPercent(Math.max(0, Math.min(99, Number(event.target.value) || 0)))}
+              className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <span className="mt-1 block text-[10px] font-normal text-slate-400">Diterapkan pada nilai upah simulasi; HOK penjadwalan tetap memakai HOK dasar.</span>
+          </label>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="rounded-xl bg-amber-50 p-3"><p className="text-[10px] text-amber-800">Nilai material setelah pengurang</p><p className="text-base font-bold text-amber-950">{formatRupiah(materialRows.reduce((sum, row) => sum + row.netAmount, 0))}</p></div>
+          <div className="rounded-xl bg-amber-50 p-3"><p className="text-[10px] text-amber-800">Nilai upah setelah pengurang</p><p className="text-base font-bold text-amber-950">{formatRupiah(laborNetTotal)}</p></div>
+        </div>
+        <p className="mt-3 text-[10px] text-slate-500">Semua pengaturan ini hanya berlaku untuk sesi halaman saat ini dan tidak disimpan ke database.</p>
+      </section>
+
       <div id="rekap-print-report" style={{ fontFamily: PDF_FONTS[pdfFont].css, fontWeight: 400, color: '#1e293b' }}>
         {project.project_category === 'PORTOFOLIO' && (
           <div className="portfolio-print-watermark" aria-hidden="true">LAPORAN DUMMY/SAMPEL</div>
