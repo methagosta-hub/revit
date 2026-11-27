@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/javawasthu_theme.dart';
 import '../data/field_repository.dart';
 
 class DirectorMonitorPage extends StatelessWidget {
@@ -30,7 +31,7 @@ class DirectorMonitorPage extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         children: [
           Card(
-            color: const Color(0xFF244C45),
+            color: JavawasthuPalette.deepTeal,
             child: Padding(
               padding: const EdgeInsets.all(18),
               child: Column(
