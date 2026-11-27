@@ -7,6 +7,7 @@ import { ArrowLeft, RefreshCw, Loader2, AlertCircle, Printer } from 'lucide-reac
 import { fetchProjectDetail } from '@/lib/services/projectService';
 import { formatRupiah } from '@/lib/format';
 import type { Project } from '@/types/rab';
+import { calculateStructuredRebar } from '@/lib/volume-calculation';
 
 type PdfThemeKey =
   | 'emerald' | 'navy' | 'burgundy' | 'terracotta' | 'slate'
@@ -88,6 +89,10 @@ type SnapshotComponent = {
   unitPrice: number;
   subtotal: number;
   type: 'material' | 'labor' | 'equipment' | 'other';
+  materialId: string | null;
+  materialCode: string | null;
+  upahId: string | null;
+  alatId: string | null;
   raw: JsonRecord;
 };
 type RABItem = {
@@ -104,7 +109,69 @@ type RABItem = {
   rab_subcategory_id?: string | null;
   components_snapshot?: unknown;
   subitems_snapshot?: unknown;
+  backupDetails?: BackupVolumeSnapshot[] | null;
 };
+
+type BackupVolumeSnapshot = {
+  id: string;
+  subitem_path?: string | null;
+  description?: string | null;
+  calc_mode?: string | null;
+  multiplier?: number | string | null;
+  parameters?: Record<string, unknown> | null;
+  subtotal?: number | string | null;
+};
+
+type MaterialMatrixRow = {
+  key: string;
+  materialId: string | null;
+  materialCode: string | null;
+  name: string;
+  unit: string;
+  itemCount: number;
+  quantity: number;
+  amount: number;
+  netQuantity: number;
+  netAmount: number;
+};
+
+type MaterialUsageRow = {
+  key: string;
+  divisionName: string;
+  itemCode: string;
+  itemName: string;
+  materialId: string | null;
+  materialCode: string | null;
+  materialName: string;
+  unit: string;
+  coefficient: number;
+  rabVolume: number;
+  quantity: number;
+  netQuantity: number;
+};
+
+type RebarDiameterUsage = {
+  diameter: number;
+  totalLengthM: number;
+  requiredWeightKg: number;
+  sourceDetails: number;
+};
+
+type ItemRebarReview = {
+  itemId: string;
+  divisionName: string;
+  code: string;
+  name: string;
+  ahspWeightKg: number;
+  backupWeightKg: number;
+  differenceKg: number;
+  coveragePercent: number;
+  status: 'sesuai' | 'belum_lengkap' | 'belum_backup' | 'lebih_backup' | 'backup_saja' | 'parameter_error';
+  diameterRows: RebarDiameterUsage[];
+  issues: string[];
+};
+
+type ForemanMode = 'ahsp' | 'custom' | 'none';
 type RABWorkSubcategory = {
   id: string;
   name: string;
@@ -209,6 +276,10 @@ function parseComponents(snapshot: unknown): SnapshotComponent[] {
       unitPrice,
       subtotal: explicitSubtotal === undefined ? coefficient * unitPrice : numberValue(explicitSubtotal),
       type: normalizeType(firstValue(row, ['type', 'category', 'jenis', 'component_type', 'item_type']), name, row),
+      materialId: row.material_id ? String(row.material_id) : null,
+      materialCode: textValue(firstValue(row, ['material_code', 'code', 'item_code']), ''),
+      upahId: row.upah_id ? String(row.upah_id) : null,
+      alatId: row.alat_id ? String(row.alat_id) : null,
       raw: row,
     };
   }).filter((item) => item.name !== 'Komponen tanpa nama' || item.coefficient !== 0 || item.unitPrice !== 0);
@@ -305,6 +376,91 @@ function parseRabItemComponents(item: RABItem): SnapshotComponent[] {
   });
 
   return [...direct, ...expand(subitems, 1, [])];
+}
+
+function normalizeUnit(value: string) {
+  return value.trim().toLowerCase().replace(/[.\\s_-]+/g, '');
+}
+
+function isHokUnit(unit: string) {
+  return ['oh', 'hok', 'oranghari', 'hariorang', 'hari'].includes(normalizeUnit(unit));
+}
+
+function classifyLaborRole(name: string): 'mandor' | 'kepala_tukang' | 'tukang' | 'pekerja' | 'lainnya' {
+  const label = name.toLocaleLowerCase('id-ID');
+  if (/\\bmandor\\b/.test(label)) return 'mandor';
+  if (/\\bkepala\\s+tukang\\b/.test(label)) return 'kepala_tukang';
+  if (/\\btukang\\b/.test(label)) return 'tukang';
+  if (/\\b(pekerja|buruh|helper)\\b/.test(label)) return 'pekerja';
+  return 'lainnya';
+}
+
+function laborRoleLabel(role: ReturnType<typeof classifyLaborRole>) {
+  return role === 'mandor' ? 'Mandor'
+    : role === 'kepala_tukang' ? 'Kepala Tukang'
+    : role === 'tukang' ? 'Tukang'
+    : role === 'pekerja' ? 'Pekerja'
+    : 'Tenaga kerja lainnya';
+}
+
+function isRebarAhspMaterial(component: SnapshotComponent) {
+  const label = component.name.toLocaleLowerCase('id-ID');
+  return normalizeUnit(component.unit) === 'kg'
+    && /\\b(besi|tulangan|wiremesh|rebar)\\b/.test(label);
+}
+
+function calculateBackupRebar(item: RABItem): { diameterRows: RebarDiameterUsage[]; weightKg: number; issues: string[] } {
+  const byDiameter = new Map<number, RebarDiameterUsage>();
+  const issues: string[] = [];
+
+  for (const detail of item.backupDetails ?? []) {
+    const mode = String(detail.calc_mode ?? '').toLowerCase();
+    const parameters = asRecord(detail.parameters);
+    const multiplier = Math.max(0, numberValue(detail.multiplier ?? 1));
+
+    try {
+      if (mode === 'rebar_structure') {
+        const result = calculateStructuredRebar(parameters, multiplier);
+        result.diameterSummary.forEach((row) => {
+          const current = byDiameter.get(row.diameter) ?? {
+            diameter: row.diameter, totalLengthM: 0, requiredWeightKg: 0, sourceDetails: 0,
+          };
+          current.totalLengthM += row.totalLengthM;
+          current.requiredWeightKg += row.requiredWeightKg;
+          current.sourceDetails += 1;
+          byDiameter.set(row.diameter, current);
+        });
+      } else if (mode === 'rebar') {
+        const diameter = numberValue(parameters.diameter);
+        const barLength = numberValue(parameters.bar_length);
+        const bars = numberValue(parameters.bars);
+        if (diameter <= 0 || barLength <= 0 || bars <= 0) {
+          throw new Error('Diameter, panjang batang, atau jumlah batang belum valid.');
+        }
+        const totalLengthM = barLength * bars * multiplier;
+        const requiredWeightKg = (diameter * diameter / 162) * totalLengthM;
+        const current = byDiameter.get(diameter) ?? {
+          diameter, totalLengthM: 0, requiredWeightKg: 0, sourceDetails: 0,
+        };
+        current.totalLengthM += totalLengthM;
+        current.requiredWeightKg += requiredWeightKg;
+        current.sourceDetails += 1;
+        byDiameter.set(diameter, current);
+      }
+    } catch (error) {
+      issues.push(
+        (detail.description || 'Rincian Backup Volume') + ': ' +
+        (error instanceof Error ? error.message : 'parameter pembesian tidak dapat dihitung'),
+      );
+    }
+  }
+
+  const diameterRows = Array.from(byDiameter.values()).sort((a, b) => a.diameter - b.diameter);
+  return {
+    diameterRows,
+    weightKg: diameterRows.reduce((sum, row) => sum + row.requiredWeightKg, 0),
+    issues,
+  };
 }
 
 function classifyCode(code: string) {
