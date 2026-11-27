@@ -1419,28 +1419,224 @@ export default function RekapRABPage() {
           })}
         </section>
 
-        {/* 5. REKAP KEBUTUHAN MATERIAL */}
+        {/* 5. MATRIKS MATERIAL PER ITEM PEKERJAAN */}
         <section className="report-page">
-          <SectionHeading letter="D" title="RINCIAN HARGA MATERIAL" theme={activeTheme} />
-          <p className="report-intro">Daftar ini menjadi acuan harga material untuk dokumen RAB yang telah dicetak. Setiap nama material dicantumkan satu kali, tanpa volume kebutuhan maupun jumlah harga. Harga yang ditampilkan adalah harga satuan untuk satu unit penuh (misalnya harga per 1 m³), bukan nilai pembelian berdasarkan volume pemakaian.</p>
-          <table className="report-table">
-            <thead><tr><th style={{width:'7%'}}>No.</th><th>Nama Material</th><th style={{width:'15%'}}>Satuan</th><th style={{width:'30%'}}>Harga Satuan</th></tr></thead>
-            <tbody>{materialRows.map((row,index)=><tr key={`${row.name}-${row.unit}`}><td className="center">{index+1}</td><td>{row.name}</td><td className="center">{row.unit}</td><td className="number">{formatRupiah(row.unitPrice)}</td></tr>)}
-              {materialRows.length===0 && <tr><td colSpan={4} className="center">Tidak ditemukan komponen material pada snapshot AHSP RAB.</td></tr>}
+          <SectionHeading letter="D" title="MATRIKS KEBUTUHAN MATERIAL PER ITEM PEKERJAAN" theme={activeTheme} />
+          <p className="report-intro">
+            Kebutuhan dihitung dari koefisien komponen material pada snapshot AHSP × volume masing-masing item RAB. Perhitungan mencakup semua lokasi. Pengurang material {formatNumber(materialReductionPercent, 2)}% ditampilkan terpisah sebagai kebutuhan bersih.
+          </p>
+          <table className="report-table compact">
+            <thead>
+              <tr>
+                <th style={{width:'4%'}}>No.</th>
+                <th style={{width:'11%'}}>Lokasi</th>
+                <th style={{width:'19%'}}>Item Pekerjaan</th>
+                <th>Material</th>
+                <th style={{width:'14%'}}>material_id / Kode</th>
+                <th style={{width:'7%'}}>Sat.</th>
+                <th style={{width:'8%'}}>Koef.</th>
+                <th style={{width:'8%'}}>Vol. RAB</th>
+                <th style={{width:'10%'}}>Kebutuhan</th>
+                <th style={{width:'10%'}}>Setelah Override</th>
+              </tr>
+            </thead>
+            <tbody>
+              {materialUsageRows.map((row, index) => (
+                <tr key={row.key}>
+                  <td className="center">{index + 1}</td>
+                  <td>{row.divisionName}</td>
+                  <td>{row.itemCode ? row.itemCode + ' · ' : ''}{row.itemName}</td>
+                  <td>{row.materialName}</td>
+                  <td>{row.materialId || 'Belum terpetakan'}{row.materialCode ? <small> · {row.materialCode}</small> : null}</td>
+                  <td className="center">{row.unit}</td>
+                  <td className="number">{formatNumber(row.coefficient, 5)}</td>
+                  <td className="number">{formatNumber(row.rabVolume, 3)}</td>
+                  <td className="number">{formatNumber(row.quantity, 3)}</td>
+                  <td className="number">{formatNumber(row.netQuantity, 3)}</td>
+                </tr>
+              ))}
+              {materialUsageRows.length === 0 && <tr><td colSpan={10} className="center">Tidak ditemukan komponen material pada snapshot AHSP RAB.</td></tr>}
             </tbody>
           </table>
+          <p className="report-intro">
+            Catatan identitas: {unlinkedMaterialCount} jenis material belum mempunyai material_id pada snapshot lama. Komponen tersebut tetap direkap memakai nama dan satuan agar tidak hilang, tetapi perlu diperiksa pemetaannya ke Master Material.
+          </p>
         </section>
 
-        {/* 6. REKAP UPAH TENAGA KERJA */}
+        {/* 6. REKAP MATERIAL BERDASARKAN IDENTITAS MASTER */}
         <section className="report-page">
-          <SectionHeading letter="E" title="RINCIAN UPAH TENAGA KERJA" theme={activeTheme} />
-          <p className="report-intro">Kebutuhan tenaga dihitung dari koefisien pada snapshot AHSP dikalikan volume item RAB. Harga mengikuti harga satuan yang tersimpan pada snapshot RAB.</p>
+          <SectionHeading letter="E" title="REKAP TOTAL KEBUTUHAN MATERIAL PROYEK" theme={activeTheme} />
+          <p className="report-intro">
+            Baris dengan material_id yang sama digabung sebagai satu jenis material. Nilai setelah override = kebutuhan dasar × (1 − {formatNumber(materialReductionPercent, 2)}%).
+          </p>
           <table className="report-table">
-            <thead><tr><th style={{width:'6%'}}>No.</th><th>Uraian Tenaga Kerja</th><th style={{width:'10%'}}>Sat.</th><th style={{width:'15%'}}>Kebutuhan</th><th style={{width:'20%'}}>Harga Satuan</th><th style={{width:'22%'}}>Jumlah Upah</th></tr></thead>
-            <tbody>{laborRows.map((row,index)=><tr key={`${row.name}-${row.unit}`}><td className="center">{index+1}</td><td>{row.name}</td><td className="center">{row.unit}</td><td className="number">{formatNumber(row.volume,4)}</td><td className="number">{formatRupiah(row.unitPrice)}</td><td className="number">{formatRupiah(row.total)}</td></tr>)}
-              {laborRows.length===0 && <tr><td colSpan={6} className="center">Tidak ditemukan komponen upah tenaga kerja pada snapshot AHSP RAB.</td></tr>}
+            <thead>
+              <tr>
+                <th style={{width:'5%'}}>No.</th>
+                <th>Nama Material</th>
+                <th style={{width:'18%'}}>material_id</th>
+                <th style={{width:'8%'}}>Sat.</th>
+                <th style={{width:'9%'}}>Jumlah Item</th>
+                <th style={{width:'12%'}}>Kebutuhan Dasar</th>
+                <th style={{width:'12%'}}>Kebutuhan Bersih</th>
+                <th style={{width:'17%'}}>Nilai Dasar</th>
+                <th style={{width:'17%'}}>Nilai Bersih</th>
+              </tr>
+            </thead>
+            <tbody>
+              {materialRows.map((row, index) => (
+                <tr key={row.key}>
+                  <td className="center">{index + 1}</td>
+                  <td>{row.name}{row.materialCode ? <small> · {row.materialCode}</small> : null}</td>
+                  <td>{row.materialId || 'Belum terpetakan'}</td>
+                  <td className="center">{row.unit}</td>
+                  <td className="number">{row.itemCount}</td>
+                  <td className="number">{formatNumber(row.quantity, 3)}</td>
+                  <td className="number">{formatNumber(row.netQuantity, 3)}</td>
+                  <td className="number">{formatRupiah(row.amount)}</td>
+                  <td className="number">{formatRupiah(row.netAmount)}</td>
+                </tr>
+              ))}
+              {materialRows.length === 0 && <tr><td colSpan={9} className="center">Belum ada material yang dapat direkap.</td></tr>}
             </tbody>
-            <tfoot><tr><th colSpan={5}>TOTAL UPAH TENAGA KERJA</th><th className="number">{formatRupiah(laborRows.reduce((s,r)=>s+r.total,0))}</th></tr></tfoot>
+            <tfoot>
+              <tr>
+                <th colSpan={7}>TOTAL NILAI MATERIAL</th>
+                <th className="number">{formatRupiah(materialRows.reduce((sum, row) => sum + row.amount, 0))}</th>
+                <th className="number">{formatRupiah(materialRows.reduce((sum, row) => sum + row.netAmount, 0))}</th>
+              </tr>
+            </tfoot>
+          </table>
+          <p className="report-intro">Kuantitas antar-material yang berbeda satuan tidak dijumlahkan menjadi satu angka total. Nilai uang dijumlahkan karena seluruh komponen sudah menggunakan harga snapshot masing-masing.</p>
+        </section>
+
+        {/* 7. REKONSILIASI BERAT BESI AHSP DAN BACKUP VOLUME */}
+        <section className="report-page">
+          <SectionHeading letter="F" title="REKONSILIASI PEMBESIAN AHSP DAN BACKUP VOLUME" theme={activeTheme} />
+          <p className="report-intro">
+            Berat besi AHSP dihitung dari komponen material bersatuan kg × volume item RAB. Rincian diameter hanya diambil dari Backup Volume dengan mode pembesian lama atau pembesian struktur otomatis yang benar-benar tersedia.
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-lg border border-slate-200 p-2"><small>Total besi AHSP</small><strong className="block">{formatNumber(totalAhspRebarKg, 2)} kg</strong></div>
+            <div className="rounded-lg border border-slate-200 p-2"><small>Total dari Backup Volume</small><strong className="block">{formatNumber(totalBackupRebarKg, 2)} kg</strong></div>
+            <div className="rounded-lg border border-slate-200 p-2"><small>Belum ter-backup (estimasi selisih)</small><strong className="block">{formatNumber(uncoveredRebarKg, 2)} kg</strong></div>
+          </div>
+          <table className="report-table compact" style={{marginTop:8}}>
+            <thead>
+              <tr>
+                <th style={{width:'5%'}}>No.</th>
+                <th style={{width:'13%'}}>Lokasi</th>
+                <th>Kode / Uraian Pekerjaan</th>
+                <th style={{width:'14%'}}>Besi AHSP (kg)</th>
+                <th style={{width:'14%'}}>Backup (kg)</th>
+                <th style={{width:'13%'}}>Selisih (kg)</th>
+                <th style={{width:'10%'}}>Cakupan</th>
+                <th style={{width:'15%'}}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rebarReviewRows.map((row, index) => {
+                const statusLabel = row.status === 'sesuai' ? 'Sesuai'
+                  : row.status === 'belum_lengkap' ? 'Backup belum lengkap'
+                  : row.status === 'belum_backup' ? 'Belum ada Backup'
+                  : row.status === 'lebih_backup' ? 'Backup lebih besar'
+                  : row.status === 'backup_saja' ? 'Backup saja'
+                  : 'Parameter perlu cek';
+                return (
+                  <Fragment key={row.itemId}>
+                    <tr>
+                      <td className="center">{index + 1}</td>
+                      <td>{row.divisionName}</td>
+                      <td>{row.code ? row.code + ' · ' : ''}{row.name}</td>
+                      <td className="number">{formatNumber(row.ahspWeightKg, 2)}</td>
+                      <td className="number">{formatNumber(row.backupWeightKg, 2)}</td>
+                      <td className="number">{formatNumber(row.differenceKg, 2)}</td>
+                      <td className="number">{row.ahspWeightKg > 0 ? formatNumber(row.coveragePercent, 1) + '%' : '—'}</td>
+                      <td>{statusLabel}</td>
+                    </tr>
+                    {row.issues.map((issue, issueIndex) => (
+                      <tr key={row.itemId + '-issue-' + issueIndex}><td></td><td colSpan={7} className="empty-note">Pemeriksaan: {issue}</td></tr>
+                    ))}
+                  </Fragment>
+                );
+              })}
+              {rebarReviewRows.length === 0 && <tr><td colSpan={8} className="center">Tidak ditemukan komponen besi AHSP bersatuan kg atau rincian pembesian pada Backup Volume.</td></tr>}
+            </tbody>
+          </table>
+
+          <h3 className="mt-3 mb-2 text-sm font-bold" style={{color:activeTheme.text}}>Rekap pembesian dari Backup Volume per diameter</h3>
+          <table className="report-table">
+            <thead><tr><th style={{width:'8%'}}>No.</th><th>Diameter</th><th style={{width:'26%'}}>Panjang total (m)</th><th style={{width:'28%'}}>Berat hasil hitung (kg)</th><th style={{width:'18%'}}>Sumber rincian</th></tr></thead>
+            <tbody>
+              {rebarTotals.map((row, index) => (
+                <tr key={row.diameter}>
+                  <td className="center">{index + 1}</td>
+                  <td>Ø{row.diameter} mm</td>
+                  <td className="number">{formatNumber(row.totalLengthM, 3)}</td>
+                  <td className="number">{formatNumber(row.requiredWeightKg, 3)}</td>
+                  <td className="number">{row.sourceDetails}</td>
+                </tr>
+              ))}
+              {rebarTotals.length === 0 && <tr><td colSpan={5} className="center">Belum ada rincian diameter besi dari Backup Volume.</td></tr>}
+            </tbody>
+            <tfoot><tr><th colSpan={3}>TOTAL BERAT DARI BACKUP VOLUME</th><th className="number">{formatNumber(totalBackupRebarKg, 3)} kg</th><th></th></tr></tfoot>
+          </table>
+          <p className="report-intro">
+            Penting: total diameter di atas hanya mencakup item yang memiliki rincian pembesian di Backup Volume. Item dengan status "Belum ada Backup" atau "Backup belum lengkap" tetap dihitung dari AHSP dan selisihnya ditampilkan, tetapi tidak dikarang menjadi diameter tertentu.
+          </p>
+        </section>
+
+        {/* 8. RENCANA FORMASI DAN DURASI TENAGA KERJA */}
+        <section className="report-page">
+          <SectionHeading letter="G" title="RENCANA FORMASI TENAGA KERJA DAN DURASI" theme={activeTheme} />
+          <p className="report-intro">
+            HOK dasar dihitung dari koefisien upah pada snapshot AHSP × volume RAB semua lokasi. Durasi per formasi = HOK ÷ jumlah orang. Target rencana: {targetDurationDays} hari kerja. Estimasi waktu tim mengikuti durasi terlama antara kelompok pekerja dan tukang.
+          </p>
+          <table className="report-table">
+            <thead><tr><th>Kelompok</th><th style={{width:'15%'}}>HOK dasar</th><th style={{width:'15%'}}>HOK rencana</th><th style={{width:'13%'}}>Orang</th><th style={{width:'17%'}}>Durasi</th><th style={{width:'18%'}}>Rekomendasi untuk target</th></tr></thead>
+            <tbody>
+              <tr><td>Mandor</td><td className="number">{formatNumber(baseMandorHok, 2)}</td><td className="number">{formatNumber(effectiveMandorHok, 2)}</td><td className="number">{foremanMode === 'none' ? '0' : '1'}</td><td className="number">{formatNumber(effectiveMandorHok, 1)} hari kehadiran</td><td>{foremanMode === 'none' ? 'Tidak dialokasikan' : 'Mengikuti HOK / pengaturan mandor'}</td></tr>
+              <tr><td>Kepala Tukang</td><td className="number">{formatNumber(laborHokByRole.kepala_tukang, 2)}</td><td className="number">{formatNumber(laborHokByRole.kepala_tukang, 2)}</td><td className="number">1</td><td className="number">{formatNumber(laborHokByRole.kepala_tukang, 1)} hari</td><td>1 orang · sesuai HOK</td></tr>
+              <tr><td>Tukang</td><td className="number">{formatNumber(masonHok, 2)}</td><td className="number">{formatNumber(masonHok, 2)}</td><td className="number">{masonCount}</td><td className="number">{formatNumber(masonDays, 1)} hari</td><td>{recommendedMasonCount} orang untuk target</td></tr>
+              <tr><td>Pekerja</td><td className="number">{formatNumber(laborHokByRole.pekerja, 2)}</td><td className="number">{formatNumber(laborHokByRole.pekerja, 2)}</td><td className="number">{workerCount}</td><td className="number">{formatNumber(workerDays, 1)} hari</td><td>{recommendedWorkerCount} orang untuk target</td></tr>
+              <tr><td>Tenaga kerja lainnya (HOK)</td><td className="number">{formatNumber(laborHokByRole.lainnya, 2)}</td><td className="number">{formatNumber(laborHokByRole.lainnya, 2)}</td><td className="number">—</td><td className="number">Tidak dijadwalkan dalam dua formasi</td><td>Periksa klasifikasi nama tenaga</td></tr>
+            </tbody>
+          </table>
+          <div className="report-totals">
+            <div><span>Durasi hasil formasi pekerja</span><strong>{formatNumber(workerDays, 1)} hari</strong></div>
+            <div><span>Durasi hasil formasi tukang</span><strong>{formatNumber(masonDays, 1)} hari</strong></div>
+            <div><span>Selisih durasi</span><strong>{formatNumber(crewDayDifference, 1)} hari</strong></div>
+            <div className="grand" style={{background:activeTheme.soft,borderColor:activeTheme.border}}><span>ESTIMASI DURASI TIM</span><strong style={{color:activeTheme.accent}}>{formatNumber(estimatedCrewDays, 1)} hari kerja</strong></div>
+          </div>
+          <p className="report-intro">Komponen upah dengan satuan selain OH/HOK/hari tidak dimasukkan ke perhitungan durasi tenaga, tetapi tetap disertakan pada rincian nilai upah.</p>
+        </section>
+
+        {/* 9. RINCIAN UPAH SETELAH KEBIJAKAN */}
+        <section className="report-page">
+          <SectionHeading letter="H" title="RINCIAN UPAH DAN OVERRIDE TENAGA KERJA" theme={activeTheme} />
+          <p className="report-intro">
+            Nilai dihitung dari koefisien AHSP × volume RAB. Kebijakan mandor: {foremanMode === 'none' ? 'tanpa mandor' : foremanMode === 'custom' ? 'mandor hadir ' + formatNumber(effectiveMandorHok, 2) + ' hari' : 'mengikuti HOK AHSP'}. Pengurang upah: {formatNumber(laborReductionPercent, 2)}%. HOK dasar untuk penjadwalan tidak dikurangi oleh persentase override upah.
+          </p>
+          <table className="report-table">
+            <thead><tr><th style={{width:'5%'}}>No.</th><th>Uraian Tenaga Kerja</th><th style={{width:'8%'}}>Sat.</th><th style={{width:'11%'}}>HOK/Qty Dasar</th><th style={{width:'11%'}}>HOK/Qty Rencana</th><th style={{width:'16%'}}>Harga Satuan</th><th style={{width:'17%'}}>Nilai Dasar</th><th style={{width:'17%'}}>Nilai Bersih</th></tr></thead>
+            <tbody>
+              {plannedLaborRows.map((row, index) => (
+                <tr key={(row.upahId || row.name) + '-' + row.unit}>
+                  <td className="center">{index + 1}</td>
+                  <td>{row.name} <small>({laborRoleLabel(row.role)})</small></td>
+                  <td className="center">{row.unit}</td>
+                  <td className="number">{formatNumber(row.volume, 4)}</td>
+                  <td className="number">{formatNumber(row.plannedVolume, 4)}</td>
+                  <td className="number">{formatRupiah(row.unitPrice)}</td>
+                  <td className="number">{formatRupiah(row.grossAmount)}</td>
+                  <td className="number">{formatRupiah(row.netAmount)}</td>
+                </tr>
+              ))}
+              {plannedLaborRows.length === 0 && <tr><td colSpan={8} className="center">Tidak ditemukan komponen upah pada snapshot AHSP RAB.</td></tr>}
+            </tbody>
+            <tfoot>
+              <tr><th colSpan={6}>TOTAL NILAI UPAH</th><th className="number">{formatRupiah(laborGrossTotal)}</th><th className="number">{formatRupiah(laborNetTotal)}</th></tr>
+            </tfoot>
           </table>
         </section>
 
