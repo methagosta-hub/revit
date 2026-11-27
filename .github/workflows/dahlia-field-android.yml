@@ -1,10 +1,11 @@
-name: Dahlia Field Android CI
+name: Javawasthu Management Android CI
 
 on:
   push:
     branches:
       - feat/dahlia-field-mobile
       - fix/dahlia-field-draft-material
+      - feat/javawasthu-management-ui
     paths:
       - "apps/dahlia-field/**"
       - "supabase/migrations/**"
@@ -22,7 +23,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: dahlia-field-android-${{ github.ref }}
+  group: javawasthu-management-android-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -63,6 +64,7 @@ jobs:
             cp "$temp_project/.metadata" apps/dahlia-field/.metadata
           fi
           manifest="apps/dahlia-field/android/app/src/main/AndroidManifest.xml"
+          sed -i 's/android:label="[^"]*"/android:label="Javawasthu Management"/' "$manifest"
           if ! grep -q 'android.permission.INTERNET' "$manifest"; then
             sed -i 's#<manifest #<manifest android:installLocation="auto" #g' "$manifest"
             sed -i '/<application/i\    <uses-permission android:name="android.permission.INTERNET" />' "$manifest"
@@ -94,7 +96,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dahlia-field-android-apk
+          name: javawasthu-management-android-apk
           path: apps/dahlia-field/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 7
