@@ -1152,7 +1152,7 @@ export default function RekapRABPage() {
             <input type="number" min={1} max={365} step={1} value={targetDurationDays}
               onChange={(event) => setTargetDurationDays(Math.max(1, Math.min(365, Math.round(Number(event.target.value) || 1))))}
               className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-            <span className="mt-1 block text-[10px] font-normal text-slate-400">Nilai sementara; ubah mengikuti rencana durasi Kurva-S proyek.</span>
+            <span className="mt-1 block text-[10px] font-normal text-slate-400">Nilai awal 66 hari kerja (simulasi 3 bulan × 22 hari); ubah mengikuti rencana Kurva-S proyek.</span>
           </label>
           <label className="text-xs font-semibold text-slate-600">
             Jumlah pekerja
@@ -1173,7 +1173,8 @@ export default function RekapRABPage() {
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl bg-slate-50 p-3">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">HOK pekerja</p>
-            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(laborHokByRole.pekerja, 2)}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{formatNumber(workerHok, 2)}</p>
+            <p className="text-[10px] text-slate-500">Pekerja {formatNumber(laborHokByRole.pekerja, 2)} + tenaga lainnya {formatNumber(laborHokByRole.lainnya, 2)} HOK.</p>
             <p className="text-[10px] text-slate-500">Rencana {formatNumber(workerDays, 1)} hari · rekomendasi {recommendedWorkerCount} orang</p>
           </div>
           <div className="rounded-xl bg-slate-50 p-3">
@@ -1603,8 +1604,7 @@ export default function RekapRABPage() {
               <tr><td>Mandor</td><td className="number">{formatNumber(baseMandorHok, 2)}</td><td className="number">{formatNumber(effectiveMandorHok, 2)}</td><td className="number">{foremanMode === 'none' ? '0' : '1'}</td><td className="number">{formatNumber(effectiveMandorHok, 1)} hari kehadiran</td><td>{foremanMode === 'none' ? 'Tidak dialokasikan' : 'Mengikuti HOK / pengaturan mandor'}</td></tr>
               <tr><td>Kepala Tukang</td><td className="number">{formatNumber(laborHokByRole.kepala_tukang, 2)}</td><td className="number">{formatNumber(laborHokByRole.kepala_tukang, 2)}</td><td className="number">1</td><td className="number">{formatNumber(laborHokByRole.kepala_tukang, 1)} hari</td><td>1 orang · sesuai HOK</td></tr>
               <tr><td>Tukang</td><td className="number">{formatNumber(masonHok, 2)}</td><td className="number">{formatNumber(masonHok, 2)}</td><td className="number">{masonCount}</td><td className="number">{formatNumber(masonDays, 1)} hari</td><td>{recommendedMasonCount} orang untuk target</td></tr>
-              <tr><td>Pekerja</td><td className="number">{formatNumber(laborHokByRole.pekerja, 2)}</td><td className="number">{formatNumber(laborHokByRole.pekerja, 2)}</td><td className="number">{workerCount}</td><td className="number">{formatNumber(workerDays, 1)} hari</td><td>{recommendedWorkerCount} orang untuk target</td></tr>
-              <tr><td>Tenaga kerja lainnya (HOK)</td><td className="number">{formatNumber(laborHokByRole.lainnya, 2)}</td><td className="number">{formatNumber(laborHokByRole.lainnya, 2)}</td><td className="number">—</td><td className="number">Tidak dijadwalkan dalam dua formasi</td><td>Periksa klasifikasi nama tenaga</td></tr>
+              <tr><td>Pekerja + tenaga kerja lainnya</td><td className="number">{formatNumber(workerHok, 2)}</td><td className="number">{formatNumber(workerHok, 2)}</td><td className="number">{workerCount}</td><td className="number">{formatNumber(workerDays, 1)} hari</td><td>{recommendedWorkerCount} orang untuk target</td></tr>
             </tbody>
           </table>
           <div className="report-totals">
@@ -1613,7 +1613,7 @@ export default function RekapRABPage() {
             <div><span>Selisih durasi</span><strong>{formatNumber(crewDayDifference, 1)} hari</strong></div>
             <div className="grand" style={{background:activeTheme.soft,borderColor:activeTheme.border}}><span>ESTIMASI DURASI TIM</span><strong style={{color:activeTheme.accent}}>{formatNumber(estimatedCrewDays, 1)} hari kerja</strong></div>
           </div>
-          <p className="report-intro">Komponen upah dengan satuan selain OH/HOK/hari tidak dimasukkan ke perhitungan durasi tenaga, tetapi tetap disertakan pada rincian nilai upah.</p>
+          <p className="report-intro">HOK pekerja pada simulasi mencakup kategori pekerja dan tenaga kerja lain yang belum dikenali sebagai mandor, kepala tukang, atau tukang. Komponen upah dengan satuan selain OH/HOK/hari tidak dimasukkan ke perhitungan durasi tenaga, tetapi tetap disertakan pada rincian nilai upah.</p>
         </section>
 
         {/* 9. RINCIAN UPAH SETELAH KEBIJAKAN */}
