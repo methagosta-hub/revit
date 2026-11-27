@@ -744,7 +744,7 @@ export default function RekapRABPage() {
     else setLoading(true);
     setErrorMessage('');
     try {
-      const result = await fetchProjectDetail(projectId);
+      const result = await fetchProjectDetail(projectId, { syncTotalValue: false });
       setProject(result ? result as unknown as RekapProject : null);
     } catch (error) {
       console.error('Gagal memuat rekap RAB:', error);
@@ -1259,7 +1259,7 @@ export default function RekapRABPage() {
 
       <section className="no-print rounded-2xl border border-amber-200 bg-white p-4 shadow-sm">
         <h2 className="text-sm font-bold text-slate-900">3. Override Pengurang Kebutuhan</h2>
-        <p className="mt-1 text-xs leading-5 text-slate-500">Persentase pengurang hanya diterapkan pada rekap kebutuhan dan nilai estimasi PDF. Tidak mengubah koefisien, volume RAB, snapshot AHSP, atau data tersimpan.</p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Persentase pengurang hanya diterapkan pada rekap kebutuhan dan nilai estimasi PDF. Tidak mengubah koefisien, volume RAB, snapshot AHSP, Backup Volume, atau nilai RAB resmi pada cover. Nilai bersih material dan upah ditampilkan sebagai estimasi kebutuhan setelah kebijakan efisiensi.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="text-xs font-semibold text-slate-600">
             Pengurang material (%)
